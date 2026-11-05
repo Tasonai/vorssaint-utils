@@ -107,6 +107,11 @@ enum AgentUsageReadTests {
         let now = Date()
         let timestamp = now.timeIntervalSince1970
         let cases: [(AgentProvider, [String])] = [
+            (.antigravity, [
+                #"{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-30T05:27:55Z","content":"Command Working Directory: /tmp/example\nWork"}"#,
+                #"{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"RUNNING","created_at":"2026-10-30T05:28:00Z","input_tokens":10,"output_tokens":2,"tool_calls":[{"name":"cmd"}]}"#,
+                #"{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-30T05:28:10Z","input_tokens":10,"output_tokens":5}"#
+            ]),
             (.claude, [
                 #"{"type":"user","timestamp":\#(timestamp),"sessionId":"s","message":{"content":"work"}}"#,
                 #"{"type":"assistant","timestamp":\#(timestamp),"sessionId":"s","requestId":"r","message":{"id":"m","model":"claude-opus-5-5","stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":2}}}"#,
@@ -142,6 +147,7 @@ enum AgentUsageReadTests {
             var entries: [AgentLogEntry] = []
             let consume: (Data) -> Void = { line in
                 switch provider {
+                case .antigravity: entries += AgentLogParser.parseAntigravity(line, state: &cursor.state, now: now)
                 case .claude: entries += AgentLogParser.parseClaude(line, state: &cursor.state, now: now)
                 case .codex: entries += AgentLogParser.parseCodex(line, state: &cursor.state, now: now)
                 case .opencode: entries += AgentLogParser.parseOpenCode(line, state: &cursor.state, now: now)

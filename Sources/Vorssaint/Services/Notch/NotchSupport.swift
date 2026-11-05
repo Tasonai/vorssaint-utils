@@ -306,9 +306,9 @@ enum NotchLayout {
     /// four across, as the home page's shortcuts do.
     static let toolLeastSpacing: CGFloat = 0
     /// Three rows fit the gallery's page; two still fill a compact strip.
-    static let sectionTileHeight: CGFloat = 62
-    static let sectionTileWidth: CGFloat = 84
-    static let sectionSpacing: CGFloat = 6
+    static let sectionTileHeight: CGFloat = 86
+    static let sectionTileWidth: CGFloat = 92
+    static let sectionSpacing: CGFloat = 8
     /// The gallery's row indicator beside the tiles, with its gap.
     static let sectionIndicatorWidth: CGFloat = 12
     /// The search field the clipboard page shows once it is wanted.
@@ -1424,10 +1424,11 @@ struct NotchQuickAccessConfiguration: Equatable, Codable {
     private var version = 1
     static let maximumPerSide = 3
     static let initial = Self(buttons: [
-        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000001")!, action: .explore, side: .bottom),
-        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000002")!, action: .control(.keepAwake), side: .bottom),
-        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000003")!, action: .module(.mixer), side: .bottom),
-        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000004")!, action: .settings, side: .bottom),
+        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000001")!, action: .explore, side: .left),
+        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000002")!, action: .module(.timer), side: .left),
+        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000003")!, action: .settings, side: .right),
+        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000004")!, action: .module(.mixer), side: .right),
+        NotchQuickButton(id: UUID(uuidString: "00000000-0000-4000-8000-000000000005")!, action: .module(.music), side: .bottom),
     ])
     var actions: [NotchQuickAction] { buttons.compactMap(\.action) }
     var hasBottom: Bool { buttons.contains { $0.side == .bottom } }
@@ -1539,12 +1540,12 @@ struct NotchQuickAccessPlacement: Equatable, Identifiable {
 /// All coordinates are in the flipped presentation container, including the
 /// transparent space reserved beside the black notch.
 enum NotchQuickAccessLayout {
-    static let diameter: CGFloat = 32
-    static let gap: CGFloat = 8
-    static let gutter: CGFloat = 50
-    static let rowSpacing: CGFloat = 40
+    static let diameter: CGFloat = 44
+    static let gap: CGFloat = 12
+    static let gutter: CGFloat = 72
+    static let rowSpacing: CGFloat = 54
     static let withdrawalDuration = 0.16
-    static let hoverMargin: CGFloat = 12
+    static let hoverMargin: CGFloat = 16
     static let hoverExitDelay = 0.18
 
     static func center(index: Int, progress: CGFloat, edge: CGFloat, top: CGFloat,

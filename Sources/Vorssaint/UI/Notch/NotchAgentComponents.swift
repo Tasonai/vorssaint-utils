@@ -8,6 +8,7 @@ extension AgentProvider {
     /// Each agent keeps one color across the page, the strip and notices.
     var tint: Color {
         switch self {
+        case .antigravity: return Color(red: 0.35, green: 0.55, blue: 0.98)
         case .claude: return Color(red: 0.85, green: 0.47, blue: 0.34)
         case .codex: return Color(red: 0.49, green: 0.60, blue: 1.0)
         case .opencode: return Color(red: 0.06, green: 0.73, blue: 0.51)
@@ -371,6 +372,7 @@ private extension AgentProvider {
     /// The maker's desktop apps, the one that runs the agent first.
     var appIdentifiers: [String] {
         switch self {
+        case .antigravity: return ["com.google.antigravity"]
         case .claude: return [AgentClaudeAppUsage.bundleIdentifier]
         case .codex: return AgentCodexServer.appIdentifiers
         case .opencode: return ["ai.opencode.desktop", "ai.opencode.desktop.beta", "ai.opencode.desktop.dev"]
@@ -385,6 +387,7 @@ private extension AgentProvider {
     /// What those apps name the mark they show in the menu bar.
     var menuBarImageNames: [String] {
         switch self {
+        case .antigravity: return []
         case .claude: return ["TrayIconTemplate"]
         case .codex: return ["chatgptTemplate"]
         // The OpenCode app shows nothing in the menu bar; its icon stands in.

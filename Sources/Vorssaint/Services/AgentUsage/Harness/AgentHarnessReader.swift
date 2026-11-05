@@ -23,6 +23,7 @@ extension AgentProvider {
     /// The reader that parses this provider's logs.
     var reader: any AgentHarnessReader {
         switch self {
+        case .antigravity: AntigravityReader()
         case .claude: ClaudeReader()
         case .codex: CodexReader()
         case .opencode: OpenCodeReader()

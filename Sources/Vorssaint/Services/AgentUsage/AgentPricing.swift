@@ -283,6 +283,13 @@ enum AgentPricing {
             let name = [words.first?.capitalized ?? "", version] + words.dropFirst().map(\.capitalized)
             return name.filter { !$0.isEmpty }.joined(separator: " ")
         }
+        if id.hasPrefix("gemini-") {
+            let parts = id.split(separator: "-").map(String.init)
+            return parts.map { part in
+                if part.allSatisfy({ $0.isNumber || $0 == "." }) { return part }
+                return part.capitalized
+            }.joined(separator: " ")
+        }
         guard id.hasPrefix("gpt-") else { return id }
         var parts = id.dropFirst(4).split(separator: "-").map(String.init)
         // An alias names whatever it points to today.

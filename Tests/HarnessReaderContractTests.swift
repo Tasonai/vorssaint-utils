@@ -8,6 +8,7 @@ import Foundation
 enum HarnessReaderContractTests {
     static func run(_ suite: TestSuite) {
         readersCoverProviders(suite)
+        antigravityGolden(suite)
         claudeGolden(suite)
         codexGolden(suite)
         openCodeGolden(suite)
@@ -24,6 +25,25 @@ enum HarnessReaderContractTests {
             suite.expect(reader.readsFullHistoryFirst == (provider == .copilot),
                          "only the Copilot reader rereads history on its first pass")
         }
+    }
+
+    private static func antigravityGolden(_ suite: TestSuite) {
+        let now = Date(timeIntervalSince1970: 0)
+        var state = AgentLogState()
+        state.session = "test-session"
+        let reader = AgentProvider.antigravity.reader
+        let prompt = line(#"{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-30T05:27:55Z","content":"Command Working Directory: /Users/me/code/sample\nHello"}"#)
+        let parsedPrompt = reader.parse(prompt, state: &state, now: now)
+        suite.expect(parsedPrompt.contains(.turnBegan(AgentLogParser.timestamp("2026-10-30T05:27:55Z")!))
+                     && state.project == "sample",
+                     "an Antigravity user input opens its turn and sets the project")
+        let runningResponse = line(#"{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"RUNNING","created_at":"2026-10-30T05:28:00Z","input_tokens":100,"cache_read_tokens":50,"output_tokens":20,"tool_calls":[{"name":"read_file"}]}"#)
+        let parsedRunning = reader.parse(runningResponse, state: &state, now: now)
+        suite.expect(parsedRunning.count == 2, "a running Antigravity response reports usage and active state")
+        let doneResponse = line(#"{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-30T05:28:10Z","input_tokens":120,"cache_read_tokens":60,"output_tokens":30}"#)
+        let parsedDone = reader.parse(doneResponse, state: &state, now: now)
+        suite.expect(parsedDone.contains(.turnEnded(AgentLogParser.timestamp("2026-10-30T05:28:10Z")!, completed: true, duration: nil)),
+                     "a completed Antigravity response finishes its turn")
     }
 
     private static func claudeGolden(_ suite: TestSuite) {

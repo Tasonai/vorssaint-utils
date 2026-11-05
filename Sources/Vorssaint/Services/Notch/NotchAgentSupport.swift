@@ -91,6 +91,7 @@ enum NotchAgentSupport {
 
     static func key(for provider: AgentProvider) -> String {
         switch provider {
+        case .antigravity: return DefaultsKey.notchAgentsAntigravity
         case .claude: return DefaultsKey.notchAgentsClaude
         case .codex: return DefaultsKey.notchAgentsCodex
         case .opencode: return DefaultsKey.notchAgentsOpenCode

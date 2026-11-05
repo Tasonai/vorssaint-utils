@@ -475,7 +475,8 @@ struct AgentLogRoot: Equatable {
     static func all(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                     claudeProfile: ClaudeAccountProfile = ClaudeAccountProfile()) -> [AgentLogRoot] {
         let claude = claudeProfile.logURLs(home: home).map { AgentLogRoot(provider: .claude, url: canonical($0)) }
-        return claude + [(AgentProvider.codex, ".codex/sessions"), (.codex, ".codex/archived_sessions"),
+        return claude + [(AgentProvider.antigravity, ".gemini/antigravity/brain"),
+         (.codex, ".codex/sessions"), (.codex, ".codex/archived_sessions"),
          (.opencode, ".local/share/opencode"), (.copilot, ".copilot/session-state")].map { provider, path in
             AgentLogRoot(provider: provider, url: canonical(home.appending(path: path, directoryHint: .isDirectory)))
         }
@@ -500,6 +501,7 @@ struct AgentLogRoot: Equatable {
         guard path.hasPrefix(prefix) else { return false }
         if provider == .opencode { return path == url.appending(path: AgentOpenCodeReader.database).path }
         guard path.hasSuffix(".jsonl") else { return false }
+        if provider == .antigravity { return path.hasSuffix("/transcript.jsonl") }
         guard provider == .copilot else { return true }
         let parts = path.dropFirst(prefix.count).split(separator: "/", omittingEmptySubsequences: false)
         return parts.count == 2 && !parts[0].isEmpty && !parts[0].hasPrefix(".") && parts[1] == "events.jsonl"
@@ -581,6 +583,12 @@ final class AgentLogCursor {
         self.provider = provider
         let parent = provider == .claude ? AgentLogCursor.parent(of: path) : nil
         self.parent = parent
+        if provider == .antigravity {
+            let parts = path.split(separator: "/")
+            if let brainIdx = parts.firstIndex(of: "brain"), brainIdx + 1 < parts.count {
+                state.session = String(parts[brainIdx + 1])
+            }
+        }
     }
 
     /// The log whose turn a Codex subagent's responses count toward. It can
@@ -746,6 +754,15 @@ enum AgentLogReader {
                 let path = root.url.appending(path: AgentOpenCodeReader.database).path
                 if let modified = AgentOpenCodeReader.modified(path), modified >= horizon {
                     found.append((path, root.provider, modified, false))
+                }
+                continue
+            }
+            // Antigravity sessions keep their logs at <session>/.system_generated/logs/transcript.jsonl
+            if root.provider == .antigravity {
+                let sessions = (try? FileManager.default.contentsOfDirectory(
+                    at: root.url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
+                for session in sessions {
+                    include(session.appending(path: ".system_generated/logs/transcript.jsonl"), from: root)
                 }
                 continue
             }

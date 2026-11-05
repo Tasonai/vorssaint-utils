@@ -130,6 +130,12 @@ enum AgentLogParser {
         (try? JSONSerialization.jsonObject(with: line)) as? [String: Any]
     }
 
+    // MARK: Antigravity
+
+    static func parseAntigravity(_ line: Data, state: inout AgentLogState, now: Date) -> [AgentLogEntry] {
+        AntigravityReader().parse(line, state: &state, now: now)
+    }
+
     // MARK: Claude Code
 
     static func parseClaude(_ line: Data, state: inout AgentLogState, now: Date) -> [AgentLogEntry] {
