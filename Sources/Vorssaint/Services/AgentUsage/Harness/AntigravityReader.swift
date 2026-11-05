@@ -93,7 +93,8 @@ struct AntigravityReader: AgentHarnessReader {
                 )
                 var billable = AgentBillable()
                 billable.tokens = tokens
-                let model = state.model.isEmpty ? "Gemini 2.5 Pro" : state.model
+                let rawModel = state.model.isEmpty ? "Gemini 3.8 Flash" : state.model
+                let model = rawModel.components(separatedBy: " (").first ?? rawModel
                 let priced = AgentPricing.cost(billable, model: model)
                 let key = "antigravity:\(state.session):\(stepIndex)"
                 let projectName = state.project.isEmpty ? "Antigravity" : state.project

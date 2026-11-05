@@ -560,6 +560,13 @@ final class ShelfTileView: NSView, NSDraggingSource {
         open.target = self
         menu.addItem(open)
 
+        let quickLook = NSMenuItem(title: L10n.shared.language == .ru ? "Быстрый просмотр" : "Quick Look",
+                                   action: #selector(quickLookFiles),
+                                   keyEquivalent: " ")
+        quickLook.target = self
+        quickLook.image = NSImage(systemSymbolName: "eye", accessibilityDescription: nil)
+        menu.addItem(quickLook)
+
         let openWith = NSMenuItem(title: strings.shelfActionOpenWith,
                                   action: nil,
                                   keyEquivalent: "")
@@ -646,6 +653,23 @@ final class ShelfTileView: NSView, NSDraggingSource {
         for url in ShelfService.shared.fileURLsForActions(startingAt: item) {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    @objc private func quickLookFiles() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        guard let first = urls.first else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([first])
+    }
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 49 { // Space
+            quickLookFiles()
+            return
+        }
+        super.keyDown(with: event)
     }
 
     @objc private func openFilesWithApplication(_ sender: NSMenuItem) {

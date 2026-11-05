@@ -395,6 +395,12 @@ struct NotchClipboardView: View {
                     if entry.kind == .image, AppFeature.screenshot.isAvailable {
                         NotchIconButton(symbol: "pencil", title: text.edit) { history.editImage(entry) }
                     }
+                    if entry.kind == .image, AppFeature.screenOCR.isAvailable {
+                        NotchIconButton(symbol: "text.viewfinder",
+                                        title: l10n.language == .ru ? "Распознать текст" : "Extract Text (OCR)") {
+                            history.extractTextFromImage(entry)
+                        }
+                    }
                     NotchIconButton(symbol: copiedID == entry.id ? "checkmark" : "doc.on.doc",
                                     title: copiedID == entry.id ? text.copied : text.copy) { copy(entry) }
                     NotchIconButton(symbol: entry.isPinned ? "pin.fill" : "pin",
@@ -456,6 +462,12 @@ struct NotchClipboardView: View {
                 }
                 if entry.kind == .image, AppFeature.screenshot.isAvailable {
                     NotchIconButton(symbol: "pencil", title: text.edit) { history.editImage(entry) }
+                }
+                if entry.kind == .image, AppFeature.screenOCR.isAvailable {
+                    NotchIconButton(symbol: "text.viewfinder",
+                                    title: l10n.language == .ru ? "Распознать текст" : "Extract Text (OCR)") {
+                        history.extractTextFromImage(entry)
+                    }
                 }
                 NotchIconButton(symbol: copiedID == entry.id ? "checkmark" : "doc.on.doc",
                                 title: copiedID == entry.id ? text.copied : text.copy) { copy(entry) }

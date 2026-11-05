@@ -632,6 +632,16 @@ final class ClipboardHistoryService: ObservableObject {
         }
     }
 
+    func extractTextFromImage(_ entry: ClipboardHistoryEntry) {
+        guard entry.kind == .image, AppFeature.screenOCR.isAvailable,
+              let directory = ClipboardImageStore.directory else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let nsImage = ClipboardHistoryImageSupport.editorImage(for: entry, directory: directory),
+                  let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+            ScreenTextService.shared.copyText(from: cgImage)
+        }
+    }
+
     /// No paste follows these two, so nothing has to wait for the write: the
     /// window closes now and a stale entry simply leaves the clipboard as the
     /// user left it.

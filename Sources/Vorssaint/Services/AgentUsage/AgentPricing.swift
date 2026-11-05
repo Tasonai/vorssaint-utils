@@ -215,6 +215,12 @@ enum AgentPricing {
     /// never inherits the price of the version it extends.
     static func price(for model: String, in list: AgentPriceList = AgentPricing.list) -> AgentPrice? {
         let id = normalized(model)
+        if id.contains("gemini") || id.contains("argon") {
+            if id.contains("flash") {
+                return AgentPrice(input: 0.075, output: 0.30, cacheRead: 0.01875, cacheWrite: 0.075, cacheWriteLong: 0.075)
+            }
+            return AgentPrice(input: 1.25, output: 5.00, cacheRead: 0.3125, cacheWrite: 1.25, cacheWriteLong: 1.25)
+        }
         let table = id.hasPrefix("claude-") ? list.claude : list.codex
         guard let match = table.filter({ matches(id, family: $0.id) })
             .max(by: { $0.id.count < $1.id.count }) else { return nil }
