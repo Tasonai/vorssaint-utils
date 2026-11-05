@@ -140,7 +140,7 @@ struct NotchQuickAccessView: View {
             service.activateQuickAction(action)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .frame(width: NotchQuickAccessLayout.diameter, height: NotchQuickAccessLayout.diameter)
                 // In glass the drop beneath carries the island's shade, which
                 // the window server does not count as the window's own pixels:
@@ -148,7 +148,7 @@ struct NotchQuickAccessView: View {
                 // the app behind, not just the glyph.
                 .background(followsGlass ? Color.black.opacity(0.02) : Color.black, in: Circle())
                 .overlay {
-                    Circle().strokeBorder(.white.opacity(selected || contrast == .increased ? 0.6 : 0.16), lineWidth: 0.75)
+                    Circle().strokeBorder(.white.opacity(selected || contrast == .increased ? 0.5 : 0.12), lineWidth: 0.75)
                         .allowsHitTesting(false)
                 }
                 .contentShape(Circle())

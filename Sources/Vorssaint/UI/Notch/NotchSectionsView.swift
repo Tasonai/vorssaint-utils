@@ -100,41 +100,44 @@ struct NotchSectionsView: View {
     private func tile(_ module: NotchModule, visible: Bool) -> some View {
         let highlighted = service.highlightedSection == module
         let current = service.selected == module
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
         return Button { service.select(module) } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: 3) {
                 Image(systemName: module.symbol)
-                    .font(.system(size: 22, weight: .medium))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(tint(for: module))
-                    .frame(width: 25, height: 25)
+                    .frame(width: 20, height: 20)
                 Text(module.title(l10n.language))
                     .font(.system(size: 11, weight: .medium))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                     .multilineTextAlignment(.center)
-                    .frame(height: 27)
+                    .frame(height: 16)
                 Text("⌥⌘" + module.shortcutKey.uppercased())
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.42))
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
             .frame(maxWidth: .infinity)
             .frame(height: NotchLayout.sectionTileHeight)
-            .background(.white.opacity(highlighted ? 0.12 : 0.045), in: shape)
+            .background(.white.opacity(highlighted ? 0.12 : 0.04), in: shape)
             .overlay {
-                shape.strokeBorder(.white.opacity(highlighted ? 0.55 : contrast == .increased ? 0.4 : 0.04), lineWidth: 1)
+                if highlighted || current {
+                    shape.strokeBorder(.white.opacity(current ? 0.4 : 0.25), lineWidth: 0.75)
+                }
             }
             .overlay(alignment: .topTrailing) {
                 if current {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 10))
+                        .font(.system(size: 9))
                         .foregroundStyle(.white.opacity(0.7))
-                        .padding(7)
+                        .padding(5)
                 }
             }
             .contentShape(shape)
         }
-        .buttonStyle(NotchButtonStyle(cornerRadius: 16, lifts: false))
+        .buttonStyle(NotchButtonStyle(cornerRadius: 11, lifts: false))
         .accessibilityLabel(module.title(l10n.language))
         .accessibilityAddTraits(current ? .isSelected : [])
         .accessibilityIdentifier("notch.module.\(module.rawValue)")
