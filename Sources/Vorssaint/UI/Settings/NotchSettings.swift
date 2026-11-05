@@ -91,6 +91,8 @@ struct NotchSettings: View {
     @AppStorage(DefaultsKey.notchCapsuleFitHeight) private var capsuleFitHeight = 0.0
     @AppStorage(DefaultsKey.notchCapsuleFitDrop) private var capsuleFitDrop = 0.0
     @AppStorage(DefaultsKey.notchHapticFeedback) private var hapticFeedback = true
+    @AppStorage(DefaultsKey.notchAcousticsEnabled) private var acousticFeedback = true
+    @AppStorage(DefaultsKey.notchSplitCapsuleEnabled) private var splitCapsule = true
     @AppStorage(DefaultsKey.notchTranslucentBackground) private var translucentBackground = false
     @AppStorage(DefaultsKey.notchLiquidGlassEnabled) private var liquidGlass = false
     @AppStorage(DefaultsKey.notchShelf) private var shelfWindow = true
@@ -685,6 +687,8 @@ struct NotchSettings: View {
                                          caption: gesturesEnabled ? FeatureStrings.notchGestures(l10n.language).hint : nil,
                                          isOn: $gesturesEnabled, feature: .notchGestures)
                 switchRow("waveform.path", text.hapticFeedback, isOn: $hapticFeedback)
+                switchRow("speaker.wave.1", l10n.language == .ru ? "Акустический щелчок" : "Acoustic micro-click", isOn: $acousticFeedback)
+                switchRow("rectangle.split.2x1", l10n.language == .ru ? "Раздельный остров при двух активностях" : "Split Island for dual activity", isOn: $splitCapsule)
                 SettingsRow(symbol: "arrow.uturn.backward", title: editor.reopening) {
                     Picker(editor.reopening, selection: Binding(get: {
                         guard returnHome else { return "" }

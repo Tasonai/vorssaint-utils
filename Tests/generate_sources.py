@@ -1384,6 +1384,7 @@ def main():
                                                 "AppFeature.connectedDevices.isAvailable(in: ReviewDefaults.current)")
     write("NotchMusicVisibility.swift", "import Foundation\nextension NotchMusicVisibilityTests {\n"
           + "final class Service: State {\nfunc resignPanelKey() { panel?.resignKey() }\n"
+          + "func provideHapticFeedbackClose() {}\n"
           + music_visibility + "}\n}\n")
     write("NotchScreenEdgeClicks.swift", "import AppKit\nextension NotchScreenEdgeClickTests {\nfinal class Service: State {\n"
           + "func open() { openings += 1; expanded = true; syncScreenEdgeClicks() }\n"

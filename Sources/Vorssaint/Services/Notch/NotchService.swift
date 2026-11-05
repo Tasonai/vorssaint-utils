@@ -1482,6 +1482,7 @@ final class NotchService: ObservableObject {
 
     func collapse() {
         guard captureControls == nil, !heldDrag else { return }
+        let wasExpanded = expanded
         let closeCapture = detachCaptureIfClosingOnCollapse()
         let closesCommandBar = showingCommandBar
         hoverState.close(pointerInside: windowHost?.containsHover(NSEvent.mouseLocation) == true)
@@ -1502,6 +1503,7 @@ final class NotchService: ObservableObject {
             highlightedSection = nil
             sectionRow = 0
         }
+        if wasExpanded { provideHapticFeedbackClose() }
         panel?.acceptsKeyFocus = false
         resignPanelKey()
         if closesCommandBar { commandBarDidClose() }
@@ -1911,6 +1913,7 @@ final class NotchService: ObservableObject {
 
     func select(_ module: NotchModule) {
         guard modules.contains(module) else { return }
+        NotchFeedbackService.shared.performSelection()
         open(module)
     }
 
@@ -2003,7 +2006,12 @@ final class NotchService: ObservableObject {
 
     func provideHapticFeedback() {
         guard acceptsUserInteraction, panel?.isVisible == true, NotchSupport.usesHapticFeedback() else { return }
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+        NotchFeedbackService.shared.performOpen()
+    }
+
+    func provideHapticFeedbackClose() {
+        guard acceptsUserInteraction, panel?.isVisible == true, NotchSupport.usesHapticFeedback() else { return }
+        NotchFeedbackService.shared.performClose()
     }
 
     func fileDragChanged(_ active: Bool, internalDrag: Bool = false) {

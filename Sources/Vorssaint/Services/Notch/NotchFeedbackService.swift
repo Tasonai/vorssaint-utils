@@ -17,7 +17,9 @@ final class NotchFeedbackService {
     }
 
     var isHapticsEnabled: Bool {
-        defaults.object(forKey: DefaultsKey.notchHapticsEnabled) as? Bool ?? true
+        let master = defaults.object(forKey: DefaultsKey.notchHapticFeedback) as? Bool ?? true
+        guard master else { return false }
+        return defaults.object(forKey: DefaultsKey.notchHapticsEnabled) as? Bool ?? true
     }
 
     var isAcousticsEnabled: Bool {
