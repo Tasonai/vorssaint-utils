@@ -915,7 +915,7 @@ final class SystemMonitor: ObservableObject {
             if plan.needGPUTemperature {
                 if take(plan.temperatureKind) {
                     next.gpuTemperature = TemperatureSensorSelector.stabilizedTemperature(
-                        self.maxTemperature(of: self.gpuKeys),
+                        self.gpuTemperature(),
                         cache: &self.gpuTemperatureCache,
                         now: now,
                         maxAge: temperatureBridge,
@@ -1073,7 +1073,7 @@ final class SystemMonitor: ObservableObject {
 
         let all = client.keys { name in
             TemperatureSensorSelector.isCPUTemperatureKey(name, platform: cpuTemperaturePlatform)
-                || name.hasPrefix("Tg")
+                || TemperatureSensorSelector.isGPUTemperatureKey(name)
                 || name.range(of: "^TB[0-9]T$", options: .regularExpression) != nil
         }
         cpuKeys = all.filter {
@@ -1089,7 +1089,7 @@ final class SystemMonitor: ObservableObject {
         // core sensors with no reading at all.
         let preferredNames = Set(preferredCPUKeys.map(\.name))
         fallbackCPUKeys = cpuKeys.filter { !preferredNames.contains($0.name) }
-        gpuKeys = all.filter { $0.name.hasPrefix("Tg") }
+        gpuKeys = all.filter { TemperatureSensorSelector.isGPUTemperatureKey($0.name) }
         batteryKeys = all.filter { $0.name.hasPrefix("TB") }
     }
 
@@ -1149,6 +1149,35 @@ final class SystemMonitor: ObservableObject {
         return values.max()
     }
 
+    private func gpuTemperature() -> Double? {
+        if let smcTemp = maxTemperature(of: gpuKeys),
+           smcTemp >= TemperatureSensorSelector.minimumChipTemperature {
+            return smcTemp
+        }
+        return Self.readAcceleratorGPUTemperature()
+    }
+
+    private static func readAcceleratorGPUTemperature() -> Double? {
+        var iterator = io_iterator_t()
+        guard IOServiceGetMatchingServices(kIOMainPortDefault,
+                                           IOServiceMatching("IOAccelerator"),
+                                           &iterator) == kIOReturnSuccess else { return nil }
+        defer { IOObjectRelease(iterator) }
+
+        var hottest: Double?
+        while case let entry = IOIteratorNext(iterator), entry != 0 {
+            defer { IOObjectRelease(entry) }
+            guard let ref = IORegistryEntryCreateCFProperty(entry, "PerformanceStatistics" as CFString,
+                                                            kCFAllocatorDefault, 0),
+                  let stats = ref.takeRetainedValue() as? [String: Any],
+                  let number = stats["Temperature(C)"] as? NSNumber else { continue }
+            let value = number.doubleValue
+            guard value >= TemperatureSensorSelector.minimumChipTemperature, value < 125 else { continue }
+            hottest = max(hottest ?? value, value)
+        }
+        return hottest
+    }
+
     // MARK: - CPU usage
 
     /// Aggregated load from HOST_CPU_LOAD_INFO; usage is the busy-tick share
@@ -1205,6 +1234,7 @@ final class SystemMonitor: ObservableObject {
         // reference on the next service that nothing released. Machines with a
         // second IOAccelerator (Intel dual graphics, an eGPU) leaked one
         // io_object_t per sampling tick that way.
+        var maxUtilization: Int?
         while case let entry = IOIteratorNext(iterator), entry != 0 {
             defer { IOObjectRelease(entry) }
             // Fetch ONLY PerformanceStatistics, not the whole (large) property
@@ -1215,9 +1245,9 @@ final class SystemMonitor: ObservableObject {
                   let stats = ref.takeRetainedValue() as? [String: Any],
                   let utilization = stats["Device Utilization %"] as? Int
             else { continue }
-            return Double(utilization) / 100.0
+            maxUtilization = max(maxUtilization ?? utilization, utilization)
         }
-        return nil
+        return maxUtilization.map { Double($0) / 100.0 }
     }
 
     // MARK: - Memory pressure

@@ -49,6 +49,8 @@ final class PowerSampler {
 
     private let smc: SMCClient?
     private var systemKey: SMCClient.Key?
+    private var cpuPackageKey: SMCClient.Key?
+    private var gpuPackageKey: SMCClient.Key?
     private var adapterKey: SMCClient.Key?
     private var dcInRailKey: SMCClient.Key?
     private var resolvedKeys = false
@@ -59,6 +61,8 @@ final class PowerSampler {
     /// `PD0R` is the DC-In rail. The Mac Studio (Mac17,15) reports 0 W for PDTR,
     /// so a Mac without a battery can use the rail as an adapter-input fallback.
     private static let systemPowerKey = "PSTR"
+    private static let cpuPackagePowerKey = "PCPC"
+    private static let gpuPackagePowerKey = "PCPG"
     private static let adapterPowerKey = "PDTR"
     private static let dcInRailPowerKey = "PD0R"
 
@@ -80,12 +84,17 @@ final class PowerSampler {
             if !resolvedKeys {
                 resolvedKeys = true
                 systemKey = smc.key(named: Self.systemPowerKey)
+                cpuPackageKey = smc.key(named: Self.cpuPackagePowerKey)
+                gpuPackageKey = smc.key(named: Self.gpuPackagePowerKey)
                 adapterKey = smc.key(named: Self.adapterPowerKey)
                 if !Self.hasInternalBattery {
                     dcInRailKey = smc.key(named: Self.dcInRailPowerKey)
                 }
             }
             reading.systemWatts = plausibleWatts(systemKey)
+            if reading.systemWatts == nil, let cpuW = plausibleWatts(cpuPackageKey) {
+                reading.systemWatts = cpuW + (plausibleWatts(gpuPackageKey) ?? 0)
+            }
             reading.adapterWatts = plausibleWatts(adapterKey)
             if reading.adapterWatts == nil {
                 dcInRailWatts = plausibleWatts(dcInRailKey)

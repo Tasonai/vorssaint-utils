@@ -24,7 +24,10 @@ enum FanControlHardwareContract {
         static let minimumChipTemperature = 10.0
         static func currentPlatform() -> CPUTemperaturePlatform { .generic }
         static func isCPUTemperatureKey(_ name: String, platform: CPUTemperaturePlatform) -> Bool {
-            name.hasPrefix("TC")
+            name.hasPrefix("TC") && name != "TCGC"
+        }
+        static func isGPUTemperatureKey(_ name: String) -> Bool {
+            name.hasPrefix("Tg") || name.hasPrefix("TG") || name == "TCGC"
         }
     }
 

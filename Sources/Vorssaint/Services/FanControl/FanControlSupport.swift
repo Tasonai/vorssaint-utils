@@ -347,7 +347,13 @@ enum FanControlPolicy {
         }
         let cpu: [Double]
         if TemperatureSensorSelector.hasCPUCoreSet(platform: platform) {
-            cpu = preferredCPU.map(\.value)
+            if !preferredCPU.isEmpty {
+                cpu = preferredCPU.map(\.value)
+            } else if platform == .intel {
+                cpu = validCPU.map(\.value)
+            } else {
+                cpu = []
+            }
         } else if platform == .generic {
             cpu = validCPU.map(\.value)
         } else {
@@ -432,6 +438,9 @@ enum SMCValueCodec {
         case "sp78" where bytes.count == 2:
             let raw = UInt16(bytes[0]) << 8 | UInt16(bytes[1])
             return Double(Int16(bitPattern: raw)) / 256.0
+        case "sp87" where bytes.count == 2:
+            let raw = UInt16(bytes[0]) << 8 | UInt16(bytes[1])
+            return Double(Int16(bitPattern: raw)) / 128.0
         case "ui8 " where bytes.count == 1:
             return Double(bytes[0])
         case "ui16" where bytes.count == 2:

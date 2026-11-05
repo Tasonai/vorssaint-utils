@@ -1034,6 +1034,29 @@ enum MetricsFeatureTests {
         )
         suite.expectClose(genericCPU ?? -1, 51.6, "generic CPU sensor selection preserves previous hottest behavior")
 
+        let intelPlatform = TemperatureSensorSelector.platform(
+            brandString: "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz"
+        )
+        suite.expect(intelPlatform == .intel, "Intel Core brand string resolves to .intel platform")
+        suite.expect(TemperatureSensorSelector.hasCPUCoreSet(platform: intelPlatform),
+               "Intel platform maps PECI core sensors")
+        suite.expect(TemperatureSensorSelector.isCPUTemperatureKey("TC1C", platform: intelPlatform)
+                     && TemperatureSensorSelector.isCPUTemperatureKey("TC0P", platform: intelPlatform)
+                     && !TemperatureSensorSelector.isCPUTemperatureKey("TCGC", platform: intelPlatform)
+                     && TemperatureSensorSelector.isGPUTemperatureKey("TCGC")
+                     && TemperatureSensorSelector.isGPUTemperatureKey("TGDD")
+                     && TemperatureSensorSelector.isGPUTemperatureKey("Tg0D"),
+               "Intel CPU and GPU SMC keys classify cleanly without mixing integrated GPU into CPU")
+        let intelSample: [(key: String, value: Double)] = [
+            ("TC0T", 1.60), ("TC0P", 55.75), ("TC1C", 66.0), ("TC5C", 80.0), ("TCSA", 63.0),
+        ]
+        suite.expectClose(TemperatureSensorSelector.displayedCPUTemperature(
+            readings: intelSample, platform: intelPlatform
+        ) ?? -1, 80.0, "Intel CPU temperature displays hottest mapped PECI core and ignores sub-threshold TC0T")
+        suite.expectClose(SMCValueCodec.decode([13, 6], type: "sp87") ?? -1,
+                          Double((13 << 8) | 6) / 128.0,
+                          "sp87 codec decodes Intel SMC package wattage")
+
         // MARK: Hot CPU alert
 
         var spikeGate = SustainedAlertGate()
