@@ -966,30 +966,35 @@ final class NotchService: ObservableObject {
         if peeking { return geometry.peek }
         if showsCompactActivityPicker { return compactActivityPickerLayout.size }
         if compactActivity != nil {
-            var resting = compactActivityGeometry.compactActivitySize
-            // A strip naming its song reaches further on its cover's side,
-            // where the emphasis has the least room.
-            let named = namedMusicWings
-            if let named { resting.width += named.leading - named.trailing }
-            if isPrivacyIndicatorActive {
-                resting.width += 14
-            }
-            return hoverEmphasized
-                ? NotchHoverEmphasis.size(from: resting, geometry: geometry,
-                                          reach: named.map { ($0.leading - $0.trailing) / 2 } ?? 0)
-                : resting
+            return NotchSurfaceGeometryEngine.compactActivitySurfaceSize(
+                baseSize: compactActivityGeometry.compactActivitySize,
+                geometry: geometry,
+                namedMusicDiff: namedMusicWings.map { $0.leading - $0.trailing },
+                isPrivacyActive: isPrivacyIndicatorActive,
+                hoverEmphasized: hoverEmphasized
+            )
         }
-        let resting = geometry.restingSize(showsContent: idleContent != .none || mascotShows(on: geometry) || isPrivacyIndicatorActive)
-        return hoverEmphasized ? NotchHoverEmphasis.size(from: resting, geometry: geometry) : resting
+        let showsContent = idleContent != .none || mascotShows(on: geometry) || isPrivacyIndicatorActive
+        return NotchSurfaceGeometryEngine.restingSurfaceSize(
+            geometry: geometry,
+            showsContent: showsContent,
+            hoverEmphasized: hoverEmphasized
+        )
     }
 
     /// How far the island's centre sits right of the camera's. Only a closed
     /// notice beside a camera, or the music strip naming its song, reaches
     /// further toward its wider side. A capsule runs its strips end to end.
     var surfaceShift: CGFloat {
-        guard !geometry.floats, !fullscreenCompact, captureControls == nil, !expanded, !dragPlaceholder else { return 0 }
-        if let notice { return noticeExpanded ? 0 : geometry.noticeShift(notice.wings(in: geometry)) }
-        return namedMusicWings.map { ($0.trailing - $0.leading) / 2 } ?? 0
+        NotchSurfaceGeometryEngine.surfaceShift(
+            floats: geometry.floats,
+            fullscreenCompact: fullscreenCompact,
+            hasCaptureControls: captureControls != nil,
+            expanded: expanded,
+            dragPlaceholder: dragPlaceholder,
+            noticeShift: notice.map { noticeExpanded ? 0 : geometry.noticeShift($0.wings(in: geometry)) },
+            namedMusicShift: namedMusicWings.map { ($0.trailing - $0.leading) / 2 }
+        )
     }
 
     /// The open island around the Command Bar: the bar's width within the
@@ -1044,9 +1049,7 @@ final class NotchService: ObservableObject {
     func compactStripSize(for activity: NotchCompactActivity, companion: NotchCompactActivity? = nil) -> CGSize {
         var size = geometry.floats ? capsuleStripSize(for: activity, companion: companion)
             : compactGeometry(for: activity, companion: companion).compactActivitySize
-        if isPrivacyIndicatorActive {
-            size.width += 14
-        }
+        size.width = NotchSurfaceGeometryEngine.adjustedCompactStripWidth(size.width, isPrivacyActive: isPrivacyIndicatorActive)
         return size
     }
 
