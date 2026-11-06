@@ -39,6 +39,7 @@ struct NotchClipboardView: View {
     @State private var keysMoved = false
     @Environment(\.notchSettingsPreview) private var preview
     @Environment(\.notchGlassSurface) private var glassSurface
+    @Environment(\.notchBand) private var band
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var text: ClipboardFeatureStrings { FeatureStrings.clipboard(l10n.language) }
     private static let listSpace = "notch.clipboard.list"
@@ -66,13 +67,11 @@ struct NotchClipboardView: View {
             if !enabled, history.entries.isEmpty {
                 // The panel offers the switch beside its caption; the page
                 // says why it is empty and turns the history on from here.
-                VStack(spacing: 10) {
-                    NotchEmptyView(symbol: "doc.on.clipboard", message: text.disabled)
-                    Button(text.enable) {
+                NotchEmptyView(symbol: "doc.on.clipboard", message: text.disabled) {
+                    NotchPillButton(title: text.enable, prominent: true) {
                         enabled = true
                         history.syncWithPreferences()
                     }
-                    .buttonStyle(.bordered).controlSize(.small)
                 }
                 .frame(maxHeight: .infinity)
             } else if entries.isEmpty {
@@ -88,8 +87,10 @@ struct NotchClipboardView: View {
                                     .id(entry.id)
                             }
                         }
+                        .padding(.vertical, 2)
                     }
-                    .scrollIndicators(.automatic)
+                    .scrollIndicators(.never)
+                    .notchScrollEdgeFade()
                     .coordinateSpace(.named(Self.listSpace))
                     .onChange(of: highlightedID) { previous, id in
                         guard let id else { return }
@@ -108,8 +109,16 @@ struct NotchClipboardView: View {
         // The magnifier and the history's own actions sit in the island's top
         // row, so the cards start at the top of the page.
         .notchBand(leading: {
-            if !searchOpen {
-                NotchIconButton(symbol: "magnifyingglass", title: text.search, action: service.requestClipboardSearch)
+            HStack(spacing: 6) {
+                if !band.besideCamera {
+                    Text(NotchModule.clipboard.title(l10n.language))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(1)
+                }
+                if !searchOpen {
+                    NotchIconButton(symbol: "magnifyingglass", title: text.search, action: service.requestClipboardSearch)
+                }
             }
         }, trailing: {
             HStack(spacing: 6) { NotchClipboardHeaderActions(service: service) }

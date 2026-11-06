@@ -23,7 +23,7 @@ struct NotchScratchpadView: View {
     @AppStorage(DefaultsKey.scratchpadTextSize) private var storedTextSize = ScratchpadSupport.defaultTextSize
     private var text: ScratchpadFeatureStrings { FeatureStrings.scratchpad(l10n.language) }
     private var textSize: CGFloat { CGFloat(ScratchpadSupport.sanitizedTextSize(storedTextSize)) }
-    private static let editorInset = NSSize(width: 6, height: 6)
+    private static let editorInset = NSSize(width: 10, height: 8)
 
     /// Holds the editor's text view so a tab change can aim the caret at it
     /// and a clear or a checkbox click can go through its undo. Weak, since
@@ -283,11 +283,16 @@ struct NotchScratchpadView: View {
                 .accessibilityLabel(text.closePad)
             }
         }
-        .foregroundStyle(selected ? .white : .white.opacity(0.6))
+        .foregroundStyle(selected ? .white : .white.opacity(0.65))
         .padding(.leading, 10)
         .padding(.trailing, showsClose ? 5 : selected ? 8 : 10)
         .frame(height: 22)
         .background(.white.opacity(selected ? 0.14 : 0.05), in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(.white.opacity(selected ? 0.18 : 0.06), lineWidth: 0.5)
+                .allowsHitTesting(false)
+        }
         .contentShape(Capsule())
     }
 

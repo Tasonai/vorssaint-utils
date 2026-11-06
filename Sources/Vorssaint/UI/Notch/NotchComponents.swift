@@ -18,18 +18,18 @@ struct NotchButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         let active = enabled && hovered
+        let pressScale: CGFloat = lifts ? 0.96 : 0.985
         configuration.label
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.white.opacity(active && highlights ? 0.09 : 0))
+                    .fill(.white.opacity(configuration.isPressed && highlights ? 0.13 : (active && highlights ? 0.08 : 0)))
                     .allowsHitTesting(false)
             }
-            .opacity(enabled ? (configuration.isPressed ? 0.8 : 1) : 0.4)
-            .scaleEffect(reduceMotion || !lifts ? 1
-                         : configuration.isPressed ? 0.965 : (active ? 1.022 : 1))
-            .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.7),
+            .opacity(enabled ? (configuration.isPressed ? 0.88 : 1) : 0.4)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? pressScale : 1))
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.14),
                        value: configuration.isPressed)
-            .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.75), value: hovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: hovered)
             .onHover { hovered = $0 }
     }
 }
@@ -158,12 +158,17 @@ struct NotchIconButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(selected ? .white : .white.opacity(0.55))
+                .foregroundStyle(selected ? .white : .white.opacity(0.65))
                 .contentTransition(.symbolEffect(.replace))
                 .animation(reduceMotion ? nil : .smooth(duration: 0.24), value: symbol)
                 .frame(width: 28, height: 28)
-                .background(.white.opacity(selected ? 0.12 : 0),
+                .background(.white.opacity(selected ? 0.13 : 0),
                             in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(.white.opacity(selected ? 0.16 : 0), lineWidth: 0.5)
+                        .allowsHitTesting(false)
+                }
                 .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(NotchButtonStyle(cornerRadius: 9))
@@ -718,14 +723,12 @@ struct NotchControlSurface: ViewModifier {
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let topStroke = Color.white.opacity(selected ? 0.22 : (glassSurface ? 0.10 : 0.11))
+        let bottomStroke = Color.white.opacity(selected ? 0.08 : (glassSurface ? 0.03 : 0.03))
         Group {
             if glassSurface {
                 content
                     .background(.white.opacity(selected ? 0.11 : 0.045), in: shape)
-                    .overlay {
-                        shape.strokeBorder(.white.opacity(selected ? 0.16 : 0.065), lineWidth: 0.5)
-                            .allowsHitTesting(false)
-                    }
             } else {
 #if compiler(>=6.2)
                 if #available(macOS 26, *), glass, !reduceTransparency {
@@ -740,8 +743,20 @@ struct NotchControlSurface: ViewModifier {
             }
         }
         .overlay {
-            shape.strokeBorder(.white.opacity(contrast == .increased ? 0.5 : 0), lineWidth: 0.75)
+            if contrast == .increased {
+                shape.strokeBorder(.white.opacity(0.5), lineWidth: 0.75)
+                    .allowsHitTesting(false)
+            } else {
+                shape.strokeBorder(
+                    LinearGradient(
+                        colors: [topStroke, bottomStroke],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.5
+                )
                 .allowsHitTesting(false)
+            }
         }
     }
 }
