@@ -2030,6 +2030,14 @@ final class CommandBarService: ObservableObject {
             query = completion
             return
         }
+        if entry.id == "currency.result" || entry.id == "units.result" {
+            let completion = entry.title
+            if let editor = panel?.firstResponder as? NSTextView, editor.string == query {
+                editor.insertText(completion, replacementRange: NSRange(location: 0, length: (query as NSString).length))
+            }
+            query = completion
+            return
+        }
         guard !entry.isAnswer else { return }
         if queryBeforeCompletion == nil { queryBeforeCompletion = query }
         let completion = CommandBarCompletion.completedQuery(

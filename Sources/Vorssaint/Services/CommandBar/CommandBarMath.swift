@@ -9,7 +9,7 @@ enum CommandBarMath {
     /// Words that read as "percent OF a number" across the languages the app
     /// speaks. Parser vocabulary, not visible text: people type in their own
     /// words regardless of the interface language.
-    private static let ofWords: Set<String> = ["of", "de", "da", "do", "von", "di", "del", "dal"]
+    private static let ofWords: Set<String> = ["of", "de", "da", "do", "von", "di", "del", "dal", "от"]
 
     struct Result: Equatable {
         /// The value, formatted the way this Mac writes numbers.
@@ -142,7 +142,7 @@ enum CommandBarMath {
 
         var endsImplicitProduct: Bool {
             switch self {
-            case .number, .constant, .right: return true
+            case .number, .constant, .right, .percent: return true
             default: return false
             }
         }
@@ -264,7 +264,13 @@ enum CommandBarMath {
     private static func isCalculation(_ tokens: [Token]) -> Bool {
         tokens.contains(where: \.isExplicitOperation)
             || tokens.contains { if case .function = $0 { return true }; return false }
-            || zip(tokens, tokens.dropFirst()).contains { $0.endsImplicitProduct && $1.startsImplicitProduct }
+            || zip(tokens, tokens.dropFirst()).contains { first, second in
+                (first.endsImplicitProduct && second.startsImplicitProduct)
+                || (first == .percent && {
+                    if case .number = second { return true }
+                    return false
+                }())
+            }
     }
 
     /// Rejects mismatches and surplus closers, then returns only the matching
@@ -324,9 +330,9 @@ enum CommandBarMath {
             }
             if character.isLetter {
                 let word = readWord()
-                if word == "x" {
+                if word == "x" || word == "х" {
                     tokens.append(.times)
-                } else if word == "pi" {
+                } else if word == "pi" || word == "пи" {
                     tokens.append(.constant(Double.pi))
                 } else if word == "e" {
                     tokens.append(.constant(Foundation.exp(1)))
@@ -471,7 +477,11 @@ enum CommandBarMath {
         mutating func parseTerm() -> Operand? {
             guard var left = parseFactor() else { return nil }
             while let token = peek() {
-                let implicit = token.startsImplicitProduct
+                let percentNumberProduct = left.percentRaw != nil && {
+                    if case .number = token { return true }
+                    return false
+                }()
+                let implicit = token.startsImplicitProduct || percentNumberProduct
                 guard implicit || token == .times || token == .divide || token == .ofWord else { break }
                 if !implicit { advance() }
                 if token == .ofWord, left.percentRaw == nil { return nil }

@@ -72,6 +72,6 @@
   - **UX**: 1-click access to persistent scratchpad notes directly from the expanded Island header with active pad indicator and quick pad switcher context menu.
   - **Status**: done
 
-- [todo] **Story 4.2**: Command Bar fuzzy calculator & currency unit conversion inline preview
+- [x] **Story 4.2**: Command Bar fuzzy calculator & currency unit conversion inline preview
   - **UX**: Instant evaluation of arithmetic expressions and currency/unit conversions in Command Bar.
-  - **Status**: todo
+  - **Status**: done

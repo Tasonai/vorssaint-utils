@@ -27,7 +27,7 @@ enum CommandBarUnits {
     /// it: "5 in to cm" reads the first as inches and the second as the verb.
     static let conversionWords: Set<String> = [
         "to", "in", "into", "as", "em", "para", "pra", "en", "a", "nach", "zu",
-        "à", "su", "->", ">", "→",
+        "à", "su", "->", ">", "→", "в", "к", "во",
     ]
 
     /// Everything the bar can convert, grouped so two units only meet when
@@ -50,52 +50,52 @@ enum CommandBarUnits {
             for name in names { map[name] = KnownUnit(family: family, unit: unit) }
         }
         // Temperature. Absolute readings, never increments: 20 °C is 68 °F.
-        add(["c", "celsius", "°c", "centigrade"], .temperature, UnitTemperature.celsius)
-        add(["f", "fahrenheit", "°f"], .temperature, UnitTemperature.fahrenheit)
-        add(["k", "kelvin"], .temperature, UnitTemperature.kelvin)
+        add(["c", "celsius", "°c", "centigrade", "цельсий", "цельсия"], .temperature, UnitTemperature.celsius)
+        add(["f", "fahrenheit", "°f", "фаренгейт", "фаренгейта"], .temperature, UnitTemperature.fahrenheit)
+        add(["k", "kelvin", "кельвин", "кельвина"], .temperature, UnitTemperature.kelvin)
         // Length
-        add(["mm", "millimeter", "millimeters", "millimetre", "millimetres", "milimetro", "milimetros"],
+        add(["mm", "millimeter", "millimeters", "millimetre", "millimetres", "milimetro", "milimetros", "мм", "миллиметр", "миллиметры", "миллиметров"],
             .length, UnitLength.millimeters)
-        add(["cm", "centimeter", "centimeters", "centimetre", "centimetres", "centimetro", "centimetros"],
+        add(["cm", "centimeter", "centimeters", "centimetre", "centimetres", "centimetro", "centimetros", "см", "сантиметр", "сантиметры", "сантиметров"],
             .length, UnitLength.centimeters)
-        add(["m", "meter", "meters", "metro", "metros", "metre", "metres"], .length, UnitLength.meters)
-        add(["km", "kilometer", "kilometers", "kilometre", "kilometres", "quilometro", "quilometros"],
+        add(["m", "meter", "meters", "metro", "metros", "metre", "metres", "м", "метр", "метры", "метров"], .length, UnitLength.meters)
+        add(["km", "kilometer", "kilometers", "kilometre", "kilometres", "quilometro", "quilometros", "км", "километр", "километры", "километров"],
             .length, UnitLength.kilometers)
-        add(["in", "inch", "inches", "polegada", "polegadas", "\""], .length, UnitLength.inches)
-        add(["ft", "foot", "feet", "pe", "pes"], .length, UnitLength.feet)
-        add(["yd", "yard", "yards", "jarda", "jardas"], .length, UnitLength.yards)
-        add(["mi", "mile", "miles", "milha", "milhas"], .length, UnitLength.miles)
+        add(["in", "inch", "inches", "polegada", "polegadas", "\"", "дюйм", "дюймы", "дюймов"], .length, UnitLength.inches)
+        add(["ft", "foot", "feet", "pe", "pes", "фут", "футы", "футов"], .length, UnitLength.feet)
+        add(["yd", "yard", "yards", "jarda", "jardas", "ярд", "ярды", "ярдов"], .length, UnitLength.yards)
+        add(["mi", "mile", "miles", "milha", "milhas", "миля", "мили", "миль"], .length, UnitLength.miles)
         // Mass
-        add(["mg", "milligram", "milligrams"], .mass, UnitMass.milligrams)
-        add(["g", "gram", "grams", "grama", "gramas"], .mass, UnitMass.grams)
-        add(["kg", "kilogram", "kilograms", "quilo", "quilos"], .mass, UnitMass.kilograms)
-        add(["t", "ton", "tons", "tonne", "tonelada", "toneladas"], .mass, UnitMass.metricTons)
-        add(["oz", "ounce", "ounces", "onca", "oncas"], .mass, UnitMass.ounces)
+        add(["mg", "milligram", "milligrams", "мг", "миллиграмм", "миллиграммы"], .mass, UnitMass.milligrams)
+        add(["g", "gram", "grams", "grama", "gramas", "г", "грамм", "граммы", "граммов"], .mass, UnitMass.grams)
+        add(["kg", "kilogram", "kilograms", "quilo", "quilos", "кг", "килограмм", "килограммы", "килограммов"], .mass, UnitMass.kilograms)
+        add(["t", "ton", "tons", "tonne", "tonelada", "toneladas", "тонна", "тонны", "тонн"], .mass, UnitMass.metricTons)
+        add(["oz", "ounce", "ounces", "onca", "oncas", "унция", "унции", "унций"], .mass, UnitMass.ounces)
         add(["lb", "lbs", "pound", "pounds", "libra", "libras"], .mass, UnitMass.pounds)
         // Data. Decimal and binary are separate units on purpose: the whole
         // reason someone asks is to settle which one they meant.
-        add(["b", "byte", "bytes"], .data, UnitInformationStorage.bytes)
-        add(["kb", "kilobyte", "kilobytes"], .data, UnitInformationStorage.kilobytes)
-        add(["mb", "megabyte", "megabytes"], .data, UnitInformationStorage.megabytes)
-        add(["gb", "gigabyte", "gigabytes"], .data, UnitInformationStorage.gigabytes)
-        add(["tb", "terabyte", "terabytes"], .data, UnitInformationStorage.terabytes)
+        add(["b", "byte", "bytes", "байт", "байты", "байтов"], .data, UnitInformationStorage.bytes)
+        add(["kb", "kilobyte", "kilobytes", "кб", "килобайт", "килобайты", "килобайтов"], .data, UnitInformationStorage.kilobytes)
+        add(["mb", "megabyte", "megabytes", "мб", "мегабайт", "мегабайты", "мегабайтов"], .data, UnitInformationStorage.megabytes)
+        add(["gb", "gigabyte", "gigabytes", "гб", "гигабайт", "гигабайты", "гигабайтов"], .data, UnitInformationStorage.gigabytes)
+        add(["tb", "terabyte", "terabytes", "тб", "терабайт", "терабайты", "терабайтов"], .data, UnitInformationStorage.terabytes)
         add(["kib", "kibibyte", "kibibytes"], .data, UnitInformationStorage.kibibytes)
         add(["mib", "mebibyte", "mebibytes"], .data, UnitInformationStorage.mebibytes)
         add(["gib", "gibibyte", "gibibytes"], .data, UnitInformationStorage.gibibytes)
         add(["tib", "tebibyte", "tebibytes"], .data, UnitInformationStorage.tebibytes)
-        add(["bit", "bits"], .data, UnitInformationStorage.bits)
+        add(["bit", "bits", "бит", "биты", "битов"], .data, UnitInformationStorage.bits)
         // Duration
-        add(["ms", "millisecond", "milliseconds"], .duration, UnitDuration.milliseconds)
-        add(["s", "sec", "secs", "second", "seconds", "segundo", "segundos"], .duration, UnitDuration.seconds)
-        add(["min", "mins", "minute", "minutes", "minuto", "minutos"], .duration, UnitDuration.minutes)
-        add(["h", "hr", "hrs", "hour", "hours", "hora", "horas"], .duration, UnitDuration.hours)
-        add(["d", "day", "days", "dia", "dias"], .duration, UnitDuration.days)
-        add(["wk", "wks", "week", "weeks", "semana", "semanas"], .duration, UnitDuration.weeks)
-        add(["yr", "yrs", "year", "years", "ano", "anos"], .duration, UnitDuration.years)
+        add(["ms", "millisecond", "milliseconds", "мс", "миллисекунда", "миллисекунды"], .duration, UnitDuration.milliseconds)
+        add(["s", "sec", "secs", "second", "seconds", "segundo", "segundos", "с", "сек", "секунда", "секунды", "секунд"], .duration, UnitDuration.seconds)
+        add(["min", "mins", "minute", "minutes", "minuto", "minutos", "мин", "минута", "минуты", "минут"], .duration, UnitDuration.minutes)
+        add(["h", "hr", "hrs", "hour", "hours", "hora", "horas", "ч", "час", "часа", "часов"], .duration, UnitDuration.hours)
+        add(["d", "day", "days", "dia", "dias", "д", "день", "дня", "дней"], .duration, UnitDuration.days)
+        add(["wk", "wks", "week", "weeks", "semana", "semanas", "нед", "неделя", "недели", "недель"], .duration, UnitDuration.weeks)
+        add(["yr", "yrs", "year", "years", "ano", "anos", "год", "года", "лет"], .duration, UnitDuration.years)
         // Volume
-        add(["ml", "milliliter", "milliliters", "millilitre", "millilitres", "mililitro", "mililitros"],
+        add(["ml", "milliliter", "milliliters", "millilitre", "millilitres", "mililitro", "mililitros", "мл", "миллилитр", "миллилитры"],
             .volume, UnitVolume.milliliters)
-        add(["l", "liter", "liters", "litre", "litres", "litro", "litros"], .volume, UnitVolume.liters)
+        add(["l", "liter", "liters", "litre", "litres", "litro", "litros", "л", "литр", "литры", "литров"], .volume, UnitVolume.liters)
         add(["gal", "gallon", "gallons", "galao", "galoes"], .volume, UnitVolume.gallons)
         add(["qt", "quart", "quarts"], .volume, UnitVolume.quarts)
         add(["floz", "fluidounce", "fluidounces"], .volume, UnitVolume.fluidOunces)

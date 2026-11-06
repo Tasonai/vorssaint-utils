@@ -1725,6 +1725,16 @@ enum CommandBarCatalog {
                 countsUsage: false,
                 run: { _ in copyAnswer(result.formatted) })
         }
+        if let currency = CommandBarCurrency.convert(query) {
+            return CommandBarEntry(
+                id: "currency.result",
+                title: currency.formatted,
+                subtitle: currency.rateSummary + " · " + bar.copyHint,
+                icon: .symbol("banknote"),
+                isAnswer: true,
+                countsUsage: false,
+                run: { _ in copyAnswer(currency.formatted) })
+        }
         if let converted = CommandBarUnits.convert(query) {
             return CommandBarEntry(
                 id: "units.result",
