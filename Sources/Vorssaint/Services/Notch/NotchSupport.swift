@@ -2903,7 +2903,7 @@ enum NotchMotion {
     }
 
     static let growingWidth = Spring(duration: 0.44, bounce: 0.25)
-    static let growingHeight = Spring(duration: 0.38, bounce: 0.22)
+    static let growingHeight = Spring(duration: 0.38, bounce: 0.28)
     static let shrinkingWidth = Spring(duration: 0.30, bounce: 0)
     static let shrinkingHeight = Spring(duration: 0.26, bounce: 0)
     /// A strip that stays on screen and only fits a new reading, as a level

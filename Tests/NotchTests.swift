@@ -3019,6 +3019,9 @@ enum NotchTests {
         suite.expect(NotchMotion.duration(from: roomy.notice, to: idle)
                < NotchMotion.duration(from: idle, to: roomy.notice),
                "horizontal dismissal remains quicker than opening")
+        suite.expect(abs(NotchMotion.growingHeight.duration - 0.38) < 0.001
+                     && abs(NotchMotion.growingHeight.bounce - 0.28) < 0.001,
+                     "growing height uses response 0.38 and dampingFraction 0.72")
         // A level passing 99% or 9% keeps its notice and only fits the new width.
         for (from, to) in [(CGSize(width: 315, height: 33), CGSize(width: 329, height: 33)),
                            (CGSize(width: 315, height: 33), CGSize(width: 299, height: 33))] {
