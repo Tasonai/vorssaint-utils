@@ -9,6 +9,7 @@ struct PanelPortManagerView: View {
     @Environment(\.notchPresentation) private var inNotch
     @State private var pending: PortManagerEntry?
     @State private var force = false
+    @State private var hoveredPortID: String?
 
     var onClose: () -> Void
 
@@ -155,12 +156,8 @@ struct PanelPortManagerView: View {
     }
 
     private func portRow(_ entry: PortManagerEntry) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "network")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 18)
-
+        let isHovered = hoveredPortID == entry.id
+        return HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(String(entry.port))
@@ -184,7 +181,7 @@ struct PanelPortManagerView: View {
                     .truncationMode(.middle)
             }
             Spacer(minLength: 4)
-            if AppFeature.killProcess.isAvailable {
+            if AppFeature.killProcess.isAvailable, isHovered {
                 HStack(spacing: 4) {
                     Button(strings.kill) { confirmTermination(entry, force: false) }
                         .buttonStyle(.bordered).controlSize(.mini)
@@ -198,10 +195,13 @@ struct PanelPortManagerView: View {
                 }
             }
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
-        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6))
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .background(Color.primary.opacity(isHovered ? 0.055 : 0.03), in: RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
+        .onHover { hovering in
+            hoveredPortID = hovering ? entry.id : (hoveredPortID == entry.id ? nil : hoveredPortID)
+        }
         .contextMenu {
             PortManagerRowActions(entry: entry, language: l10n.language)
         }

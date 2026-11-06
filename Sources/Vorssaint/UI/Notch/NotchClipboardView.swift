@@ -439,7 +439,8 @@ struct NotchClipboardView: View {
 
     /// The whole entry, with its actions in the bottom row.
     private func expandedCard(_ entry: ClipboardHistoryEntry, place: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let active = hoveredID == entry.id || highlightedID == entry.id || copiedID == entry.id
+        return VStack(alignment: .leading, spacing: 6) {
             Button { activate(entry) } label: {
                 preview(entry, compact: false, open: !comfortable)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -454,28 +455,36 @@ struct NotchClipboardView: View {
                     .environment(\.locale, l10n.language.formattingLocale())
                     .font(.system(size: 9.5)).foregroundStyle(.tertiary).lineLimit(1)
                 Spacer(minLength: 0)
-                if place < 9, service.panelIsKey {
-                    Text("⌘\(place + 1)")
-                        .font(.system(size: 9.5, weight: .medium)).monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
-                if entry.kind == .image, AppFeature.screenshot.isAvailable {
-                    NotchIconButton(symbol: "pencil", title: text.edit) { history.editImage(entry) }
-                }
-                if entry.kind == .image, AppFeature.screenOCR.isAvailable {
-                    NotchIconButton(symbol: "text.viewfinder",
-                                    title: l10n.language == .ru ? "Распознать текст" : "Extract Text (OCR)") {
-                        history.extractTextFromImage(entry)
+                if active {
+                    if entry.kind == .image, AppFeature.screenshot.isAvailable {
+                        NotchIconButton(symbol: "pencil", title: text.edit) { history.editImage(entry) }
+                    }
+                    if entry.kind == .image, AppFeature.screenOCR.isAvailable {
+                        NotchIconButton(symbol: "text.viewfinder",
+                                        title: l10n.language == .ru ? "Распознать текст" : "Extract Text (OCR)") {
+                            history.extractTextFromImage(entry)
+                        }
+                    }
+                    NotchIconButton(symbol: copiedID == entry.id ? "checkmark" : "doc.on.doc",
+                                    title: copiedID == entry.id ? text.copied : text.copy) { copy(entry) }
+                    NotchIconButton(symbol: entry.isPinned ? "pin.fill" : "pin",
+                                    title: entry.isPinned ? text.unpin : text.pin) {
+                        history.togglePin(entry)
+                    }
+                    NotchIconButton(symbol: "trash", title: text.delete) { remove(entry) }
+                } else {
+                    if entry.isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                    if place < 9, service.panelIsKey {
+                        Text("⌘\(place + 1)")
+                            .font(.system(size: 9.5, weight: .medium)).monospacedDigit()
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
                 }
-                NotchIconButton(symbol: copiedID == entry.id ? "checkmark" : "doc.on.doc",
-                                title: copiedID == entry.id ? text.copied : text.copy) { copy(entry) }
-                NotchIconButton(symbol: entry.isPinned ? "pin.fill" : "pin",
-                                title: entry.isPinned ? text.unpin : text.pin) {
-                    history.togglePin(entry)
-                }
-                NotchIconButton(symbol: "trash", title: text.delete) { remove(entry) }
             }
             .frame(height: 28)
         }

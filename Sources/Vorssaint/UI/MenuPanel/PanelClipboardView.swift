@@ -10,6 +10,7 @@ struct PanelClipboardView: View {
     @AppStorage(DefaultsKey.clipboardHistoryShortcutEnabled) private var shortcutEnabled = true
     @State private var query = ""
     @State private var copiedID: UUID?
+    @State private var hoveredEntryID: UUID?
     /// Counts copies, so the list also follows an entry copied again while
     /// it still carries the tick.
     @State private var copyCount = 0
@@ -76,20 +77,29 @@ struct PanelClipboardView: View {
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Toggle(text.enable, isOn: $enabled)
-                .toggleStyle(.checkbox)
-                .font(.system(size: 11.5, weight: .medium))
-                .onChange(of: enabled) { _, _ in
-                    ClipboardHistoryService.shared.syncWithPreferences()
+            HStack(spacing: 8) {
+                Toggle(text.enable, isOn: $enabled)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .onChange(of: enabled) { _, _ in
+                        ClipboardHistoryService.shared.syncWithPreferences()
+                    }
+                Spacer(minLength: 4)
+                if enabled, shortcutEnabled {
+                    Text(shortcut.displayString)
+                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.primary.opacity(0.06), in: Capsule())
+                        .help(text.shortcut)
                 }
-            Text(enabled ? text.caption : text.disabled)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if enabled, shortcutEnabled {
-                Text("\(text.shortcut): \(shortcut.displayString)")
-                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.tertiary)
+            }
+            if !enabled {
+                Text(text.disabled)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 6) {
                 TextField(text.search, text: $query)
@@ -233,93 +243,114 @@ struct PanelClipboardView: View {
         }
     }
 
-    private func entryRow(_ entry: ClipboardHistoryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            if entry.isPinned {
-                Label(text.pinned, systemImage: "pin.fill")
-                    .font(.system(size: 9.5, weight: .bold))
-                    .foregroundStyle(Color.accentColor)
+    private func copyEntry(_ entry: ClipboardHistoryEntry) {
+        // A copied recent entry moves to the top, so the second
+        // click of a double click would copy whichever entry took
+        // its place.
+        if let event = NSApp.currentEvent, [.leftMouseDown, .leftMouseUp].contains(event.type),
+           event.clickCount > 1 { return }
+        // The tick means "it is on the clipboard", so it waits for
+        // the write instead of announcing one still queued behind
+        // a stalled pasteboard provider.
+        history.copy(entry) { copied in
+            if copied {
+                copiedID = entry.id
+                copyCount += 1
+            } else {
+                NSSound.beep()
             }
-            entryPreview(entry)
+        }
+    }
+
+    private func entryRow(_ entry: ClipboardHistoryEntry) -> some View {
+        let isHovered = hoveredEntryID == entry.id || copiedID == entry.id
+        return VStack(alignment: .leading, spacing: 6) {
+            Button {
+                copyEntry(entry)
+            } label: {
+                entryPreview(entry)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(text.copy)
+
             HStack(spacing: 6) {
-                Button {
-                    history.move(entry, .up)
-                } label: {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 10, weight: .bold))
+                if entry.isPinned {
+                    Label(text.pinned, systemImage: "pin.fill")
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help(text.moveUp)
-                .disabled(!canReorderEntries || !history.canMove(entry, .up))
-                Button {
-                    history.move(entry, .down)
-                } label: {
-                    Image(systemName: "arrow.down")
-                        .font(.system(size: 10, weight: .bold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help(text.moveDown)
-                .disabled(!canReorderEntries || !history.canMove(entry, .down))
-                Button {
-                    history.togglePin(entry)
-                } label: {
-                    Image(systemName: entry.isPinned ? "pin.slash" : "pin")
-                        .font(.system(size: 10, weight: .bold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help(entry.isPinned ? text.unpin : text.pin)
-                if entry.kind == .image, AppFeature.screenshot.isAvailable {
-                    Button { history.editImage(entry) } label: {
-                        Image(systemName: "pencil")
+                Text(entry.copiedAt, style: .time)
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 4)
+                if isHovered {
+                    if canReorderEntries && (history.canMove(entry, .up) || history.canMove(entry, .down)) {
+                        Button {
+                            history.move(entry, .up)
+                        } label: {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .help(text.moveUp)
+                        .disabled(!history.canMove(entry, .up))
+                        Button {
+                            history.move(entry, .down)
+                        } label: {
+                            Image(systemName: "arrow.down")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .help(text.moveDown)
+                        .disabled(!history.canMove(entry, .down))
+                    }
+                    Button {
+                        history.togglePin(entry)
+                    } label: {
+                        Image(systemName: entry.isPinned ? "pin.slash" : "pin")
                             .font(.system(size: 10, weight: .bold))
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
-                    .help(text.edit)
-                    .accessibilityLabel(text.edit)
-                }
-                Button {
-                    // A copied recent entry moves to the top, so the second
-                    // click of a double click would copy whichever entry took
-                    // its place.
-                    if let event = NSApp.currentEvent, [.leftMouseDown, .leftMouseUp].contains(event.type),
-                       event.clickCount > 1 { return }
-                    // The tick means "it is on the clipboard", so it waits for
-                    // the write instead of announcing one still queued behind
-                    // a stalled pasteboard provider.
-                    history.copy(entry) { copied in
-                        if copied {
-                            copiedID = entry.id
-                            copyCount += 1
-                        } else {
-                            NSSound.beep()
+                    .help(entry.isPinned ? text.unpin : text.pin)
+                    if entry.kind == .image, AppFeature.screenshot.isAvailable {
+                        Button { history.editImage(entry) } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 10, weight: .bold))
                         }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .help(text.edit)
+                        .accessibilityLabel(text.edit)
                     }
-                } label: {
-                    Label(copiedID == entry.id ? text.copied : text.copy,
-                          systemImage: copiedID == entry.id ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 10, weight: .semibold))
+                    Button {
+                        copyEntry(entry)
+                    } label: {
+                        Label(copiedID == entry.id ? text.copied : text.copy,
+                              systemImage: copiedID == entry.id ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.mini)
+                    Button {
+                        history.remove(entry)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .help(text.delete)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.mini)
-                Button {
-                    history.remove(entry)
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 10, weight: .bold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help(text.delete)
-                Spacer()
-                Text(entry.copiedAt, style: .time)
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(.tertiary)
             }
+            .frame(minHeight: 18)
         }
         .panelCard()
+        .onHover { hovering in
+            hoveredEntryID = hovering ? entry.id : (hoveredEntryID == entry.id ? nil : hoveredEntryID)
+        }
     }
 }

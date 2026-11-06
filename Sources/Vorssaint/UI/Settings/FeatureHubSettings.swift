@@ -426,11 +426,14 @@ struct FeatureHubSettings: View {
             Text(groupTitle(group)).font(.headline)
             Spacer(minLength: 12)
             Text("\(installed)/\(total)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-            InstalledShareBar(installed: installed, total: total)
-                .controlSize(.small)
-                .frame(width: 64)
+                .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(installed > 0 ? Color.accentColor : Color.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2.5)
+                .background(
+                    Capsule()
+                        .fill(installed > 0 ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.06))
+                )
         }
     }
 

@@ -424,12 +424,20 @@ private struct NotchCalendarEventRow: View {
             }
             .font(.system(size: 11)).monospacedDigit()
             .foregroundStyle(.white.opacity(0.75))
-            Text(event.calendar)
-                .font(.system(size: 10)).foregroundStyle(.white.opacity(0.5)).lineLimit(1)
-            if !event.location.isEmpty {
-                Label(event.location, systemImage: "mappin")
-                    .font(.system(size: 10)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+            HStack(spacing: 5) {
+                Text(event.calendar)
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                if !event.location.isEmpty {
+                    Text("·")
+                        .foregroundStyle(.white.opacity(0.35))
+                        .accessibilityHidden(true)
+                    Label(event.location, systemImage: "mappin")
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
             }
+            .font(.system(size: 10))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.leading, 12)

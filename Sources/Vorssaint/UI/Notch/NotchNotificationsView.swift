@@ -81,6 +81,11 @@ private struct NotchNotificationRow: View {
     @ObservedObject var service: NotchNotificationService
     let text: NotchNotificationStrings
     @State private var feedback: String?
+    @State private var isHovered = false
+
+    private var showsActions: Bool {
+        isHovered || service.openingID == item.id
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -89,20 +94,23 @@ private struct NotchNotificationRow: View {
                 Text(item.content.app.isEmpty ? text.title : item.content.app)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Text(item.received, format: .dateTime.hour().minute()).monospacedDigit()
-                if service.openingID == item.id {
-                    ProgressView().controlSize(.mini)
-                } else if service.canOpen(item) {
-                    NotchIconButton(symbol: "arrow.up.forward.app", title: text.open) {
-                        feedback = nil
-                        service.open(item.id) { result in
-                            if result == .unavailable || result == .uncertain { feedback = text.unavailable }
+                if showsActions {
+                    if service.openingID == item.id {
+                        ProgressView().controlSize(.mini)
+                    } else if service.canOpen(item) {
+                        NotchIconButton(symbol: "arrow.up.forward.app", title: text.open) {
+                            feedback = nil
+                            service.open(item.id) { result in
+                                if result == .unavailable || result == .uncertain { feedback = text.unavailable }
+                            }
                         }
+                        .disabled(service.openingID != nil)
                     }
-                    .disabled(service.openingID != nil)
+                    NotchIconButton(symbol: "xmark", title: text.dismiss) { service.dismiss(item.id) }
+                        .disabled(service.openingID == item.id)
+                } else {
+                    Text(item.received, format: .dateTime.hour().minute()).monospacedDigit()
                 }
-                NotchIconButton(symbol: "xmark", title: text.dismiss) { service.dismiss(item.id) }
-                    .disabled(service.openingID == item.id)
             }
             .font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
             .frame(height: 22)
@@ -119,8 +127,9 @@ private struct NotchNotificationRow: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+        .background(.white.opacity(isHovered ? 0.08 : 0.06), in: RoundedRectangle(cornerRadius: 14))
         .clipped()
+        .onHover { isHovered = $0 }
         .accessibilityElement(children: .contain)
     }
 }
