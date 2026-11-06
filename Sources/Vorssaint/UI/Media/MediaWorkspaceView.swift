@@ -270,10 +270,13 @@ struct MediaWorkspaceView: View {
         HStack(spacing: 9) {
             Label(l10n.s.mediaName, systemImage: "photo.on.rectangle.angled")
                 .font(.system(size: compact ? 12 : 16, weight: .semibold))
+                .help(l10n.s.mediaLocalNote)
             Spacer(minLength: 0)
-            Text(l10n.s.mediaLocalNote)
-                .font(.system(size: compact ? 9.5 : 11, weight: .medium))
-                .foregroundStyle(.secondary)
+            if !compact {
+                Text(l10n.s.mediaLocalNote)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
             if let onClose {
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
@@ -375,22 +378,24 @@ struct MediaWorkspaceView: View {
         VStack(alignment: .leading, spacing: 9) {
             inputDropTarget
 
-            HStack(spacing: 7) {
-                Text(l10n.s.mediaOutput)
-                    .font(.system(size: compact ? 9.5 : 10.5, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Text(outputURL?.lastPathComponent ?? l10n.s.mediaOutputAutomatic)
-                    .font(.system(size: compact ? 10 : 11))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 0)
-                Button {
-                    chooseOutput()
-                } label: {
-                    Label(l10n.s.mediaChooseOutput, systemImage: "folder")
+            if !inputURLs.isEmpty {
+                HStack(spacing: 7) {
+                    Text(l10n.s.mediaOutput)
+                        .font(.system(size: compact ? 9.5 : 10.5, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text(outputURL?.lastPathComponent ?? l10n.s.mediaOutputAutomatic)
+                        .font(.system(size: compact ? 10 : 11))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 0)
+                    Button {
+                        chooseOutput()
+                    } label: {
+                        Label(l10n.s.mediaChooseOutput, systemImage: "folder")
+                    }
+                    .controlSize(.small)
+                    .disabled(isRunning)
                 }
-                .controlSize(.small)
-                .disabled(inputURLs.isEmpty || isRunning)
             }
             if selectedTool == .imageCompressor, inputURLs.count > 1 {
                 Toggle(imageText.saveInSubfolder, isOn: $imageSaveInSubfolder)

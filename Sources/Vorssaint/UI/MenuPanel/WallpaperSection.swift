@@ -85,29 +85,34 @@ struct WallpaperSection: View {
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("", selection: Binding(
-                get: { service.filter },
-                set: { newValue in
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        service.setFilter(newValue)
+            HStack(spacing: 10) {
+                Picker("", selection: Binding(
+                    get: { service.filter },
+                    set: { newValue in
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            service.setFilter(newValue)
+                        }
                     }
+                )) {
+                    Text(text.filterAll).tag(WallpaperSupport.Filter.all)
+                    Text(text.filterOwn).tag(WallpaperSupport.Filter.own)
+                    Text(text.filterApple).tag(WallpaperSupport.Filter.apple)
                 }
-            )) {
-                Text(text.filterAll).tag(WallpaperSupport.Filter.all)
-                Text(text.filterOwn).tag(WallpaperSupport.Filter.own)
-                Text(text.filterApple).tag(WallpaperSupport.Filter.apple)
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
 
-            Toggle(text.applyAllDisplays, isOn: Binding(
-                get: { service.applyAllDisplays },
-                set: { service.applyAllDisplays = $0 }
-            ))
-            .toggleStyle(.switch)
-            .controlSize(.small)
+                Spacer(minLength: 0)
+
+                Toggle(text.applyAllDisplays, isOn: Binding(
+                    get: { service.applyAllDisplays },
+                    set: { service.applyAllDisplays = $0 }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
 
             HStack(spacing: 8) {
                 Button(text.addImage) { service.addImages(inNotch: inNotch) }

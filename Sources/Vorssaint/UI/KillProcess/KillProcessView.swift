@@ -14,6 +14,7 @@ struct KillProcessView: View {
     @Environment(\.controlActiveState) private var controlActiveState
     @State private var refreshTimer: Timer?
     @State private var pendingAction: PendingAction?
+    @State private var hoveredPID: pid_t?
 
     private var strings: KillProcessFeatureStrings { FeatureStrings.killProcess(l10n.language) }
 
@@ -56,46 +57,55 @@ struct KillProcessView: View {
     // MARK: Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Form {
-                Section {
-                    Toggle(strings.groupToggle, isOn: groupBinding)
-                    Text(strings.groupCaption)
-                        .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField(strings.searchPlaceholder, text: $service.query)
+                        .textFieldStyle(.plain)
+                    if service.isRefreshing {
+                        ProgressView().controlSize(.small)
+                    }
                 }
-                Section {
-                    Toggle(strings.commandBarToggle, isOn: $commandBarEnabled)
-                    Text(strings.commandBarCaption)
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .formStyle(.grouped)
-            .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-            HStack(spacing: 16) {
-                Spacer()
                 Text(String(format: strings.processCountFormat, service.filteredEntries.count))
-                    .font(.caption)
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+
                 Button {
                     service.refresh(force: true)
                 } label: {
-                    Image(systemName: "arrow.clockwise").foregroundStyle(.secondary)
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 .help(strings.refreshTooltip)
             }
 
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField(strings.searchPlaceholder, text: $service.query)
-                    .textFieldStyle(.plain)
-                if service.isRefreshing {
-                    ProgressView().controlSize(.small)
-                }
+            HStack(spacing: 18) {
+                Toggle(strings.groupToggle, isOn: groupBinding)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help(strings.groupCaption)
+
+                Toggle(strings.commandBarToggle, isOn: $commandBarEnabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help(strings.commandBarCaption)
+
+                Spacer(minLength: 0)
             }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private var groupBinding: Binding<Bool> {
@@ -210,31 +220,53 @@ struct KillProcessView: View {
             }
             .frame(minWidth: 44)
             .disabled(entry.isProtected)
+            .opacity(hoveredPID == entry.pid ? 1 : 0)
+            .allowsHitTesting(hoveredPID == entry.pid)
             Menu {
-                Button(strings.forceKillButton) { pendingAction = .kill(entry, force: true) }
-                    .disabled(entry.isProtected)
-                Button(String(format: strings.killAllFormat, entry.name)) {
-                    pendingAction = .killAll(name: entry.name, force: false)
-                }
-                .disabled(entry.isProtected)
-                Button(strings.killTreeButton) { pendingAction = .killTree(entry, force: false) }
-                    .disabled(entry.isProtected)
-                if service.canRestart(entry) {
-                    Button(strings.restartButton) { service.restart(entry) }
-                }
-                Divider()
-                Button(strings.copyPID) { copy(String(entry.pid)) }
-                Button(strings.copyPath) { copy(entry.path) }
+                rowActions(for: entry)
             } label: {
                 Image(systemName: "ellipsis")
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .frame(minWidth: 44)
+            .opacity(hoveredPID == entry.pid ? 1 : 0)
+            .allowsHitTesting(hoveredPID == entry.pid)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
         .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onHover { isHovered in
+            if isHovered {
+                hoveredPID = entry.pid
+            } else if hoveredPID == entry.pid {
+                hoveredPID = nil
+            }
+        }
+        .contextMenu {
+            Button(strings.killButton) { pendingAction = .kill(entry, force: false) }
+                .disabled(entry.isProtected)
+            rowActions(for: entry)
+        }
+    }
+
+    @ViewBuilder
+    private func rowActions(for entry: KillProcessEntry) -> some View {
+        Button(strings.forceKillButton) { pendingAction = .kill(entry, force: true) }
+            .disabled(entry.isProtected)
+        Button(String(format: strings.killAllFormat, entry.name)) {
+            pendingAction = .killAll(name: entry.name, force: false)
+        }
+        .disabled(entry.isProtected)
+        Button(strings.killTreeButton) { pendingAction = .killTree(entry, force: false) }
+            .disabled(entry.isProtected)
+        if service.canRestart(entry) {
+            Button(strings.restartButton) { service.restart(entry) }
+        }
+        Divider()
+        Button(strings.copyPID) { copy(String(entry.pid)) }
+        Button(strings.copyPath) { copy(entry.path) }
     }
 
     // MARK: Confirmation

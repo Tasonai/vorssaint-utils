@@ -120,14 +120,6 @@ struct TextSnippetsSettings: View {
                 } label: {
                     Label(text.addButton, systemImage: "plus")
                 }
-            } footer: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(text.variablesHint)
-                    Text(text.variablesCaption)
-                    Text(text.variablesFormatCaption)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

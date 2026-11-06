@@ -7,6 +7,7 @@ struct PortManagerView: View {
     @ObservedObject private var service = PortManagerService.shared
     @State private var pending: PortManagerEntry?
     @State private var force = false
+    @State private var hoveredPortID: String?
     @ObservedObject private var l10n = L10n.shared
 
     private var strings: PortManagerFeatureStrings { FeatureStrings.portManager(l10n.language) }
@@ -95,11 +96,6 @@ struct PortManagerView: View {
 
     private func portRow(_ entry: PortManagerEntry) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "network")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 18)
-
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(String(entry.port))
@@ -123,7 +119,7 @@ struct PortManagerView: View {
                     .truncationMode(.middle)
             }
             Spacer(minLength: 4)
-            if AppFeature.killProcess.isAvailable {
+            if AppFeature.killProcess.isAvailable, hoveredPortID == entry.id {
                 HStack(spacing: 4) {
                     Button(strings.kill) { force = false; pending = entry }
                         .buttonStyle(.bordered).controlSize(.mini)
@@ -139,6 +135,13 @@ struct PortManagerView: View {
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
+        .onHover { isHovered in
+            if isHovered {
+                hoveredPortID = entry.id
+            } else if hoveredPortID == entry.id {
+                hoveredPortID = nil
+            }
+        }
         .contextMenu {
             PortManagerRowActions(entry: entry, language: l10n.language)
         }

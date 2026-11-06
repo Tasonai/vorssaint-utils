@@ -45,14 +45,11 @@ struct AudioPriorityDisclosure: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help(l10n.s.audioPriorityCaption)
             }
 
             if expanded {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(l10n.s.audioPriorityCaption)
-                        .font(.system(size: 9.5))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                     outputPrioritySubsection
                     Divider()
                     inputPrioritySubsection
