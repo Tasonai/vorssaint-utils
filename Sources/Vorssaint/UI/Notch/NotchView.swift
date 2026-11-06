@@ -375,6 +375,7 @@ struct NotchView: View {
                 // offers the same actions either way.
                 HStack(spacing: 8) {
                     NotchPrivacyHeaderBadge()
+                    NotchExpandedAudioBadge()
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 6) { items.trailing; trailingSections(band); updateControl(band); pinMark }
                         HStack(spacing: 6) {
