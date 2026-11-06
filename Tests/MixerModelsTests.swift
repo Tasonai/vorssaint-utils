@@ -82,5 +82,11 @@ enum MixerModelsTests {
         let hidden = MixerHiddenApp(id: "com.apple.quicktimeplayerx", name: "QuickTime Player")
         suite.expect(hidden.id == "com.apple.quicktimeplayerx", "MixerHiddenApp id matches")
         suite.expect(hidden.name == "QuickTime Player", "MixerHiddenApp name matches")
+
+        // 4. Mixer Service Presets & Mute Methods
+        let mixerSource = (try? String(contentsOfFile: "Sources/Vorssaint/Services/Audio/AppVolumeMixer.swift", encoding: .utf8)) ?? ""
+        suite.expect(mixerSource.contains("func toggleMuteFrontmostApp()"), "AppVolumeMixer supports muting frontmost app")
+        suite.expect(mixerSource.contains("func setPresetVolume("), "AppVolumeMixer supports setting preset volumes")
+        suite.expect(mixerSource.contains("func toggleMute("), "AppVolumeMixer supports toggling mute")
     }
 }

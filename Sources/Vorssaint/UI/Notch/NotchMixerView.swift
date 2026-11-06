@@ -638,6 +638,15 @@ private struct NotchAppFader: View {
         }
         if !app.isBypassed {
             if app.persistenceID != nil { Divider() }
+            Menu(l10n.language == .ru ? "Уровень громкости" : "Volume Preset") {
+                Button("0% (\(l10n.s.actionMute))") { mixer.setVolume(0, for: app) }
+                Button("25%") { mixer.setVolume(0.25, for: app) }
+                Button("50%") { mixer.setVolume(0.50, for: app) }
+                Button("75%") { mixer.setVolume(0.75, for: app) }
+                Button("100% (1.0x)") { mixer.setVolume(1.0, for: app) }
+                Button("150% (1.5x)") { mixer.setVolume(1.5, for: app) }
+                Button("200% (2.0x)") { mixer.setVolume(2.0, for: app) }
+            }
             Picker(l10n.s.mixerOutputTooltip, selection: outputSelection) {
                 Text(l10n.s.mixerOutputDefault).tag(MixerRoutingSupport.systemDefaultSelectionID)
                 ForEach(mixer.outputDevices) { device in

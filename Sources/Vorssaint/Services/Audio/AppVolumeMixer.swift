@@ -1190,6 +1190,24 @@ final class AppVolumeMixer: ObservableObject {
         }
     }
 
+    /// Toggles mute for the currently active/frontmost application.
+    @discardableResult
+    func toggleMuteFrontmostApp() -> Bool {
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else { return false }
+        let pid = frontmost.processIdentifier
+        let bundleID = frontmost.bundleIdentifier
+        if let app = apps.first(where: { $0.ownerPid == pid || ($0.persistenceID != nil && $0.persistenceID == bundleID) }) {
+            toggleMute(app)
+            return true
+        }
+        return false
+    }
+
+    /// Sets volume to a specific preset fraction (e.g. 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0).
+    func setPresetVolume(_ fraction: Double, for app: MixerApp) {
+        setVolume(max(0, min(Self.maxVolume, fraction)), for: app)
+    }
+
     /// Main-thread only. Engine creation happens off-main (CoreAudio object
     /// setup takes tens of milliseconds) and lands back here exactly once.
     ///

@@ -36,9 +36,9 @@
   - **Arch**: Standalone domain models with identity hashing, equality, and persistence mapping.
   - **Status**: done
 
-- [todo] **Story 2.2**: App audio mute shortcuts and individual volume presets
-  - **UX**: 1-click quick-mute on mixer app rows and global toggle per focused app.
-  - **Status**: todo
+- [x] **Story 2.2**: App audio mute shortcuts and individual volume presets
+  - **UX**: 1-click quick-mute on mixer app rows, volume presets (0%, 25%, 50%, 75%, 100%, 150%, 200%) and global toggle per focused app.
+  - **Status**: done
 
 - [todo] **Story 2.3**: Dynamic Island Audio Level Visualizer in expanded notch view
   - **UX**: Visual audio equalizer reflects live app mixer activity in expanded island.

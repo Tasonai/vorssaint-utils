@@ -1054,6 +1054,17 @@ private struct MixerRow: View {
             Label(isPinned ? arrangementStrings.unpin : arrangementStrings.pin,
                   systemImage: isPinned ? "pin.slash" : "pin")
         }
+        if !app.isBypassed {
+            Menu(l10n.language == .ru ? "Уровень громкости" : "Volume Preset") {
+                Button("0% (\(l10n.s.actionMute))") { mixer.setVolume(0, for: app) }
+                Button("25%") { mixer.setVolume(0.25, for: app) }
+                Button("50%") { mixer.setVolume(0.50, for: app) }
+                Button("75%") { mixer.setVolume(0.75, for: app) }
+                Button("100% (1.0x)") { mixer.setVolume(1.0, for: app) }
+                Button("150% (1.5x)") { mixer.setVolume(1.5, for: app) }
+                Button("200% (2.0x)") { mixer.setVolume(2.0, for: app) }
+            }
+        }
         if app.supportsVolumeOverride {
             Divider()
             Toggle(sharingStrings.allowVolumeControl, isOn: Binding(
