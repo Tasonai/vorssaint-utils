@@ -588,18 +588,23 @@ private struct NotchAppFader: View {
             }
         }
         .overlay(alignment: .bottomLeading) {
-            // An app sent to its own device wears the route on its icon; the
-            // panel's row shows the picker itself, which the column has no
-            // room for.
+            // An app sent to its own device wears the route on its icon; clicking it
+            // opens a 1-click device switcher for this specific app.
             if routed {
-                Image(systemName: app.outputDeviceUnavailable ? "exclamationmark.triangle.fill" : "arrow.triangle.branch")
-                    .font(.system(size: 7, weight: .bold))
-                    .foregroundStyle(app.outputDeviceUnavailable ? Color.orange : Color.white)
-                    .frame(width: 12, height: 12)
-                    .background(.black, in: Circle())
-                    .offset(x: -2, y: 1)
-                    .help(routeDescription)
-                    .accessibilityLabel(routeDescription)
+                Menu {
+                    quickRoutingMenuItems
+                } label: {
+                    Image(systemName: app.outputDeviceUnavailable ? "exclamationmark.triangle.fill" : "arrow.triangle.branch")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(app.outputDeviceUnavailable ? Color.orange : Color.white)
+                        .frame(width: 14, height: 14)
+                        .background(.black, in: Circle())
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .offset(x: -2, y: 1)
+                .help(routeDescription)
+                .accessibilityLabel(routeDescription)
             }
         }
     }
@@ -671,6 +676,38 @@ private struct NotchAppFader: View {
         if app.persistenceID != nil {
             Divider()
             Button(l10n.s.mixerHideFromList) { mixer.hideFromList(app) }
+        }
+    }
+
+    @ViewBuilder private var quickRoutingMenuItems: some View {
+        Button {
+            mixer.setOutputDeviceUID(nil, for: app)
+        } label: {
+            Label(
+                title: { Text(l10n.s.mixerOutputDefault) },
+                icon: { Image(systemName: app.selectedOutputDeviceUID == nil ? "checkmark" : "speaker") }
+            )
+        }
+        Divider()
+        ForEach(mixer.outputDevices) { device in
+            Button {
+                mixer.setOutputDeviceUID(device.uid, for: app)
+            } label: {
+                Label(
+                    title: { Text(device.isDefault ? "\(device.name) (\(l10n.s.mixerOutputCurrent))" : device.name) },
+                    icon: {
+                        Image(systemName: app.selectedOutputDeviceUID == device.uid ? "checkmark" : device.systemImageName)
+                    }
+                )
+            }
+        }
+        if mixer.outputDevices.contains(where: { MixerRoutingSupport.isAirPlaySentinel($0.uid) }) {
+            Divider()
+            Button {
+                mixer.setOutputDeviceUID(MixerRoutingSupport.airPlaySpeakerChoiceID, for: app)
+            } label: {
+                Label(l10n.s.mixerAirPlayChooseSpeaker, systemImage: "airplayaudio")
+            }
         }
     }
 

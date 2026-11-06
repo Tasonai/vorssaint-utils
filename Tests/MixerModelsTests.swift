@@ -48,6 +48,8 @@ enum MixerModelsTests {
         suite.expect(device1.id == "dev-1", "MixerOutputDevice identifies by id")
         suite.expect(device1.audioObjectID == 42, "MixerOutputDevice preserves CoreAudio AudioObjectID")
         suite.expect(headphones.isHeadphones, "MixerOutputDevice reflects headphone state")
+        suite.expect(headphones.systemImageName == "headphones", "Headphones device uses headphones SF Symbol")
+        suite.expect(device1.systemImageName == "speaker.wave.2.fill", "Speaker device uses speaker SF Symbol")
 
         // 2. MixerApp
         var app = MixerApp(

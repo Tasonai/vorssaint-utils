@@ -48,6 +48,16 @@
   - **Arch**: Isolate AudioServerPlugIn tap registration, active tap map, and device routing logic into dedicated service.
   - **Status**: done
 
-- [todo] **Story 2.5**: Quick app audio routing menu in Dynamic Island & Menu Bar
+- [x] **Story 2.5**: Quick app audio routing menu in Dynamic Island & Menu Bar
   - **UX**: Redirect audio of specific apps to different audio output devices (Headphones, External Display, Built-in Speakers) with 1 click.
+  - **Status**: done
+
+## Milestone 3: Dynamic Island HUD & Shelf Evolution
+
+- [todo] **Story 3.1**: Island HUD indicator badges for volume & display brightness changes
+  - **UX**: When user adjusts volume or screen brightness via keyboard keys, show smooth mini-bar animation inside Dynamic Island wings.
+  - **Status**: todo
+
+- [todo] **Story 3.2**: Shelf quick-drop target zone in Dynamic Island
+  - **UX**: Dragging files towards the top notch reveals a spring-loaded quick-stash shelf target.
   - **Status**: todo

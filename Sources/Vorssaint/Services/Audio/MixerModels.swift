@@ -29,6 +29,19 @@ struct MixerOutputDevice: Identifiable, Equatable {
         self.priorityTier = priorityTier
         self.audioObjectID = audioObjectID
     }
+
+    var systemImageName: String {
+        if isHeadphones { return "headphones" }
+        if MixerRoutingSupport.isAirPlaySentinel(uid) { return "airplayaudio" }
+        let lower = name.lowercased()
+        if lower.contains("display") || lower.contains("hdmi") || lower.contains("tv") || lower.contains("monitor") {
+            return "display"
+        }
+        if lower.contains("speaker") || lower.contains("динамик") {
+            return "speaker.wave.2.fill"
+        }
+        return "speaker.fill"
+    }
 }
 
 /// One app in the mixer: every audio-producing process it is responsible for,

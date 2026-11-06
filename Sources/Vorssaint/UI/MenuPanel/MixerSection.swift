@@ -1064,6 +1064,9 @@ private struct MixerRow: View {
                 Button("150% (1.5x)") { mixer.setVolume(1.5, for: app) }
                 Button("200% (2.0x)") { mixer.setVolume(2.0, for: app) }
             }
+            Menu(l10n.s.mixerOutputTooltip) {
+                quickRoutingMenuItems
+            }
         }
         if app.supportsVolumeOverride {
             Divider()
@@ -1121,6 +1124,38 @@ private struct MixerRow: View {
 
     private func outputDeviceTitle(_ device: MixerOutputDevice) -> String {
         device.isDefault ? "\(device.name) (\(l10n.s.mixerOutputCurrent))" : device.name
+    }
+
+    @ViewBuilder private var quickRoutingMenuItems: some View {
+        Button {
+            mixer.setOutputDeviceUID(nil, for: app)
+        } label: {
+            Label(
+                title: { Text(l10n.s.mixerOutputDefault) },
+                icon: { Image(systemName: app.selectedOutputDeviceUID == nil ? "checkmark" : "speaker") }
+            )
+        }
+        Divider()
+        ForEach(mixer.outputDevices) { device in
+            Button {
+                mixer.setOutputDeviceUID(device.uid, for: app)
+            } label: {
+                Label(
+                    title: { Text(outputDeviceTitle(device)) },
+                    icon: {
+                        Image(systemName: app.selectedOutputDeviceUID == device.uid ? "checkmark" : device.systemImageName)
+                    }
+                )
+            }
+        }
+        if mixer.outputDevices.contains(where: { MixerRoutingSupport.isAirPlaySentinel($0.uid) }) {
+            Divider()
+            Button {
+                mixer.setOutputDeviceUID(MixerRoutingSupport.airPlaySpeakerChoiceID, for: app)
+            } label: {
+                Label(l10n.s.mixerAirPlayChooseSpeaker, systemImage: "airplayaudio")
+            }
+        }
     }
 }
 
