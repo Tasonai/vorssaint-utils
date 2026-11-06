@@ -72,12 +72,7 @@ struct NotchCapsuleNoticeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tint: Color {
-        switch notice.event {
-        // A warning reads as one in any agent's color; other AI notices wear it.
-        case .agents: return notice.symbol.hasPrefix("exclamationmark") ? .orange : notice.agent?.tint ?? .white
-        case .timer: return .orange
-        default: return .white
-        }
+        NotchHUDTheme.tint(for: notice.event, level: notice.level, symbol: notice.symbol)
     }
 
     var body: some View {
@@ -112,14 +107,15 @@ struct NotchCapsuleNoticeView: View {
             NotchCapsuleSymbol(name: notice.symbol, tint: tint)
             NotchMeter(value: level, height: CapsuleLayout.meterHeight, tint: tint)
                 .frame(width: CapsuleLayout.meterWidth)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: level)
+                .animation(reduceMotion ? nil : NotchHUDTheme.levelSpring, value: level)
             Text(notice.detail)
                 .font(Font(CapsuleLayout.levelFont as CTFont))
+                .foregroundStyle(tint)
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .frame(width: CapsuleLayout.levelReadingWidth(notice.detail), alignment: .trailing)
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: notice.detail)
+        .animation(reduceMotion ? nil : NotchHUDTheme.levelSpring, value: notice.detail)
         .transaction { $0.disablesAnimations = false }
     }
 

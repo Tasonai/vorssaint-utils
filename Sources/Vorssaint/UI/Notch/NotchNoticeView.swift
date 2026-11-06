@@ -14,13 +14,7 @@ struct NotchNoticeView: View {
 
     private var wings: NotchNoticeWings { notice.wings(in: geometry) }
     private var tint: Color {
-        switch notice.event {
-        // A warning reads as one in any agent's color; other AI notices wear it.
-        case .agents: return notice.symbol.hasPrefix("exclamationmark") ? .orange : notice.agent?.tint ?? .white
-        // The timer's notice keeps the orange its strip and page wear.
-        case .timer: return .orange
-        default: return .white
-        }
+        NotchHUDTheme.tint(for: notice.event, level: notice.level, symbol: notice.symbol)
     }
     /// The words of a timer's notice share its orange too.
     private var textTint: Color { notice.event == .timer ? .orange : .white }
@@ -127,8 +121,8 @@ struct NotchNoticeView: View {
                 .lineLimit(NotchNotificationBannerLayout.messageLines(stripHeight: geometry.stripHeight))
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else if let level = notice.level {
-            NotchMeter(value: level, height: 5, tint: tint)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: level)
+            NotchMeter(value: level, height: NotchHUDTheme.meterHeight, tint: tint)
+                .animation(reduceMotion ? nil : NotchHUDTheme.levelSpring, value: level)
                 .transaction { $0.disablesAnimations = false }
         } else {
             Text(notice.detail)
@@ -156,14 +150,20 @@ struct NotchExpandedLevelView: View {
     /// from the player's cover, keeps the glyph and a meter long enough to read.
     var showsDetail = true
 
+    private var tint: Color {
+        NotchHUDTheme.tint(for: notice.event, level: notice.level, symbol: notice.symbol)
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: notice.symbol)
+                .foregroundStyle(tint)
                 .frame(width: 18)
-            NotchMeter(value: notice.level ?? 0, height: 5, tint: .white)
+            NotchMeter(value: notice.level ?? 0, height: NotchHUDTheme.meterHeight, tint: tint)
                 .frame(maxWidth: 96)
             if showsDetail {
                 Text(notice.detail)
+                    .foregroundStyle(tint)
                     .monospacedDigit()
                     .fixedSize()
             }

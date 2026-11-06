@@ -58,16 +58,22 @@ struct NotchLiveEqualizerBars: View {
 /// thin system bar, so every meter in the panel matches.
 struct NotchMeter: View {
     let value: Double
-    var height: CGFloat = 5
+    var height: CGFloat = NotchHUDTheme.meterHeight
     var tint: Color = .white
 
     var body: some View {
         let fraction = value.isFinite ? min(1, max(0, value)) : 0
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule(style: .continuous).fill(.white.opacity(0.14))
+                Capsule(style: .continuous).fill(.white.opacity(NotchHUDTheme.trackOpacity))
                 Capsule(style: .continuous)
-                    .fill(tint.opacity(0.9))
+                    .fill(
+                        LinearGradient(
+                            colors: [tint, tint.opacity(0.85)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(width: max(fraction > 0 ? height : 0, proxy.size.width * fraction))
             }
         }

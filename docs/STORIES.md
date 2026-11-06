@@ -54,9 +54,9 @@
 
 ## Milestone 3: Dynamic Island HUD & Shelf Evolution
 
-- [todo] **Story 3.1**: Island HUD indicator badges for volume & display brightness changes
-  - **UX**: When user adjusts volume or screen brightness via keyboard keys, show smooth mini-bar animation inside Dynamic Island wings.
-  - **Status**: todo
+- [x] **Story 3.1**: Island HUD indicator badges for volume & display brightness changes
+  - **UX**: When user adjusts volume or screen brightness via keyboard keys, show smooth mini-bar animation inside Dynamic Island wings with distinct semantic tints (solar amber for brightness, cool cyan for keyboard backlight, alert coral for mute, spring physics).
+  - **Status**: done
 
 - [todo] **Story 3.2**: Shelf quick-drop target zone in Dynamic Island
   - **UX**: Dragging files towards the top notch reveals a spring-loaded quick-stash shelf target.
