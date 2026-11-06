@@ -15,6 +15,7 @@ struct CameraPreviewView: View {
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var service = CameraPreviewService.shared
     @State private var hovering = false
+    @State private var menuHovered = false
 
     private var strings: CameraPreviewFeatureStrings {
         FeatureStrings.cameraPreview(l10n.language)
@@ -113,12 +114,17 @@ struct CameraPreviewView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
+            .background(.black.opacity(menuHovered ? 0.72 : 0.55), in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(menuHovered ? 0.35 : 0.16), lineWidth: 1)
+            )
+            .onHover { menuHovered = $0 }
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
         .foregroundStyle(.white)
-        .background(.black.opacity(0.55), in: Capsule())
         .accessibilityLabel(strings.cameraMenuLabel)
     }
 

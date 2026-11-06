@@ -197,6 +197,7 @@ private struct AppearanceChoice: View {
     let title: String
     let selected: Bool
     let action: () -> Void
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
@@ -206,20 +207,23 @@ private struct AppearanceChoice: View {
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.12),
+                            .strokeBorder(selected ? Color.accentColor
+                                                   : Color.primary.opacity(isHovered ? 0.25 : 0.12),
                                           lineWidth: selected ? 2 : 1)
                     }
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(selected ? Color.accentColor : .primary)
+                    .foregroundStyle(selected ? Color.accentColor : (isHovered ? .primary : .secondary))
             }
             .frame(maxWidth: .infinity)
             .padding(8)
-            .background(selected ? Color.accentColor.opacity(0.08) : Color.clear,
+            .background(selected ? Color.accentColor.opacity(isHovered ? 0.12 : 0.08)
+                                 : (isHovered ? Color.primary.opacity(0.04) : Color.clear),
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
         .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }

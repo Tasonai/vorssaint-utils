@@ -100,6 +100,8 @@ struct CleanerView: View {
     /// The panel hosted card starts folded; the Settings page shows it open.
     @State private var scheduleExpanded = false
     @State private var whatsAppExpanded = false
+    @State private var scheduleHovered = false
+    @State private var whatsAppHovered = false
     /// Tightens paddings for the panel and launcher.
     var compact = false
 
@@ -358,9 +360,7 @@ struct CleanerView: View {
     private var whatsAppCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                var transaction = Transaction(animation: nil)
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
+                withAnimation(.easeOut(duration: 0.16)) {
                     whatsAppExpanded.toggle()
                 }
             } label: {
@@ -379,9 +379,14 @@ struct CleanerView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(11)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.primary.opacity(whatsAppHovered ? 0.05 : 0))
+                )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .onHover { whatsAppHovered = $0 }
 
             if whatsAppExpanded {
                 VStack(alignment: .leading, spacing: 8) {
@@ -509,9 +514,7 @@ struct CleanerView: View {
         if compact {
             VStack(alignment: .leading, spacing: 0) {
                 Button {
-                    var transaction = Transaction(animation: nil)
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
+                    withAnimation(.easeOut(duration: 0.16)) {
                         scheduleExpanded.toggle()
                     }
                 } label: {
@@ -530,9 +533,14 @@ struct CleanerView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.primary.opacity(scheduleHovered ? 0.05 : 0))
+                    )
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .onHover { scheduleHovered = $0 }
 
                 if scheduleExpanded {
                     VStack(alignment: .leading, spacing: 8) {

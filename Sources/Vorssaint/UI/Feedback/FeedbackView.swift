@@ -50,6 +50,7 @@ struct FeedbackView: View {
                 .font(.title2.weight(.semibold))
             Spacer()
             Button(strings.done, action: onClose)
+                .keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 18)
@@ -198,6 +199,7 @@ struct FeedbackView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 400)
             Button(strings.done, action: onClose)
+                .keyboardShortcut(.cancelAction)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .padding(.top, 8)

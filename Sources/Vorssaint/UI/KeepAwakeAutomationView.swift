@@ -87,6 +87,23 @@ struct KeepAwakeAutomationEditor: View {
                                icon: String,
                                selected: Bool,
                                action: @escaping () -> Void) -> some View {
+        KeepAwakeConditionTile(title: title,
+                               icon: icon,
+                               selected: selected,
+                               compact: compact,
+                               action: action)
+    }
+}
+
+private struct KeepAwakeConditionTile: View {
+    let title: String
+    let icon: String
+    let selected: Bool
+    let compact: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: compact ? 5 : 7) {
                 HStack {
@@ -94,11 +111,9 @@ struct KeepAwakeAutomationEditor: View {
                         .font(.system(size: compact ? 14 : 17, weight: .semibold))
                         .foregroundStyle(selected ? Color.accentColor : Color.secondary)
                     Spacer(minLength: 4)
-                    if selected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: compact ? 11 : 13, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                    }
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: compact ? 11 : 13, weight: .semibold))
+                        .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(isHovered ? 0.45 : 0.25))
                 }
                 Text(title)
                     .font(.system(size: compact ? 10 : 12, weight: .medium))
@@ -110,15 +125,17 @@ struct KeepAwakeAutomationEditor: View {
             .frame(maxWidth: .infinity, minHeight: compact ? 65 : 78, alignment: .topLeading)
             .background(
                 RoundedRectangle(cornerRadius: compact ? 9 : 11, style: .continuous)
-                    .fill(selected ? Color.accentColor.opacity(0.11) : Color.primary.opacity(0.045))
+                    .fill(selected ? Color.accentColor.opacity(isHovered ? 0.16 : 0.11)
+                                   : Color.primary.opacity(isHovered ? 0.08 : 0.045))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: compact ? 9 : 11, style: .continuous)
-                    .strokeBorder(selected ? Color.accentColor.opacity(0.32) : Color.primary.opacity(0.08))
+                    .strokeBorder(selected ? Color.accentColor.opacity(isHovered ? 0.5 : 0.32)
+                                           : Color.primary.opacity(isHovered ? 0.16 : 0.08))
             )
             .contentShape(RoundedRectangle(cornerRadius: compact ? 9 : 11, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
-
 }

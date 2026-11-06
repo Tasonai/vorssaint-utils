@@ -61,10 +61,57 @@ struct KeepAwakeIconPicker: View {
     }
 
     private func iconButton(_ icon: KeepAwakeActiveIcon) -> some View {
-        let selected = icon == selectedIcon
-        return Button {
+        KeepAwakeIconButton(icon: icon,
+                            selected: icon == selectedIcon,
+                            selectedTint: selectedTint,
+                            compact: compact,
+                            title: title(icon)) {
             iconValue = icon.rawValue
-        } label: {
+        }
+    }
+
+    /// The Vorssaint choice draws whatever the menu bar shows, which can be a
+    /// symbol chosen in the menu bar settings.
+    private func title(_ icon: KeepAwakeActiveIcon) -> String {
+        guard icon == .vorssaint,
+              BlackHoleGlyph.customMark(named: Defaults.sanitizedMenuBarIconSymbol(menuBarSymbol)) != nil
+        else { return icon.title(l10n.s) }
+        return FeatureStrings.generalSettings(l10n.language).menuBarIconTitle
+    }
+
+    private func tintButton(_ tint: KeepAwakeIconTint) -> some View {
+        KeepAwakeTintButton(tint: tint,
+                            selected: tint == selectedTint,
+                            compact: compact,
+                            title: tint.title(l10n.s),
+                            color: tintColor(tint)) {
+            tintValue = tint.rawValue
+        }
+    }
+
+    private func tintColor(_ tint: KeepAwakeIconTint) -> Color? {
+        switch tint {
+        case .orange: return .orange
+        case .green: return .green
+        case .blue: return .blue
+        case .purple: return .purple
+        case .pink: return .pink
+        case .none: return nil
+        }
+    }
+}
+
+private struct KeepAwakeIconButton: View {
+    let icon: KeepAwakeActiveIcon
+    let selected: Bool
+    let selectedTint: KeepAwakeIconTint
+    let compact: Bool
+    let title: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
             Group {
                 if let image = BlackHoleGlyph.activeImage(style: icon, tint: selectedTint) {
                     Image(nsImage: image)
@@ -82,38 +129,37 @@ struct KeepAwakeIconPicker: View {
             .frame(height: compact ? 29 : 35)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selected ? Color.accentColor.opacity(0.14)
-                                   : Color.secondary.opacity(0.06))
+                    .fill(selected ? Color.accentColor.opacity(isHovered ? 0.20 : 0.14)
+                                   : Color.secondary.opacity(isHovered ? 0.12 : 0.06))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .strokeBorder(selected ? Color.accentColor.opacity(0.75)
-                                           : Color.secondary.opacity(0.13),
+                                           : Color.secondary.opacity(isHovered ? 0.25 : 0.13),
                                   lineWidth: selected ? 1.2 : 1)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(title(icon))
-        .accessibilityLabel(title(icon))
+        .onHover { isHovered = $0 }
+        .help(title)
+        .accessibilityLabel(title)
     }
+}
 
-    /// The Vorssaint choice draws whatever the menu bar shows, which can be a
-    /// symbol chosen in the menu bar settings.
-    private func title(_ icon: KeepAwakeActiveIcon) -> String {
-        guard icon == .vorssaint,
-              BlackHoleGlyph.customMark(named: Defaults.sanitizedMenuBarIconSymbol(menuBarSymbol)) != nil
-        else { return icon.title(l10n.s) }
-        return FeatureStrings.generalSettings(l10n.language).menuBarIconTitle
-    }
+private struct KeepAwakeTintButton: View {
+    let tint: KeepAwakeIconTint
+    let selected: Bool
+    let compact: Bool
+    let title: String
+    let color: Color?
+    let action: () -> Void
+    @State private var isHovered = false
 
-    private func tintButton(_ tint: KeepAwakeIconTint) -> some View {
-        let selected = tint == selectedTint
-        return Button {
-            tintValue = tint.rawValue
-        } label: {
+    var body: some View {
+        Button(action: action) {
             ZStack {
-                if let color = tintColor(tint) {
+                if let color {
                     Circle()
                         .fill(color)
                         .frame(width: compact ? 12 : 14, height: compact ? 12 : 14)
@@ -121,9 +167,6 @@ struct KeepAwakeIconPicker: View {
                     Circle()
                         .strokeBorder(Color.secondary, lineWidth: 1.2)
                         .frame(width: compact ? 12 : 14, height: compact ? 12 : 14)
-                    // "slash" is not a symbol the system has, so the bar
-                    // across the circle was never drawn: the choice for no
-                    // icon showed an empty ring.
                     Image(systemName: "line.diagonal")
                         .font(.system(size: compact ? 8 : 9, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -133,28 +176,20 @@ struct KeepAwakeIconPicker: View {
             .frame(height: compact ? 24 : 28)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selected ? Color.accentColor.opacity(0.12) : Color.clear)
+                    .fill(selected ? Color.accentColor.opacity(isHovered ? 0.18 : 0.12)
+                                   : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(selected ? Color.accentColor.opacity(0.7) : Color.clear,
+                    .strokeBorder(selected ? Color.accentColor.opacity(0.7)
+                                           : (isHovered ? Color.primary.opacity(0.18) : Color.clear),
                                   lineWidth: 1.1)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(tint.title(l10n.s))
-        .accessibilityLabel(tint.title(l10n.s))
-    }
-
-    private func tintColor(_ tint: KeepAwakeIconTint) -> Color? {
-        switch tint {
-        case .orange: return .orange
-        case .green: return .green
-        case .blue: return .blue
-        case .purple: return .purple
-        case .pink: return .pink
-        case .none: return nil
-        }
+        .onHover { isHovered = $0 }
+        .help(title)
+        .accessibilityLabel(title)
     }
 }

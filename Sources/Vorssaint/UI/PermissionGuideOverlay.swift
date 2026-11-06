@@ -141,6 +141,7 @@ private struct PermissionGuideCard: View {
     let onStartOver: () -> Void
     let onRelaunch: () -> Void
     let onClose: () -> Void
+    @State private var isCloseHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -158,9 +159,10 @@ private struct PermissionGuideCard: View {
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(isCloseHovered ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                 }
                 .buttonStyle(.plain)
+                .onHover { isCloseHovered = $0 }
                 .help(guide.closeHelp)
             }
 

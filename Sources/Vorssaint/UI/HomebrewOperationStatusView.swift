@@ -125,16 +125,11 @@ struct HomebrewOperationStatusView: View {
     }
 
     private var detailsToggle: some View {
-        Button {
-            showDetails.toggle()
-        } label: {
-            Label(showDetails ? l10n.s.homebrewOperationHideDetails : l10n.s.homebrewOperationShowDetails,
-                  systemImage: showDetails ? "chevron.up" : "chevron.down")
-                .font(.system(size: compact ? 10 : 11, weight: .medium))
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .disabled(log.isEmpty)
+        HomebrewDetailsToggle(showDetails: $showDetails,
+                              hideTitle: l10n.s.homebrewOperationHideDetails,
+                              showTitle: l10n.s.homebrewOperationShowDetails,
+                              compact: compact,
+                              disabled: log.isEmpty)
     }
 
     private var technicalLog: some View {
@@ -299,5 +294,37 @@ private struct HomebrewIndeterminateProgressBar: View {
                 offset = 1.05
             }
         }
+    }
+}
+
+private struct HomebrewDetailsToggle: View {
+    @Binding var showDetails: Bool
+    let hideTitle: String
+    let showTitle: String
+    let compact: Bool
+    let disabled: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.16)) {
+                showDetails.toggle()
+            }
+        } label: {
+            Label(showDetails ? hideTitle : showTitle,
+                  systemImage: showDetails ? "chevron.up" : "chevron.down")
+                .font(.system(size: compact ? 10 : 11, weight: .medium))
+                .foregroundStyle(isHovered ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.primary.opacity(isHovered ? 0.06 : 0))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .disabled(disabled)
     }
 }
