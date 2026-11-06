@@ -250,7 +250,7 @@ struct RecorderInspector: View {
                 .foregroundStyle(Color(white: 0.72))
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
-                .frame(width: 50, alignment: .leading)
+                .frame(width: 64, alignment: .leading)
             Slider(value: Binding(get: { value }, set: onChange), in: 0...1)
                 .controlSize(.mini)
                 .onTapGesture(count: 2) { onReset() }

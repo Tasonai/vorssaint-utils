@@ -56,7 +56,7 @@ struct AppBundleList<Accessory: View>: View {
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
+        DisclosureGroup(isExpanded: $isExpanded.animation(.easeOut(duration: 0.16))) {
             ForEach(sortedBundleIDs, id: \.self) { bundleID in
                 HStack(spacing: 9) {
                     Image(nsImage: InstalledApps.icon(for: bundleID))

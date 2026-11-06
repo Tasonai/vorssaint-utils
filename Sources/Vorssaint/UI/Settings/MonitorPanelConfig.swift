@@ -289,10 +289,12 @@ struct MonitorPanelConfig: View {
         Binding(
             get: { expandedBlocks.contains(id) },
             set: { expanded in
-                if expanded {
-                    expandedBlocks.insert(id)
-                } else {
-                    expandedBlocks.remove(id)
+                withAnimation(.easeOut(duration: 0.16)) {
+                    if expanded {
+                        expandedBlocks.insert(id)
+                    } else {
+                        expandedBlocks.remove(id)
+                    }
                 }
             }
         )

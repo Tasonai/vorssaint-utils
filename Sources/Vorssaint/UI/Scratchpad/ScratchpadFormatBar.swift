@@ -41,7 +41,25 @@ struct ScratchpadFormatBar: View {
     }
 
     private func markButton(_ mark: ScratchpadMark) -> some View {
-        Button { service.apply(mark, through: editor) } label: {
+        ScratchpadMarkButton(mark: mark,
+                             style: style,
+                             tint: tint,
+                             label: text.label(for: mark)) {
+            service.apply(mark, through: editor)
+        }
+    }
+}
+
+private struct ScratchpadMarkButton: View {
+    let mark: ScratchpadMark
+    let style: ScratchpadFormatBar.Style
+    let tint: Color
+    let label: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
             Group {
                 // A letter where one says the thing better than any glyph: every
                 // symbol for a heading reads as font size instead.
@@ -51,12 +69,19 @@ struct ScratchpadFormatBar: View {
                     Image(systemName: mark.symbol).font(.system(size: 12, weight: .medium))
                 }
             }
-            .foregroundStyle(tint)
+            .foregroundStyle(isHovered ? (style.isDark ? Color.white.opacity(0.92) : Color.primary) : tint)
             .frame(width: style.buttonSize, height: style.buttonSize)
+            .background(
+                RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
+                    .fill(style.isDark
+                          ? Color.white.opacity(isHovered ? 0.12 : 0)
+                          : Color.primary.opacity(isHovered ? 0.08 : 0))
+            )
             .contentShape(RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
-        .help(text.label(for: mark))
-        .accessibilityLabel(text.label(for: mark))
+        .onHover { isHovered = $0 }
+        .help(label)
+        .accessibilityLabel(label)
     }
 }

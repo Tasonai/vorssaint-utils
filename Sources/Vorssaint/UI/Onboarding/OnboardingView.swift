@@ -214,6 +214,8 @@ private struct PurposeStep: View {
     @ObservedObject private var l10n = L10n.shared
     @Binding var selectedFeatures: Set<AppFeature>
     @Binding var selectedPreset: FeaturePreset?
+    @State private var hoveredPreset: FeaturePreset?
+    @State private var hoveredFeature: AppFeature?
 
     private var hub: FeatureHubStrings { FeatureStrings.hub(l10n.language) }
 
@@ -289,6 +291,7 @@ private struct PurposeStep: View {
 
     private func bundleCard(_ preset: FeaturePreset) -> some View {
         let selected = selectedPreset == preset
+        let isHovered = hoveredPreset == preset
         return Button {
             selectedPreset = preset
             selectedFeatures = preset.features
@@ -309,26 +312,36 @@ private struct PurposeStep: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
-                if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.accentColor)
-                        .accessibilityHidden(true)
-                }
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(isHovered ? 0.6 : 0.35))
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(selected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.05))
+                    .fill(selected
+                          ? Color.accentColor.opacity(isHovered ? 0.16 : 0.12)
+                          : Color.primary.opacity(isHovered ? 0.08 : 0.05))
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(selected ? Color.accentColor.opacity(0.45) : .clear,
+                    .strokeBorder(selected
+                                  ? Color.accentColor.opacity(0.45)
+                                  : Color.primary.opacity(isHovered ? 0.14 : 0),
                                   lineWidth: 1)
             }
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { isHovered in
+            if isHovered {
+                hoveredPreset = preset
+            } else if hoveredPreset == preset {
+                hoveredPreset = nil
+            }
+        }
         .accessibilityLabel("\(name(preset)). \(caption(preset))")
         .accessibilityAddTraits(selected ? .isSelected : [])
         .animation(.easeOut(duration: 0.15), value: selectedPreset)
@@ -336,6 +349,7 @@ private struct PurposeStep: View {
 
     private func featureCard(_ feature: AppFeature) -> some View {
         let selected = selectedFeatures.contains(feature)
+        let isHovered = hoveredFeature == feature
         // The picker writes availability through the same runtime gate as the
         // hub, so a feature this Mac cannot run would silently stay off after
         // being ticked here. It is shown and refused instead, exactly as the
@@ -377,18 +391,35 @@ private struct PurposeStep: View {
                 Spacer(minLength: 8)
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(0.45))
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(isHovered ? 0.65 : 0.45))
                     .accessibilityHidden(true)
             }
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(selected ? Color.accentColor.opacity(0.09) : Color.primary.opacity(0.035))
+                    .fill(selected
+                          ? Color.accentColor.opacity(isHovered ? 0.13 : 0.09)
+                          : Color.primary.opacity(isHovered ? 0.065 : 0.035))
             )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(selected
+                                  ? Color.accentColor.opacity(isHovered ? 0.35 : 0.18)
+                                  : Color.primary.opacity(isHovered ? 0.12 : 0),
+                                  lineWidth: 1)
+            }
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { isHovered in
+            guard blocked == nil else { return }
+            if isHovered {
+                hoveredFeature = feature
+            } else if hoveredFeature == feature {
+                hoveredFeature = nil
+            }
+        }
         .disabled(blocked != nil)
         .opacity(blocked == nil ? 1 : 0.4)
         .saturation(blocked == nil ? 1 : 0)
@@ -464,6 +495,7 @@ private struct SelectedPermissionsStep: View {
                     .fill(Color.primary.opacity(0.05))
             )
             .padding(.horizontal, 28)
+            .animation(.easeOut(duration: 0.16), value: showingOtherPermissions)
 
             DisclosureGroup(isExpanded: $showingOtherPermissions) {
                 VStack(alignment: .leading, spacing: 14) {
@@ -486,6 +518,7 @@ private struct SelectedPermissionsStep: View {
                     .fill(Color.primary.opacity(0.05))
             )
             .padding(.horizontal, 28)
+            .animation(.easeOut(duration: 0.16), value: showingOtherPermissions)
 
             Text(l10n.s.permissionRestartNote)
                 .font(.caption)

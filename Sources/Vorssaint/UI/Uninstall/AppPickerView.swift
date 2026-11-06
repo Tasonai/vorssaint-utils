@@ -162,6 +162,7 @@ struct AppPickerView: View {
 private struct AppPickerRow: View {
     let app: InstalledApps.InstalledApp
     var compact: Bool
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: compact ? 7 : 10) {
@@ -186,7 +187,8 @@ private struct AppPickerRow: View {
         .padding(.vertical, compact ? 5 : 7)
         .background {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.primary.opacity(0.001))
+                .fill(Color.primary.opacity(isHovered ? 0.065 : 0.001))
         }
+        .onHover { isHovered = $0 }
     }
 }

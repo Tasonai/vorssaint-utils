@@ -61,7 +61,7 @@ private struct ShelfPill: View {
         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(targeted ? Color.accentColor : Color.white.opacity(0.12),
+                .strokeBorder(targeted ? Color.accentColor : Color.primary.opacity(hovered ? 0.22 : 0.12),
                               lineWidth: targeted ? 2 : 1)
         )
         .scaleEffect(targeted ? 1.06 : 1)

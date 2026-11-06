@@ -346,7 +346,7 @@ struct PanelClipboardView: View {
                     .help(text.delete)
                 }
             }
-            .frame(minHeight: 18)
+            .frame(minHeight: 22)
         }
         .panelCard()
         .onHover { hovering in

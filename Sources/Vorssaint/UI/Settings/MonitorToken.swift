@@ -21,6 +21,7 @@ struct MonitorToken: View {
     /// the checkmark always shows or hides it.
     var select: (() -> Void)? = nil
     @State private var showsOptions = false
+    @State private var isHovered = false
     @Environment(\.isEnabled) private var isEnabled
 
     private var on: Bool { included && available }
@@ -35,12 +36,22 @@ struct MonitorToken: View {
         .font(.system(size: large ? 13 : 12, weight: large ? .medium : .regular))
         .imageScale(large ? .large : .medium)
         .frame(maxWidth: .infinity, minHeight: large ? 40 : 28)
-        .background(on ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.07),
-                    in: RoundedRectangle(cornerRadius: large ? 10 : 8, style: .continuous))
+        .background(
+            on
+                ? Color.accentColor.opacity(isHovered ? 0.17 : 0.12)
+                : Color.secondary.opacity(isHovered ? 0.12 : 0.07),
+            in: RoundedRectangle(cornerRadius: large ? 10 : 8, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: large ? 10 : 8, style: .continuous)
-                .strokeBorder(selected ? Color.accentColor.opacity(0.7) : .clear, lineWidth: 1)
+                .strokeBorder(
+                    selected
+                        ? Color.accentColor.opacity(0.7)
+                        : (isHovered && available ? Color.primary.opacity(0.14) : .clear),
+                    lineWidth: 1
+                )
         }
+        .onHover { isHovered = $0 }
         .popover(isPresented: $showsOptions, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 10) {
                 Label(title, systemImage: symbol).font(.headline)

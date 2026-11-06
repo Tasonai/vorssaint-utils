@@ -28,7 +28,7 @@ struct CutFeedbackView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
         )
         .animation(.easeOut(duration: 0.18), value: service.marked)
         .animation(.easeOut(duration: 0.18), value: service.lastResult)

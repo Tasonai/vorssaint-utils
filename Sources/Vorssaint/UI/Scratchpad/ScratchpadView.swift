@@ -47,7 +47,7 @@ struct ScratchpadView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
         )
         .overlay(ScratchpadResizeOverlay())
         .alert(dialogTitle, isPresented: dialogIsPresented) {
@@ -160,7 +160,7 @@ struct ScratchpadView: View {
                     .font(.system(size: 11, weight: selected ? .semibold : .regular))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                if showClose {
+                if service.canClosePad {
                     Button {
                         requestClose(pad)
                     } label: {
@@ -173,13 +173,20 @@ struct ScratchpadView: View {
                     .buttonStyle(.plain)
                     .help(text.closePad)
                     .accessibilityLabel(text.closePad)
+                    .opacity(showClose ? 1 : 0)
+                    .allowsHitTesting(showClose)
+                    .accessibilityHidden(!showClose)
                 }
             }
                 .padding(.leading, 8)
-                .padding(.trailing, showClose ? 4 : 8)
+                .padding(.trailing, service.canClosePad ? 4 : 8)
                 .frame(minWidth: 46, maxWidth: 130)
                 .frame(height: 24)
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .background {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(!selected && isHovered ? Color.primary.opacity(0.06) : Color.clear)
+                }
                 .background {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(selected ? Color.accentColor.opacity(0.16) : Color.clear)
@@ -375,14 +382,32 @@ struct ScratchpadView: View {
                               _ label: String,
                               tint: Color? = nil,
                               action: @escaping () -> Void) -> some View {
+        ScratchpadFooterButton(symbol: symbol, label: label, tint: tint, action: action)
+    }
+}
+
+private struct ScratchpadFooterButton: View {
+    let symbol: String
+    let label: String
+    let tint: Color?
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+                .foregroundStyle(tint.map(AnyShapeStyle.init)
+                                 ?? (isHovered ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)))
                 .frame(width: 26, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.primary.opacity(isHovered ? 0.08 : 0))
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
         .help(label)
         .accessibilityLabel(label)
     }
