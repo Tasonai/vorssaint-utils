@@ -2019,7 +2019,11 @@ final class NotchService: ObservableObject {
         heldDrag = active && internalDrag
         if !heldDrag { shelfDragExitWork?.cancel(); shelfDragExitWork = nil }
         if active, !internalDrag, NotchSupport.revealsShelfDrag(), !expanded {
+            let wasPlaceholder = dragPlaceholder
             mutatePresentation { dragPlaceholder = true; peeking = false }
+            if !wasPlaceholder {
+                NotchFeedbackService.shared.performOpen()
+            }
         } else if !active {
             mutatePresentation { dragPlaceholder = false }
             inside = windowHost?.containsHover(NSEvent.mouseLocation) == true

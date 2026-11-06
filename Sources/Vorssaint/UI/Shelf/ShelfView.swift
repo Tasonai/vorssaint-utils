@@ -22,6 +22,7 @@ struct ShelfView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var clearButtonHovered = false
     @State private var shareButtonHovered = false
+    @State private var actionsButtonHovered = false
     /// The system share sheet points at a real view, which SwiftUI does not
     /// hand out; this invisible one sits behind the share button.
     @State private var shareAnchor = ShelfSharePickerAnchor.Anchor()
@@ -165,10 +166,82 @@ struct ShelfView: View {
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
             Spacer(minLength: 8)
+            actionsMenuButton
             shareButton
             clearButton
         }
         .frame(minHeight: 30)
+    }
+
+    private var actionsMenuButton: some View {
+        let enabled = shelf.hasFilesForActions
+        let isRussian = l10n.language == .ru
+        return Menu {
+            Button {
+                ShelfActionsEngine.compressToZip(urls: shelf.fileURLsForActions())
+            } label: {
+                Label(isRussian ? "Сжать в ZIP" : "Compress to ZIP", systemImage: "archivebox")
+            }
+
+            let urls = shelf.fileURLsForActions()
+            let hasImages = urls.contains { ShelfInteractionSupport.editableImage(in: [$0]) != nil }
+            if hasImages {
+                Menu {
+                    Button("PNG") {
+                        if let img = urls.first(where: { ShelfInteractionSupport.editableImage(in: [$0]) != nil }) {
+                            ShelfActionsEngine.convertImage(url: img, to: .png)
+                        }
+                    }
+                    Button("JPEG") {
+                        if let img = urls.first(where: { ShelfInteractionSupport.editableImage(in: [$0]) != nil }) {
+                            ShelfActionsEngine.convertImage(url: img, to: .jpeg)
+                        }
+                    }
+                } label: {
+                    Label(isRussian ? "Конвертировать изображение" : "Convert Image", systemImage: "photo.on.rectangle")
+                }
+
+                Button {
+                    for img in urls where ShelfInteractionSupport.editableImage(in: [img]) != nil {
+                        ShelfActionsEngine.stripMetadata(url: img)
+                    }
+                } label: {
+                    Label(isRussian ? "Очистить метаданные (EXIF)" : "Strip EXIF Metadata", systemImage: "shield.lefthalf.filled")
+                }
+
+                Button {
+                    if let img = urls.first(where: { ShelfInteractionSupport.editableImage(in: [$0]) != nil }) {
+                        ShelfActionsEngine.extractTextOCR(from: img)
+                    }
+                } label: {
+                    Label(isRussian ? "Распознать текст (OCR)" : "Recognize Text (OCR)", systemImage: "text.viewfinder")
+                }
+            }
+
+            Button {
+                ShelfActionsEngine.copyFilePaths(urls: shelf.fileURLsForActions())
+            } label: {
+                Label(isRussian ? "Скопировать пути файлов" : "Copy File Paths", systemImage: "doc.on.doc")
+            }
+
+            Divider()
+
+            Button {
+                ShelfQuickLookCoordinator.shared.toggle(urls: shelf.fileURLsForActions())
+            } label: {
+                Label(isRussian ? "Быстрый просмотр (Пробел)" : "Quick Look (Space)", systemImage: "eye")
+            }
+        } label: {
+            footerButtonFace(systemImage: "wand.and.stars", tint: .purple, hovered: actionsButtonHovered && enabled)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .foregroundStyle(actionsButtonHovered ? Color.purple : Color.secondary)
+        .opacity(enabled ? 1 : 0.4)
+        .onHover { actionsButtonHovered = $0 }
+        .disabled(!enabled)
+        .help(isRussian ? "Быстрые действия с файлами" : "Quick Actions")
     }
 
     private var shareButton: some View {

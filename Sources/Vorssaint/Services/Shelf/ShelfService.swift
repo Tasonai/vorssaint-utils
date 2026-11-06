@@ -1415,6 +1415,7 @@ final class ShelfService: ObservableObject {
                 }
             } else if isVisible, let source, source === panel {
                 hide()
+                NotchFeedbackService.shared.performClose()
             } else if dockedVisible, let source, source === dockedPanel {
                 collapseDocked()
             }
@@ -1520,6 +1521,7 @@ final class ShelfService: ObservableObject {
     private func noteAcceptedDrop(_ draggingInfo: NSDraggingInfo) {
         if draggingInfo.draggingDestinationWindow === dockedPanel { dockDidAccept() }
         noteInteraction()
+        NotchFeedbackService.shared.performSelection()
     }
 
     private func filePromiseReceivers(from pasteboard: NSPasteboard) -> [NSFilePromiseReceiver] {
@@ -2531,6 +2533,7 @@ final class ShelfService: ObservableObject {
         updatePointerInsidePanel()
         scheduleAutoHideIfIdle()
         scheduleDockedSync()
+        NotchFeedbackService.shared.performOpen()
     }
 
     func hide() {

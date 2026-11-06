@@ -598,6 +598,53 @@ final class ShelfTileView: NSView, NSDraggingSource {
             menu.addItem(edit)
         }
 
+        // Drop Actions Bar / Quick Actions
+        menu.addItem(.separator())
+        let isRussian = L10n.shared.language == .ru
+
+        let zipTitle = isRussian ? "Сжать в ZIP" : "Compress to ZIP"
+        let zipItem = NSMenuItem(title: zipTitle, action: #selector(compressSelectedToZip), keyEquivalent: "")
+        zipItem.target = self
+        zipItem.image = NSImage(systemSymbolName: "archivebox", accessibilityDescription: nil)
+        menu.addItem(zipItem)
+
+        if let _ = urls.first(where: { ShelfInteractionSupport.editableImage(in: [$0]) != nil }) {
+            let convertMenu = NSMenu(title: isRussian ? "Конвертировать изображение" : "Convert Image")
+            let toPNG = NSMenuItem(title: "PNG", action: #selector(convertToPNG), keyEquivalent: "")
+            toPNG.target = self
+            convertMenu.addItem(toPNG)
+
+            let toJPEG = NSMenuItem(title: "JPEG", action: #selector(convertToJPEG), keyEquivalent: "")
+            toJPEG.target = self
+            convertMenu.addItem(toJPEG)
+
+            let convertItem = NSMenuItem(title: isRussian ? "Конвертировать в..." : "Convert to...", action: nil, keyEquivalent: "")
+            convertItem.image = NSImage(systemSymbolName: "photo.on.rectangle", accessibilityDescription: nil)
+            convertItem.submenu = convertMenu
+            menu.addItem(convertItem)
+
+            let stripTitle = isRussian ? "Очистить метаданные (EXIF)" : "Strip EXIF Metadata"
+            let stripItem = NSMenuItem(title: stripTitle, action: #selector(stripImageMetadata), keyEquivalent: "")
+            stripItem.target = self
+            stripItem.image = NSImage(systemSymbolName: "shield.lefthalf.filled", accessibilityDescription: nil)
+            menu.addItem(stripItem)
+
+            let ocrTitle = isRussian ? "Распознать текст (OCR)" : "Recognize Text (OCR)"
+            let ocrItem = NSMenuItem(title: ocrTitle, action: #selector(extractTextOCR), keyEquivalent: "")
+            ocrItem.target = self
+            ocrItem.image = NSImage(systemSymbolName: "text.viewfinder", accessibilityDescription: nil)
+            menu.addItem(ocrItem)
+        }
+
+        let copyPathTitle = urls.count > 1
+            ? (isRussian ? "Скопировать пути" : "Copy File Paths")
+            : (isRussian ? "Скопировать путь" : "Copy File Path")
+        let copyPathItem = NSMenuItem(title: copyPathTitle, action: #selector(copyFilePaths), keyEquivalent: "")
+        copyPathItem.target = self
+        copyPathItem.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
+        menu.addItem(copyPathItem)
+
+        menu.addItem(.separator())
         menu.addItem(sharePresenter.shareMenuItem(for: urls, title: strings.shelfActionShare))
         menu.addItem(.separator())
 
@@ -658,8 +705,52 @@ final class ShelfTileView: NSView, NSDraggingSource {
     @objc private func quickLookFiles() {
         ShelfService.shared.noteInteraction()
         let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
-        guard let first = urls.first else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([first])
+        guard !urls.isEmpty else { return }
+        ShelfQuickLookCoordinator.shared.toggle(urls: urls)
+    }
+
+    @objc private func compressSelectedToZip() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        ShelfActionsEngine.compressToZip(urls: urls)
+    }
+
+    @objc private func convertToPNG() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        if let imageURL = urls.first(where: { ShelfInteractionSupport.editableImage(in: [$0]) != nil }) {
+            ShelfActionsEngine.convertImage(url: imageURL, to: .png)
+        }
+    }
+
+    @objc private func convertToJPEG() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        if let imageURL = urls.first(where: { ShelfInteractionSupport.editableImage(in: [$0]) != nil }) {
+            ShelfActionsEngine.convertImage(url: imageURL, to: .jpeg)
+        }
+    }
+
+    @objc private func stripImageMetadata() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        for url in urls where ShelfInteractionSupport.editableImage(in: [url]) != nil {
+            ShelfActionsEngine.stripMetadata(url: url)
+        }
+    }
+
+    @objc private func extractTextOCR() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        if let imageURL = urls.first(where: { ShelfInteractionSupport.editableImage(in: [$0]) != nil }) {
+            ShelfActionsEngine.extractTextOCR(from: imageURL)
+        }
+    }
+
+    @objc private func copyFilePaths() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        ShelfActionsEngine.copyFilePaths(urls: urls)
     }
 
     override var acceptsFirstResponder: Bool { true }
