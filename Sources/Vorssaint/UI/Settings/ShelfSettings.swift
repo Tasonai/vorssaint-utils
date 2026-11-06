@@ -17,6 +17,7 @@ struct ShelfSettings: View {
     @AppStorage(DefaultsKey.shelfCloseAfterDrop) private var closeAfterDrop = false
     @AppStorage(DefaultsKey.shelfRemoveAfterDrop) private var removeAfterDrop = true
     @AppStorage(DefaultsKey.shelfClearOnClose) private var clearOnClose = false
+    @AppStorage(DefaultsKey.shelfCatchSystemScreenshots) private var catchSystemScreenshots = true
     @AppStorage(DefaultsKey.notchShelf) private var opensInIsland = true
     @State private var showingAppPicker = false
     @State private var islandShowsFiles = NotchSupport.showsFiles()
@@ -152,6 +153,15 @@ struct ShelfSettings: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Toggle(l10n.s.shelfClearOnClose, isOn: $clearOnClose)
                         Text(l10n.s.shelfClearOnCloseCaption)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Toggle(l10n.language == .ru ? "Перехватывать системные скриншоты" : "Catch system screenshots", isOn: $catchSystemScreenshots)
+                            .onChange(of: catchSystemScreenshots) { _, _ in
+                                ShelfService.shared.syncDragMonitor()
+                            }
+                        Text(l10n.language == .ru ? "Снимки экрана через ⌘⇧3 и ⌘⇧4 сразу появляются на полке." : "Screenshots taken via ⌘⇧3 and ⌘⇧4 automatically appear on the shelf.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

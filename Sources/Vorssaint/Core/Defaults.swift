@@ -212,6 +212,7 @@ enum DefaultsKey {
     static let shelfCloseAfterDrop = "shelfCloseAfterDrop"
     static let shelfRemoveAfterDrop = "shelfRemoveAfterDrop"
     static let shelfClearOnClose = "shelfClearOnClose"
+    static let shelfCatchSystemScreenshots = "shelfCatchSystemScreenshots"
     static let shelfShortcutAddsFinderSelection = "shelfShortcutAddsFinderSelection"
     static let shelfAutomaticExclusions = "shelfAutomaticExclusions" // [bundle id] blocks automatic opening only
     static let extraBrightnessEnabled = "extraBrightnessEnabled"
@@ -1374,6 +1375,7 @@ enum Defaults {
         DefaultsKey.shelfCloseAfterDrop: false,
         DefaultsKey.shelfRemoveAfterDrop: true,
         DefaultsKey.shelfClearOnClose: false,
+        DefaultsKey.shelfCatchSystemScreenshots: true,
         DefaultsKey.shelfShortcutAddsFinderSelection: false,
         DefaultsKey.shelfAutomaticExclusions: [String](),
         DefaultsKey.extraBrightnessEnabled: false,

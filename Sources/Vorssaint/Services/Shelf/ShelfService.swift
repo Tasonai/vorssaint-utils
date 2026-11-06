@@ -380,6 +380,7 @@ final class ShelfService: ObservableObject {
                 || NotchSupport.revealsShelfDrag())
         if wanted { startDragMonitor() } else { stopDragMonitor() }
         syncDockedShelf()
+        SystemScreenshotWatcher.shared.syncWithPreferences()
     }
 
     // MARK: - Triggers

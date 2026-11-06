@@ -721,6 +721,10 @@ final class ShelfTileView: NSView, NSDraggingSource {
         menu.addItem(copyPathItem)
 
         menu.addItem(.separator())
+        let airdropItem = NSMenuItem(title: "AirDrop", action: #selector(shareViaAirDrop), keyEquivalent: "")
+        airdropItem.target = self
+        airdropItem.image = NSImage(systemSymbolName: "airdrop", accessibilityDescription: nil) ?? NSImage(systemSymbolName: "antenna.radiowaves.left.and.right", accessibilityDescription: nil)
+        menu.addItem(airdropItem)
         menu.addItem(sharePresenter.shareMenuItem(for: urls, title: strings.shelfActionShare))
         menu.addItem(.separator())
 
@@ -858,6 +862,18 @@ final class ShelfTileView: NSView, NSDraggingSource {
         let tag = sender.representedObject as? String
         let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
         ShelfActionsEngine.setFinderTag(urls: urls, tag: (tag?.isEmpty == true) ? nil : tag)
+    }
+
+    @objc private func shareViaAirDrop() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        guard !urls.isEmpty else { return }
+        if let airdrop = NSSharingService(named: .sendViaAirDrop),
+           airdrop.canPerform(withItems: urls) {
+            airdrop.perform(withItems: urls)
+        } else {
+            NSSharingServicePicker(items: urls).show(relativeTo: bounds, of: self, preferredEdge: .minY)
+        }
     }
 
     @objc private func copyFilePaths() {

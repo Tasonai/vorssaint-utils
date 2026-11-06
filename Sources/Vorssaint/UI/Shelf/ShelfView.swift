@@ -304,6 +304,15 @@ struct ShelfView: View {
                 Label(isRussian ? "Метка Finder" : "Finder Tag", systemImage: "tag")
             }
 
+            Button {
+                let urls = shelf.fileURLsForActions()
+                if let airdrop = NSSharingService(named: .sendViaAirDrop), airdrop.canPerform(withItems: urls) {
+                    airdrop.perform(withItems: urls)
+                }
+            } label: {
+                Label("AirDrop", systemImage: "airdrop")
+            }
+
             Divider()
 
             Button {
