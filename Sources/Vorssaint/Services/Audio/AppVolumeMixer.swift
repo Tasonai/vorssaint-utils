@@ -41,6 +41,7 @@ final class AppVolumeMixer: ObservableObject {
     /// own toggle hides it, so the panel can offer to bring any of them back.
     @Published private(set) var hiddenApps: [MixerHiddenApp] = []
 
+    public let tapCoordinator = MixerTapCoordinator()
     private var engines: [String: any GainEngine] = [:]
     /// Arbitrates the engine builds running off-main: it suppresses duplicate
     /// builds while a slider keeps dragging, and discards a build that lands
@@ -239,6 +240,7 @@ final class AppVolumeMixer: ObservableObject {
         builds.invalidateAll()
         for engine in engines.values { engine.stop() }
         engines.removeAll()
+        tapCoordinator.clearAll()
         configurationRepairs.removeAll()
         engineChangeAt.removeAll()
         objectsLostAt.removeAll()
@@ -1250,6 +1252,9 @@ final class AppVolumeMixer: ObservableObject {
             outputDeviceUID: targetOutputDeviceUID)
         guard engineRecovery.allowsBuild(app.id, configuration: configuration) else { return }
         guard #available(macOS 14.4, *), let token = builds.begin(app.id) else { return }
+        tapCoordinator.recordBuildStarted(appID: app.id,
+                                          token: token,
+                                          outputDeviceUID: targetOutputDeviceUID)
 
         if MixerRoutingSupport.isAirPlaySentinel(targetOutputDeviceUID) {
             // Without a listed Mac output to clock it, the engine would count
@@ -1327,6 +1332,7 @@ final class AppVolumeMixer: ObservableObject {
         // add a second live tap to the app and render its sound twice.
         guard isCurrentBuild, !stopped else {
             engine?.stop()
+            tapCoordinator.unregister(appID: id)
             return
         }
         guard let engine else {
@@ -1343,8 +1349,12 @@ final class AppVolumeMixer: ObservableObject {
             }
             // A row that still has a tap running is plainly not being refused
             // for lack of consent, so the permission hint stays out of it.
-            if engines[id] == nil, !needsPermission {
-                needsPermission = true
+            if engines[id] == nil {
+                let fallbackUID = apps.first(where: { $0.id == id })?.effectiveOutputDeviceUID ?? ""
+                tapCoordinator.recordPermissionDenied(appID: id, outputDeviceUID: fallbackUID)
+                if !needsPermission {
+                    needsPermission = true
+                }
             }
             // The engine kept in its place skipped the read on the change
             // that called for this build, so its app's level is read now.
@@ -1359,18 +1369,25 @@ final class AppVolumeMixer: ObservableObject {
         // latest state, never an old tap target.
         guard let latestApp = apps.first(where: { $0.id == id }) else {
             engine.stop()
+            tapCoordinator.unregister(appID: id)
             return
         }
         guard latestApp.audioObjects == engine.tappedObjects,
               latestApp.effectiveOutputDeviceUID == engine.outputDeviceUID,
               appNeedsEngine(latestApp) else {
             engine.stop()
+            tapCoordinator.unregister(appID: id)
             applyRouting(for: latestApp)
             return
         }
         engine.gain = MixerRoutingSupport.gain(forVolume: latestApp.volume)
         configurationRepairs.removeValue(forKey: id)
         let previous = engines.updateValue(engine, forKey: id)
+        tapCoordinator.recordBuildFinished(appID: id,
+                                           token: token,
+                                           outputDeviceUID: engine.outputDeviceUID,
+                                           gain: engine.gain,
+                                           objectsCount: engine.tappedObjects.count)
         engineChangeAt[id] = CFAbsoluteTimeGetCurrent()
         // The fresh engine starts its render count over.
         engineRenderProgress.removeValue(forKey: id)
@@ -1385,6 +1402,7 @@ final class AppVolumeMixer: ObservableObject {
     /// or the row went away, never for a rebuild.
     private func discardEngine(for id: String) {
         engines.removeValue(forKey: id)?.stop()
+        tapCoordinator.unregister(appID: id)
         configurationRepairs.removeValue(forKey: id)
         engineChangeAt.removeValue(forKey: id)
         objectsLostAt.removeValue(forKey: id)
@@ -2046,6 +2064,7 @@ final class AppVolumeMixer: ObservableObject {
                     engineRecovery.clear(id)
                 }
                 engineRenderProgress[id] = observation
+                tapCoordinator.recordRenderCycles(appID: id, cycles: engine.renderCycles)
                 nextPassDelay = min(nextPassDelay ?? recheckAfter, recheckAfter)
             case .stalled(let recheckAfter):
                 nextPassDelay = min(nextPassDelay ?? recheckAfter, recheckAfter)

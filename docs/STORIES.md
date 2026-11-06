@@ -44,9 +44,9 @@
   - **UX**: Visual audio equalizer reflects live app mixer activity in expanded island.
   - **Status**: done
 
-- [todo] **Story 2.4**: Extract `MixerTapEngine` audio tap state and lifecycle from `AppVolumeMixer`
+- [x] **Story 2.4**: Extract `MixerTapEngine` audio tap state and lifecycle from `AppVolumeMixer`
   - **Arch**: Isolate AudioServerPlugIn tap registration, active tap map, and device routing logic into dedicated service.
-  - **Status**: todo
+  - **Status**: done
 
 - [todo] **Story 2.5**: Quick app audio routing menu in Dynamic Island & Menu Bar
   - **UX**: Redirect audio of specific apps to different audio output devices (Headphones, External Display, Built-in Speakers) with 1 click.
