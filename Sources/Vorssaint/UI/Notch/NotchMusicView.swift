@@ -23,8 +23,18 @@ struct NotchMusicView: View {
     /// The cover's own colour, used for the moving parts that belong to this
     /// track. Neutral covers keep them white.
     private var accent: Color { service.artworkTint?.color ?? .white }
-    private var showsLyrics: Bool { lyricsEnabled && AppFeature.notchLyrics.isAvailable }
-    private var showsQueue: Bool { queueEnabled && AppFeature.notchQueue.isAvailable }
+    private var isStreamWithoutTracks: Bool {
+        service.playback != nil
+            && service.lacksTrackSkipping(.next)
+            && service.lacksTrackSkipping(.previous)
+            && !shuffle.isOffered
+    }
+    private var showsLyrics: Bool {
+        lyricsEnabled && AppFeature.notchLyrics.isAvailable && (!isStreamWithoutTracks || extra == .lyrics)
+    }
+    private var showsQueue: Bool {
+        queueEnabled && AppFeature.notchQueue.isAvailable && (!isStreamWithoutTracks || extra == .queue)
+    }
     private var showsVolume: Bool { showVolume && AppFeature.mixer.isAvailable }
     private var openExtra: MusicExtra? {
         guard service.playback != nil else { return nil }
@@ -228,6 +238,14 @@ struct NotchMusicView: View {
         if band.pageSectionsButton { NotchSectionsButton(action: NotchService.shared.toggleSections) }
     }
 
+    @ViewBuilder private var backToControlsButton: some View {
+        if !band.besideCamera, NotchSupport.modules().contains(.controls) {
+            NotchIconButton(symbol: "chevron.left", title: FeatureStrings.notch(l10n.language).controls) {
+                NotchService.shared.select(.controls)
+            }
+        }
+    }
+
     private func extraButton(_ target: MusicExtra, title: String, symbol: String) -> some View {
         NotchIconButton(symbol: symbol, title: title, selected: extra == target) {
             extra = extra == target ? nil : target
@@ -309,6 +327,7 @@ struct NotchMusicView: View {
                 }
                 if band.besideCamera { sectionsButton }
             } corner: {
+                backToControlsButton
                 extraButtons
                 sectionsButton
             }
@@ -319,6 +338,8 @@ struct NotchMusicView: View {
                     shuffleButton
                 } else if !band.besideCamera, service.sources.count > 1 || !service.sourceIsAutomatic {
                     sourceMenu(playback)
+                } else {
+                    shuffleButton
                 }
             } middle: { slot in
                 NotchMusicTransport(playback: playback, slot: slot)
@@ -347,17 +368,19 @@ struct NotchMusicView: View {
             // The chosen row, even while the automatic player fills its gap.
             return NotchMenuItem(title: title, checked: source.pid == service.selectedSourcePID) { service.selectSource(source.selection) }
         }
-        return NotchMenuButton(title: extras.playbackSource, items: items, cornerRadius: 6) {
+        return NotchMenuButton(title: extras.playbackSource, items: items, cornerRadius: 22) {
             Group {
                 if let icon {
                     Image(nsImage: icon).resizable().interpolation(.high)
+                        .frame(width: 20, height: 20)
                 } else {
-                    Image(systemName: "app").font(.system(size: 13)).foregroundStyle(.secondary)
+                    Image(systemName: "tv.and.mediabox")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.55))
                 }
             }
-            .frame(width: 18, height: 18)
-            .padding(3)
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
         }
         .help("\(extras.playbackSource): \(name)")
         .accessibilityValue([service.sourceIsAutomatic ? extras.automaticSource : nil, name].compactMap { $0 }.joined(separator: ", "))
@@ -445,9 +468,20 @@ private enum NotchPlayerApps {
     static func app(pid: Int32, bundle: String?) -> (name: String?, icon: NSImage?) {
         if let entry = known[pid], bundle == nil || entry.bundle == bundle { return (entry.name, entry.icon) }
         let running = NSRunningApplication(processIdentifier: pid)
+        let resolvedBundle = running?.bundleIdentifier ?? bundle
+        let icon: NSImage?
+        if running?.activationPolicy == .regular, running?.bundleURL?.pathExtension == "app" {
+            icon = running?.icon
+        } else if let resolvedBundle,
+                  let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: resolvedBundle),
+                  url.pathExtension == "app" {
+            icon = NSWorkspace.shared.icon(forFile: url.path)
+        } else {
+            icon = nil
+        }
         if known.count >= 16 { known.removeAll() }
-        known[pid] = (running?.bundleIdentifier ?? bundle, running?.localizedName, running?.icon)
-        return (running?.localizedName, running?.icon)
+        known[pid] = (resolvedBundle, running?.localizedName, icon)
+        return (running?.localizedName, icon)
     }
 }
 
@@ -569,18 +603,10 @@ private struct NotchMusicTransport: View {
     /// The player's own glyphs, white on the island with no plate behind
     /// them, as on the lock screen. Play and pause stand out by size.
     private var transportButtons: some View {
-        HStack(spacing: slot == nil ? (compact ? 12 : 18) : 0) {
-            if !service.lacksTrackSkipping(.previous) {
-                playbackButton("backward.fill", title: text.mediaPrevious, command: .previous).frame(width: slot)
-            } else if let slot {
-                Color.clear.frame(width: slot)
-            }
+        HStack(spacing: slot == nil ? (compact ? 10 : 18) : 0) {
+            playbackButton("backward.fill", title: text.mediaPrevious, command: .previous).frame(width: slot)
             toggleButton.frame(width: slot)
-            if !service.lacksTrackSkipping(.next) {
-                playbackButton("forward.fill", title: text.mediaNext, command: .next).frame(width: slot)
-            } else if let slot {
-                Color.clear.frame(width: slot)
-            }
+            playbackButton("forward.fill", title: text.mediaNext, command: .next).frame(width: slot)
         }
         .frame(height: height)
     }
@@ -623,15 +649,16 @@ private struct NotchMusicTransport: View {
     }
 
     private func playbackButton(_ symbol: String, title: String, command: NotchMusicService.Command) -> some View {
-        Button { service.send(command, context: playback.commandContext) } label: {
+        let available = !service.lacksTrackSkipping(command) && service.canPerform(command)
+        return Button { service.send(command, context: playback.commandContext) } label: {
             Image(systemName: symbol)
-                .font(.system(size: compact ? 16 : 19, weight: .semibold))
-                .foregroundStyle(.white)
+                .font(.system(size: compact ? 15 : 19, weight: .semibold))
+                .foregroundStyle(.white.opacity(available ? 1 : 0.25))
                 .frame(width: height, height: height)
                 .contentShape(Circle())
         }
         .buttonStyle(NotchButtonStyle(cornerRadius: height / 2))
-        .disabled(!service.canPerform(command))
+        .disabled(!available)
         .accessibilityLabel(title)
         .help(title)
     }

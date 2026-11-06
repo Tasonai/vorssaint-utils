@@ -67,9 +67,12 @@ struct NotchSectionsView: View {
                 if edge == .bottom { service.scrollSections(by: 1) }
                 else if edge == .top { service.scrollSections(by: -1) }
             }
-            indicator(positions: positions, current: first)
-                .frame(width: NotchLayout.sectionIndicatorWidth, alignment: .trailing)
+            if positions > 1 {
+                indicator(positions: positions, current: first)
+                    .frame(width: NotchLayout.sectionIndicatorWidth, alignment: .trailing)
+            }
         }
+        .padding(.horizontal, positions > 1 ? 0 : 4)
         .accessibilityHint(text.sectionKeyboardHint)
     }
 
@@ -147,17 +150,11 @@ struct NotchSectionsView: View {
                 )
             }
             .overlay(alignment: .topTrailing) {
-                if highlighted {
-                    Text("⌥⌘" + module.shortcutKey.uppercased())
-                        .font(.system(size: 8.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 5)
-                } else if current {
+                if current {
                     Circle()
                         .fill(moduleTint)
                         .frame(width: 5, height: 5)
-                        .padding(7)
+                        .padding(8)
                 }
             }
             .contentShape(shape)
@@ -228,10 +225,10 @@ struct NotchSectionSearch: View {
     }
 
     var body: some View {
-        HStack(spacing: expanded ? 4 : 6) {
+        HStack(spacing: expanded ? 4 : 0) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(expanded ? .white : .white.opacity(0.55))
+                .foregroundStyle(expanded ? .white : .white.opacity(0.65))
                 .frame(width: expanded ? 22 : 28, height: 28)
             // The field keeps its focus at a hair's width, so typing filters
             // the gallery before the field has even shown itself.
@@ -239,7 +236,7 @@ struct NotchSectionSearch: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
                 .focused($searching)
-                .frame(maxWidth: expanded ? maximumFieldWidth : 1)
+                .frame(maxWidth: expanded ? maximumFieldWidth : 0)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { fieldWidth = $0 }
                 .opacity(expanded ? 1 : 0)
                 .accessibilityLabel(text.searchSections)
@@ -253,7 +250,7 @@ struct NotchSectionSearch: View {
         }
         .padding(.trailing, expanded ? 8 : 0)
         .frame(height: 28)
-        .background(.white.opacity(expanded ? 0.07 : 0), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(.white.opacity(expanded ? 0.09 : 0.06), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .clipped()
         .onHover { hovering in

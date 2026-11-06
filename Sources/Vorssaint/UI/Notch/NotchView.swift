@@ -156,9 +156,13 @@ struct NotchView: View {
                 let layout = service.compactActivityPickerLayout
                 VStack(spacing: 0) {
                     let strip = service.compactStripSize(for: activity, companion: service.compactCompanion)
+                    let renderStrip = floats
+                        ? CGSize(width: max(strip.width, layout.size.width - NotchActivityPickerLayout.horizontalInset * 2),
+                                 height: strip.height)
+                        : strip
                     ZStack(alignment: .top) {
-                        activityStrip(activity, size: strip)
-                            .frame(width: strip.width, height: layout.headerHeight, alignment: .top)
+                        activityStrip(activity, size: renderStrip)
+                            .frame(width: renderStrip.width, height: layout.headerHeight, alignment: .top)
                             .id(NotchPickedStrip(activity: activity, companion: service.compactCompanion))
                             .transition(.blurReplace)
                     }
@@ -905,21 +909,25 @@ struct NotchActivityPicker: View {
                         Image(systemName: activity.symbol)
                         Text(activity.title(language)).lineLimit(1).minimumScaleFactor(0.8)
                     }
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 10)
+                    .font(.system(size: 12, weight: chosen ? .semibold : .medium))
+                    .padding(.horizontal, 12)
                     .frame(maxWidth: .infinity)
                     .frame(height: NotchActivityPickerLayout.rowHeight)
-                    .foregroundStyle(chosen ? Color.black : Color.white)
+                    .foregroundStyle(Color.white.opacity(chosen ? 1 : 0.72))
                     .background {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.12))
+                            Capsule().fill(Color.white.opacity(0.07))
                             if chosen {
-                                RoundedRectangle(cornerRadius: 8).fill(Color.white)
+                                Capsule()
+                                    .fill(Color.white.opacity(0.18))
+                                    .overlay {
+                                        Capsule().strokeBorder(Color.white.opacity(0.28), lineWidth: 0.75)
+                                    }
                                     .matchedGeometryEffect(id: "choice", in: choice)
                             }
                         }
                     }
-                    .contentShape(RoundedRectangle(cornerRadius: 8))
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(activity.title(language))

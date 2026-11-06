@@ -107,7 +107,7 @@ struct NotchControlsView: View {
         case .panel:
             NotchActionTile(symbol: item.symbol, title: item.title(l10n)) { service.openAppPanel() }
         case .mixer:
-            NotchActionTile(symbol: item.symbol, title: item.title(l10n)) { service.select(.mixer) }
+            NotchActionTile(symbol: "slider.vertical.3", title: item.title(l10n)) { service.select(.mixer) }
         case .commandBar:
             NotchActionTile(symbol: item.symbol, title: item.title(l10n)) { service.perform { CommandBarService.shared.show() } }
         case .scratchpad:
