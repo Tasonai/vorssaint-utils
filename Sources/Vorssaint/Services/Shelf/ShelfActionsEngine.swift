@@ -292,6 +292,95 @@ enum ShelfActionsEngine {
         }
     }
 
+    enum ImageStitchDirection {
+        case vertical
+        case horizontal
+    }
+
+    /// Stitches multiple images into a single vertical or horizontal composite.
+    static func stitchImages(urls: [URL], direction: ImageStitchDirection, addToShelf: Bool = true, completion: ((URL?) -> Void)? = nil) {
+        guard urls.count >= 2 else { completion?(nil); return }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let images = urls.compactMap { NSImage(contentsOf: $0) }
+            guard images.count >= 2 else { DispatchQueue.main.async { completion?(nil) }; return }
+
+            let totalWidth: CGFloat
+            let totalHeight: CGFloat
+            switch direction {
+            case .vertical:
+                totalWidth = images.map(\.size.width).max() ?? 100
+                totalHeight = images.map(\.size.height).reduce(0, +)
+            case .horizontal:
+                totalWidth = images.map(\.size.width).reduce(0, +)
+                totalHeight = images.map(\.size.height).max() ?? 100
+            }
+
+            let newSize = NSSize(width: totalWidth, height: totalHeight)
+            let resultImage = NSImage(size: newSize)
+            resultImage.lockFocus()
+
+            var currentX: CGFloat = 0
+            var currentY: CGFloat = totalHeight
+
+            for img in images {
+                switch direction {
+                case .vertical:
+                    currentY -= img.size.height
+                    img.draw(in: NSRect(x: 0, y: currentY, width: img.size.width, height: img.size.height))
+                case .horizontal:
+                    img.draw(in: NSRect(x: currentX, y: totalHeight - img.size.height, width: img.size.width, height: img.size.height))
+                    currentX += img.size.width
+                }
+            }
+
+            resultImage.unlockFocus()
+
+            guard let tiff = resultImage.tiffRepresentation,
+                  let rep = NSBitmapImageRep(data: tiff),
+                  let pngData = rep.representation(using: .png, properties: [:]) else {
+                DispatchQueue.main.async { completion?(nil) }
+                return
+            }
+
+            let dir = urls[0].deletingLastPathComponent()
+            let baseName = direction == .vertical ? "Stitched-Vertical" : "Stitched-Horizontal"
+            let targetURL = uniqueURL(in: dir, name: baseName, ext: "png")
+            do {
+                try pngData.write(to: targetURL)
+                DispatchQueue.main.async {
+                    NotchFeedbackService.shared.performSelection()
+                    if addToShelf {
+                        ShelfService.shared.addFiles([targetURL])
+                    }
+                    let msg = L10n.shared.language == .ru ? "Изображения склеены" : "Images stitched"
+                    QuickToolHUD.show(icon: "rectangle.split.2x1", message: msg)
+                    completion?(targetURL)
+                }
+            } catch {
+                DispatchQueue.main.async { completion?(nil) }
+            }
+        }
+    }
+
+    /// Sets or removes Finder color tag on files.
+    static func setFinderTag(urls: [URL], tag: String?) {
+        guard !urls.isEmpty else { return }
+        for url in urls {
+            let nsurl = url as NSURL
+            if let tag = tag, !tag.isEmpty {
+                try? nsurl.setResourceValue([tag], forKey: .tagNamesKey)
+            } else {
+                try? nsurl.setResourceValue([] as [String], forKey: .tagNamesKey)
+            }
+        }
+        NotchFeedbackService.shared.performSelection()
+        let msg = tag != nil
+            ? (L10n.shared.language == .ru ? "Метка установлена: \(tag!)" : "Tag set: \(tag!)")
+            : (L10n.shared.language == .ru ? "Метки очищены" : "Tags cleared")
+        QuickToolHUD.show(icon: "tag.fill", message: msg)
+    }
+
     private static func uniqueURL(in directory: URL, name: String, ext: String) -> URL {
         var candidate = directory.appendingPathComponent("\(name).\(ext)")
         var index = 2

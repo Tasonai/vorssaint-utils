@@ -662,6 +662,56 @@ final class ShelfTileView: NSView, NSDraggingSource {
             menu.addItem(renameItem)
         }
 
+        let images = urls.filter { ShelfInteractionSupport.editableImage(in: [$0]) != nil }
+        if images.count >= 2 {
+            let stitchMenu = NSMenu(title: isRussian ? "Склеить изображения" : "Stitch Images")
+            let vertItem = NSMenuItem(title: isRussian ? "По вертикали" : "Vertically", action: #selector(stitchVertically), keyEquivalent: "")
+            vertItem.target = self
+            stitchMenu.addItem(vertItem)
+
+            let horizItem = NSMenuItem(title: isRussian ? "По горизонтали" : "Horizontally", action: #selector(stitchHorizontally), keyEquivalent: "")
+            horizItem.target = self
+            stitchMenu.addItem(horizItem)
+
+            let stitchItem = NSMenuItem(title: isRussian ? "Склеить изображения" : "Stitch Images", action: nil, keyEquivalent: "")
+            stitchItem.image = NSImage(systemSymbolName: "rectangle.split.2x1", accessibilityDescription: nil)
+            stitchItem.submenu = stitchMenu
+            menu.addItem(stitchItem)
+        }
+
+        let tagMenu = NSMenu(title: isRussian ? "Метка Finder" : "Finder Tag")
+        let tags: [(String, String, NSColor)] = [
+            (isRussian ? "Красный" : "Red", "Red", .systemRed),
+            (isRussian ? "Оранжевый" : "Orange", "Orange", .systemOrange),
+            (isRussian ? "Жёлтый" : "Yellow", "Yellow", .systemYellow),
+            (isRussian ? "Зелёный" : "Green", "Green", .systemGreen),
+            (isRussian ? "Синий" : "Blue", "Blue", .systemBlue),
+            (isRussian ? "Фиолетовый" : "Purple", "Purple", .systemPurple),
+            (isRussian ? "Серый" : "Gray", "Gray", .systemGray),
+        ]
+        for (title, value, color) in tags {
+            let item = NSMenuItem(title: title, action: #selector(applyFinderTag(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = value
+            let circle = NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
+                color.setFill()
+                NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+                return true
+            }
+            item.image = circle
+            tagMenu.addItem(item)
+        }
+        tagMenu.addItem(.separator())
+        let clearTagItem = NSMenuItem(title: isRussian ? "Снять метки" : "Clear Tags", action: #selector(applyFinderTag(_:)), keyEquivalent: "")
+        clearTagItem.target = self
+        clearTagItem.representedObject = ""
+        tagMenu.addItem(clearTagItem)
+
+        let tagMenuItem = NSMenuItem(title: isRussian ? "Метка Finder" : "Finder Tag", action: nil, keyEquivalent: "")
+        tagMenuItem.image = NSImage(systemSymbolName: "tag", accessibilityDescription: nil)
+        tagMenuItem.submenu = tagMenu
+        menu.addItem(tagMenuItem)
+
         let copyPathTitle = urls.count > 1
             ? (isRussian ? "Скопировать пути" : "Copy File Paths")
             : (isRussian ? "Скопировать путь" : "Copy File Path")
@@ -791,6 +841,25 @@ final class ShelfTileView: NSView, NSDraggingSource {
         ShelfActionsEngine.batchRename(urls: urls, pattern: .slugify)
     }
 
+    @objc private func stitchVertically() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        ShelfActionsEngine.stitchImages(urls: urls, direction: .vertical)
+    }
+
+    @objc private func stitchHorizontally() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        ShelfActionsEngine.stitchImages(urls: urls, direction: .horizontal)
+    }
+
+    @objc private func applyFinderTag(_ sender: NSMenuItem) {
+        ShelfService.shared.noteInteraction()
+        let tag = sender.representedObject as? String
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        ShelfActionsEngine.setFinderTag(urls: urls, tag: (tag?.isEmpty == true) ? nil : tag)
+    }
+
     @objc private func copyFilePaths() {
         ShelfService.shared.noteInteraction()
         let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
@@ -802,6 +871,10 @@ final class ShelfTileView: NSView, NSDraggingSource {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 49 { // Space
             quickLookFiles()
+            return
+        }
+        if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "v" {
+            ShelfService.shared.pasteFromClipboard()
             return
         }
         super.keyDown(with: event)

@@ -1496,6 +1496,18 @@ final class ShelfService: ObservableObject {
             : beginPromisedFileReceive(receivers, additions: nonPromisedItems(from: pasteboard), mergeInto: nil)
     }
 
+    /// Pastes the current system clipboard content directly onto the shelf.
+    @discardableResult
+    func pasteFromClipboard() -> Bool {
+        let accepted = acceptDrop(pasteboard: .general)
+        if accepted {
+            NotchFeedbackService.shared.performSelection()
+            let msg = L10n.shared.language == .ru ? "Вставлено из буфера" : "Pasted from clipboard"
+            QuickToolHUD.show(icon: "doc.on.clipboard", message: msg)
+        }
+        return accepted
+    }
+
     func accept(draggingInfo: NSDraggingInfo) -> Bool {
         let accepted = acceptDrop(pasteboard: draggingInfo.draggingPasteboard)
         if accepted { noteAcceptedDrop(draggingInfo) }

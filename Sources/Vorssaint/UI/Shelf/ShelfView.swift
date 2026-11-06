@@ -27,6 +27,7 @@ struct ShelfView: View {
     /// hand out; this invisible one sits behind the share button.
     @State private var shareAnchor = ShelfSharePickerAnchor.Anchor()
     @State private var pinButtonHovered = false
+    @State private var pasteButtonHovered = false
     @State private var closeButtonHovered = false
 
     private static let panelWidth: CGFloat = 304
@@ -103,6 +104,7 @@ struct ShelfView: View {
             .contentShape(Rectangle())
             .overlay(WindowMoveHandle())
 
+            pasteButton
             if !brandWatermark { pinButton }
             closeButton
         }
@@ -110,7 +112,27 @@ struct ShelfView: View {
 
     private var topMoveHandle: some View {
         WindowMoveHandle(acceptsDrops: true)
-            .frame(width: Self.panelWidth - (brandWatermark ? 58 : 96), height: 55)
+            .frame(width: Self.panelWidth - (brandWatermark ? 92 : 130), height: 55)
+    }
+
+    private var pasteButton: some View {
+        Button { shelf.pasteFromClipboard() } label: {
+            Image(systemName: "doc.on.clipboard")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 30, height: 30)
+                .background(
+                    Circle().fill(Color.white.opacity(pasteButtonHovered ? 0.18 : 0.11))
+                )
+                .overlay(
+                    Circle().strokeBorder(Color.white.opacity(pasteButtonHovered ? 0.75 : 0.32), lineWidth: 1)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.secondary)
+        .onHover { pasteButtonHovered = $0 }
+        .help(l10n.language == .ru ? "Вставить из буфера обмена (⌘V)" : "Paste from clipboard (⌘V)")
+        .accessibilityLabel(l10n.language == .ru ? "Вставить из буфера обмена" : "Paste from clipboard")
     }
 
     private var pinButton: some View {
@@ -218,6 +240,20 @@ struct ShelfView: View {
                 }
             }
 
+            let imageURLs = urls.filter { ShelfInteractionSupport.editableImage(in: [$0]) != nil }
+            if imageURLs.count >= 2 {
+                Menu {
+                    Button(isRussian ? "По вертикали" : "Vertically") {
+                        ShelfActionsEngine.stitchImages(urls: imageURLs, direction: .vertical)
+                    }
+                    Button(isRussian ? "По горизонтали" : "Horizontally") {
+                        ShelfActionsEngine.stitchImages(urls: imageURLs, direction: .horizontal)
+                    }
+                } label: {
+                    Label(isRussian ? "Склеить изображения" : "Stitch Images", systemImage: "rectangle.split.2x1")
+                }
+            }
+
             if urls.count > 1 || urls.contains(where: { $0.pathExtension.lowercased() == "pdf" }) {
                 Button {
                     ShelfActionsEngine.mergeToPDF(urls: shelf.fileURLsForActions())
@@ -243,6 +279,29 @@ struct ShelfView: View {
                 ShelfActionsEngine.copyFilePaths(urls: shelf.fileURLsForActions())
             } label: {
                 Label(isRussian ? "Скопировать пути файлов" : "Copy File Paths", systemImage: "doc.on.doc")
+            }
+
+            Menu {
+                let tags: [(String, String)] = [
+                    (isRussian ? "Красный" : "Red", "Red"),
+                    (isRussian ? "Оранжевый" : "Orange", "Orange"),
+                    (isRussian ? "Жёлтый" : "Yellow", "Yellow"),
+                    (isRussian ? "Зелёный" : "Green", "Green"),
+                    (isRussian ? "Синий" : "Blue", "Blue"),
+                    (isRussian ? "Фиолетовый" : "Purple", "Purple"),
+                    (isRussian ? "Серый" : "Gray", "Gray"),
+                ]
+                ForEach(tags, id: \.1) { name, val in
+                    Button(name) {
+                        ShelfActionsEngine.setFinderTag(urls: shelf.fileURLsForActions(), tag: val)
+                    }
+                }
+                Divider()
+                Button(isRussian ? "Снять метки" : "Clear Tags") {
+                    ShelfActionsEngine.setFinderTag(urls: shelf.fileURLsForActions(), tag: nil)
+                }
+            } label: {
+                Label(isRussian ? "Метка Finder" : "Finder Tag", systemImage: "tag")
             }
 
             Divider()
