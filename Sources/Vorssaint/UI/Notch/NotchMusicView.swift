@@ -23,17 +23,21 @@ struct NotchMusicView: View {
     /// The cover's own colour, used for the moving parts that belong to this
     /// track. Neutral covers keep them white.
     private var accent: Color { service.artworkTint?.color ?? .white }
-    private var isStreamWithoutTracks: Bool {
-        service.playback != nil
-            && service.lacksTrackSkipping(.next)
-            && service.lacksTrackSkipping(.previous)
-            && !shuffle.isOffered
+    private var supportsMusicCatalogExtras: Bool {
+        guard let playback = service.playback else { return true }
+        if service.lacksTrackSkipping(.next) && service.lacksTrackSkipping(.previous) && !shuffle.isOffered {
+            return false
+        }
+        let bundle = (playback.track.appBundleIdentifier ?? "").lowercased()
+        guard !bundle.isEmpty else { return false }
+        let musicApps = ["music", "spotify", "tidal", "deezer", "qobuz", "vox", "doppler", "swinsian", "foobar", "cog"]
+        return musicApps.contains { bundle.contains($0) }
     }
     private var showsLyrics: Bool {
-        lyricsEnabled && AppFeature.notchLyrics.isAvailable && (!isStreamWithoutTracks || extra == .lyrics)
+        lyricsEnabled && AppFeature.notchLyrics.isAvailable && (supportsMusicCatalogExtras || extra == .lyrics)
     }
     private var showsQueue: Bool {
-        queueEnabled && AppFeature.notchQueue.isAvailable && (!isStreamWithoutTracks || extra == .queue)
+        queueEnabled && AppFeature.notchQueue.isAvailable && (supportsMusicCatalogExtras || extra == .queue)
     }
     private var showsVolume: Bool { showVolume && AppFeature.mixer.isAvailable }
     private var openExtra: MusicExtra? {
@@ -603,10 +607,14 @@ private struct NotchMusicTransport: View {
     /// The player's own glyphs, white on the island with no plate behind
     /// them, as on the lock screen. Play and pause stand out by size.
     private var transportButtons: some View {
-        HStack(spacing: slot == nil ? (compact ? 10 : 18) : 0) {
-            playbackButton("backward.fill", title: text.mediaPrevious, command: .previous).frame(width: slot)
+        HStack(spacing: slot == nil ? (compact ? 6 : 18) : 0) {
+            if !compact {
+                playbackButton("backward.fill", title: text.mediaPrevious, command: .previous).frame(width: slot)
+            }
             toggleButton.frame(width: slot)
-            playbackButton("forward.fill", title: text.mediaNext, command: .next).frame(width: slot)
+            if !compact || !service.lacksTrackSkipping(.next) {
+                playbackButton("forward.fill", title: text.mediaNext, command: .next).frame(width: slot)
+            }
         }
         .frame(height: height)
     }

@@ -410,13 +410,20 @@ struct NotchView: View {
 
     @ViewBuilder private func bandLeading(_ band: NotchBand) -> some View {
         if service.showingSections {
-            NotchIconButton(symbol: "chevron.left", title: l10n.s.obBack, action: service.toggleSections)
-            // Beside the camera the field takes the rest of its side.
-            NotchSectionSearch(service: service, maximumFieldWidth: band.besideCamera ? .infinity : 150)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            NotchBandBackButton(title: text.sectionsTitle, action: service.toggleSections)
+            if service.modules.count > 8 || !service.sectionQuery.isEmpty {
+                // Beside the camera the field takes the rest of its side.
+                NotchSectionSearch(service: service, maximumFieldWidth: band.besideCamera ? .infinity : 150)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         } else if showsDetail {
             NotchBandBackButton(title: service.detailTitle, action: service.goBack)
         } else if band.sectionsButton {
+            if service.selected != .controls && service.modules.contains(.controls) {
+                NotchIconButton(symbol: "chevron.left", title: FeatureStrings.notch(l10n.language).controls) {
+                    service.select(.controls)
+                }
+            }
             // Without the floating button, the sections stay one click away;
             // the row keeps it room before the page's own controls.
             NotchSectionsButton(action: service.toggleSections)

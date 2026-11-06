@@ -563,6 +563,7 @@ private struct NotchAppFader: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(NotchButtonStyle(cornerRadius: 5))
+                    .opacity(muted || isHovered ? 1 : 0)
                     .accessibilityLabel(muted ? l10n.s.actionUnmute : l10n.s.actionMute)
                 }
                 .frame(height: 28)
