@@ -26,6 +26,6 @@
   - **UX**: When music and timer/agent are active simultaneously, island renders as dual pills with central gap.
   - **Status**: done
 
-- [doing] **Story 1.7**: Edge peek gesture detector extraction from `ShelfService`
+- [x] **Story 1.7**: Edge peek gesture detector extraction from `ShelfService`
   - **Arch**: Decouple global mouse drag monitoring and dock proximity math into `ShelfEdgeDragMonitor`.
-  - **Status**: in-progress
+  - **Status**: done

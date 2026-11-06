@@ -77,6 +77,7 @@ struct MetricsTests {
             ("shelf", {
                 ShelfFeatureTests.run(suite)
                 ShelfItemTests.run(suite)
+                ShelfEdgeDragMonitorTests.run(suite)
             }),
             ("overlays", { OverlayPanelTests.run(suite) }),
             ("updates", {

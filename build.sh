@@ -453,6 +453,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/AutoQuit/AutoQuitSupport.swift
         Sources/Vorssaint/Core/AutoQuitDockAppsStrings.swift
         Sources/Vorssaint/Services/Shelf/ShelfItem.swift
+        Sources/Vorssaint/Services/Shelf/ShelfEdgeDragMonitor.swift
         Sources/Vorssaint/Services/Shelf/ShelfSupport.swift
         Sources/Vorssaint/Services/Shelf/ShelfFilePromiseTransfer.swift
         Sources/Vorssaint/Core/ShelfPromiseDeliveryStrings.swift
