@@ -187,6 +187,9 @@ struct NotchFilesView: View {
         if !shelf.selection.isEmpty {
             Text(String(format: l10n.s.shelfSelectedFormat, shelf.selection.count))
                 .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+        } else {
+            Text(FeatureStrings.notch(l10n.language).files)
+                .font(.system(size: 13, weight: .semibold)).lineLimit(1)
         }
     }
 

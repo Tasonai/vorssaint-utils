@@ -92,12 +92,15 @@ struct NotchSystemView: View {
     }
 
     var body: some View {
-        let cards = cards
+        let allCards = cards
+        let cards = size.height < 230 && allCards.count > 6 ? Array(allCards.prefix(6)) : allCards
         if cards.isEmpty {
             NotchEmptyView(symbol: "gauge.with.dots.needle.50percent", message: l10n.s.monitorUnavailable)
         } else {
             let inset = NotchLayout.systemHoverInset(width: size.width)
-            let rows = NotchLayout.systemRowRanges(count: cards.count, width: size.width - inset * 2)
+            let rows = cards.count == 6 && size.width >= 380
+                ? [0..<3, 3..<6]
+                : NotchLayout.systemRowRanges(count: cards.count, width: size.width - inset * 2)
             let height = NotchLayout.railHeight(rows: rows.count, rowHeight: NotchLayout.systemCardHeight,
                                                spacing: NotchLayout.rowSpacing) + inset * 2
             Group {
@@ -111,6 +114,11 @@ struct NotchSystemView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .notchBand(leading: {
+                Text(FeatureStrings.notch(l10n.language).system)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+            })
         }
     }
 

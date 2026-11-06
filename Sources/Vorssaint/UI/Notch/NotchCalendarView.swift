@@ -235,6 +235,7 @@ struct NotchCalendarView: View {
         ScrollViewReader { proxy in
             ScrollView { appointmentList(now: now) }
                 .scrollIndicators(.automatic)
+                .notchScrollEdgeFade()
                 .id(selectedDay)
                 .onChange(of: calendar.loading ? nil : calendar.revealing, initial: true) { _, target in
                     guard !preview, let target else { return }
@@ -256,9 +257,9 @@ struct NotchCalendarView: View {
         } else if groups.isEmpty {
             emptyAgenda.frame(maxWidth: .infinity, minHeight: 72)
         } else {
-            LazyVStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 10) {
                 ForEach(groups, id: \.day) { group in
-                    VStack(alignment: .leading, spacing: 7) {
+                    VStack(alignment: .leading, spacing: 5) {
                         if selectedDay == nil { dayLabel(group.day, now: now) }
                         ForEach(group.events) { event in
                             NotchCalendarEventRow(event: event, day: group.day, now: now,
@@ -446,7 +447,8 @@ private struct NotchCalendarEventRow: View {
                 .frame(width: 3)
                 .accessibilityHidden(true)
         }
-        .padding(10)
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(event.color.color.opacity(ongoing ? 0.2 : 0.1),
                     in: RoundedRectangle(cornerRadius: 11, style: .continuous))

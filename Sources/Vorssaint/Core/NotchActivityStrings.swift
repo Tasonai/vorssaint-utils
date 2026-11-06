@@ -268,7 +268,7 @@ extension FeatureStrings {
             longBreak: "Длинный перерыв",
             pomodoroHint: "Начинайте каждый этап, когда будете готовы. Цикл заканчивается после последнего сеанса работы.",
             totalSessions: "Всего сеансов",
-            longBreakInterval: "Сеансов между длинными перерывами",
+            longBreakInterval: "До длинного",
             sessionProgress: "Сеанс %d из %d",
             pomodoroFinished: "Помодоро завершён",
             minutes: "Минуты",

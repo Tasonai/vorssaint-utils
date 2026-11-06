@@ -15,7 +15,7 @@ struct NotchQuickScratchpadButton: View {
     }
 
     private var shouldShowInHeader: Bool {
-        !service.showingSections && service.selected != .scratchpad && !band.besideCamera
+        !service.showingSections && service.selected == .controls && !band.besideCamera
     }
 
     private var title: String {

@@ -176,13 +176,16 @@ struct ShelfTilesView: NSViewRepresentable {
                                                    tileWidth: tile.width,
                                                    spacing: spacing,
                                                    inset: inset)
+        let effectiveSpacing = sideways && columns > 1 && scroll.contentSize.width > tile.width * CGFloat(columns)
+            ? max(spacing, floor((scroll.contentSize.width - inset * 2 - CGFloat(columns) * tile.width) / CGFloat(columns - 1)))
+            : spacing
         let rows = sideways
             ? ShelfTileLayout.rowCount(contentHeight: scroll.contentSize.height, tileHeight: tile.height,
                                        spacing: spacing, inset: inset)
             : max(1, Int(ceil(Double(items.count) / Double(columns))))
         let frame: (Int) -> CGRect = { index in
             sideways
-                ? ShelfTileLayout.sidewaysTileFrame(index: index, rows: rows, tileSize: tile, spacing: spacing, inset: inset)
+                ? ShelfTileLayout.sidewaysTileFrame(index: index, rows: rows, tileSize: tile, spacing: effectiveSpacing, inset: inset)
                 : ShelfTileLayout.tileFrame(index: index, columns: columns, tileSize: tile, spacing: spacing, inset: inset)
         }
 
@@ -228,7 +231,7 @@ struct ShelfTilesView: NSViewRepresentable {
         if sideways {
             let size = ShelfTileLayout.sidewaysDocumentSize(itemCount: items.count, rows: rows,
                                                              visibleSize: scroll.contentSize, tileSize: tile,
-                                                             spacing: spacing, inset: inset)
+                                                             spacing: effectiveSpacing, inset: inset)
             scroll.hasHorizontalScroller = size.width > scroll.contentSize.width + 1
             document.frame = NSRect(origin: .zero, size: size)
         } else {
