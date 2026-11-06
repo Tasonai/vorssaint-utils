@@ -15,6 +15,7 @@ struct PanelUninstallerView: View {
     @State private var showingAppPicker = false
     @State private var pendingHomebrewRemoval: AppUninstaller.HomebrewRemovalConfirmation?
     @State private var showHomebrewDetails = false
+    @State private var hoveredLeftoverID: UUID?
 
     var onClose: () -> Void
 
@@ -284,20 +285,26 @@ struct PanelUninstallerView: View {
                 .font(.system(size: 9.5))
             }
             Spacer(minLength: 0)
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([item.url])
-            } label: {
-                Image(systemName: "folder")
+            if hoveredLeftoverID == item.id {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .buttonStyle(.plain)
+                .help(l10n.s.cleanerRevealInFinder)
+                .accessibilityLabel(l10n.s.cleanerRevealInFinder)
             }
-            .buttonStyle(.plain)
-            .help(l10n.s.cleanerRevealInFinder)
-            .accessibilityLabel(l10n.s.cleanerRevealInFinder)
             Text(Self.byteString(item.size))
                 .font(.system(size: 10))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
         .frame(minHeight: 24)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            hoveredLeftoverID = hovering ? item.id : (hoveredLeftoverID == item.id ? nil : hoveredLeftoverID)
+        }
     }
 
     private var footer: some View {

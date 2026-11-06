@@ -204,11 +204,6 @@ struct PanelHomebrewView: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            Text(l10n.s.homebrewKeyboardHint)
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .panelCard()
     }

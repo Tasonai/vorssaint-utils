@@ -31,7 +31,11 @@ struct PanelWindowLayoutView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
-            intro
+            if editingActions {
+                intro
+            } else if !permissions.accessibility || (edgeSnapEnabled && systemTilingEnabled) {
+                statusBanner
+            }
             actionGroup(title: text.halves, actions: [.leftHalf, .rightHalf, .topHalf, .bottomHalf, .centerHalf])
             actionGroup(title: text.thirds, actions: [
                 .leftThird, .centerThird, .rightThird, .leftTwoThirds, .rightTwoThirds, .centerTwoThirds,
@@ -108,6 +112,34 @@ struct PanelWindowLayoutView: View {
         var hidden = hiddenActions
         if !hidden.insert(action).inserted { hidden.remove(action) }
         hiddenActionsRaw = WindowLayoutAction.hiddenActionsStorageValue(hidden)
+    }
+
+    private var statusBanner: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if edgeSnapEnabled && systemTilingEnabled {
+                Label(text.edgeSnapSystemConflict, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(text.edgeSnapOpenSystemSettings) {
+                    NSWorkspace.shared.open(WindowEdgeSnapSupport.desktopAndDockSettingsURL)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+            if !permissions.accessibility {
+                Button {
+                    Permissions.shared.requestAccessibility()
+                    Permissions.shared.openAccessibilitySettings()
+                } label: {
+                    Label(text.missingPermission, systemImage: "hand.raised.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+        }
+        .panelCard()
     }
 
     private var intro: some View {

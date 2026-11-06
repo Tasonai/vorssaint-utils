@@ -22,6 +22,7 @@ struct RecentCapturesView: View {
     @ObservedObject private var history = RecentCaptureService.shared
     @Environment(\.notchPresentation) private var inNotch
     @State private var confirmingClear = false
+    @State private var hoveredEntryID: UUID?
 
     var onClose: (() -> Void)?
     /// Inside the island the list becomes a rail of cards that fill this
@@ -131,8 +132,16 @@ struct RecentCapturesView: View {
     }
 
     private func row(_ entry: RecentCaptureEntry) -> some View {
-        HStack(spacing: 10) {
-            preview(entry)
+        let isHovered = hoveredEntryID == entry.id
+        return HStack(spacing: 10) {
+            Button {
+                history.open(entry)
+            } label: {
+                preview(entry)
+            }
+            .buttonStyle(.plain)
+            .help(entry.kind == .screenshot ? text.restore : text.open)
+
             VStack(alignment: .leading, spacing: 5) {
                 Text(entry.kind == .screenshot ? text.screenshot : text.recording)
                     .font(.system(size: 11.5, weight: .semibold))
@@ -152,21 +161,26 @@ struct RecentCapturesView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.mini)
-                    Button {
-                        history.remove(entry)
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 10, weight: .semibold))
+                    if isHovered {
+                        Button {
+                            history.remove(entry)
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .help(text.remove)
+                        .accessibilityLabel(text.remove)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .help(text.remove)
-                    .accessibilityLabel(text.remove)
                 }
             }
             Spacer(minLength: 0)
         }
         .panelCard()
+        .onHover { hovering in
+            hoveredEntryID = hovering ? entry.id : (hoveredEntryID == entry.id ? nil : hoveredEntryID)
+        }
     }
 
     @ViewBuilder

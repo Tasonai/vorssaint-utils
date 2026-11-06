@@ -126,6 +126,7 @@ struct NotchDownloadsView: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage(DefaultsKey.notchDownloadsEnabled) private var enabled = true
     @Environment(\.notchSettingsPreview) private var preview
+    @State private var hoveredDownloadID: String?
     private var text: NotchFilesStrings { FeatureStrings.notchFiles(l10n.language) }
 
     private var needsSetup: Bool { !enabled || downloads.folderName == nil || downloads.folderUnavailable }
@@ -170,7 +171,8 @@ struct NotchDownloadsView: View {
     }
 
     private func downloadCard(_ item: NotchDownloadItem) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let isHovered = hoveredDownloadID == item.id
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 let fileLabel = HStack(spacing: 8) {
                     Image(systemName: item.completed ? "checkmark.circle.fill" : "arrow.down.circle")
@@ -188,12 +190,14 @@ struct NotchDownloadsView: View {
                     .buttonStyle(NotchButtonStyle(cornerRadius: 6, lifts: false))
                     .help(l10n.s.shelfActionOpen)
                     .accessibilityHint(l10n.s.shelfActionOpen)
-                    NotchIconButton(symbol: "folder", title: l10n.s.mediaOpenInFinder) {
-                        NSWorkspace.shared.activateFileViewerSelecting([item.url])
-                    }
-                    if AppFeature.shelf.isAvailable {
-                        NotchIconButton(symbol: "tray.and.arrow.down", title: FeatureStrings.notch(l10n.language).files) {
-                            _ = ShelfService.shared.addFiles([item.url])
+                    if isHovered {
+                        NotchIconButton(symbol: "folder", title: l10n.s.mediaOpenInFinder) {
+                            NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                        }
+                        if AppFeature.shelf.isAvailable {
+                            NotchIconButton(symbol: "tray.and.arrow.down", title: FeatureStrings.notch(l10n.language).files) {
+                                _ = ShelfService.shared.addFiles([item.url])
+                            }
                         }
                     }
                 } else {
@@ -204,9 +208,7 @@ struct NotchDownloadsView: View {
                     }
                 }
             }
-            if item.completed {
-                Text(text.saved).font(.caption).foregroundStyle(.secondary)
-            } else {
+            if !item.completed {
                 if let fraction = item.fraction {
                     NotchMeter(value: fraction)
                 } else if item.active {
@@ -223,10 +225,14 @@ struct NotchDownloadsView: View {
                 }.font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, item.completed ? 8 : 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(.white.opacity(isHovered ? 0.09 : 0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .clipped()
+        .onHover { hovering in
+            hoveredDownloadID = hovering ? item.id : (hoveredDownloadID == item.id ? nil : hoveredDownloadID)
+        }
         .accessibilityElement(children: .contain)
     }
 }

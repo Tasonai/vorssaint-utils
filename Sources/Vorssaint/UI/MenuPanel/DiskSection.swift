@@ -33,10 +33,16 @@ struct DiskSection: View {
                         .font(.system(size: 10.5))
                         .foregroundStyle(.tertiary)
                 } else {
-                    diskSelector
+                    let showsSelector = disks.count > 1 || disks.contains(where: \.canEject)
+                    if showsSelector {
+                        diskSelector
+                    }
                     if let selected = selectedDisk {
-                        ForEach(blocks(editing: editing), id: \.self) { block in
-                            Divider()
+                        let visibleBlocks = blocks(editing: editing)
+                        ForEach(Array(visibleBlocks.enumerated()), id: \.element) { index, block in
+                            if index > 0 || showsSelector {
+                                Divider()
+                            }
                             PanelReorderableItem(item: block,
                                                  isEnabled: editing,
                                                  order: blockOrderBinding,
