@@ -22,7 +22,7 @@ struct DiskExclusionsList: View {
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
+        DisclosureGroup(isExpanded: $isExpanded.animation(.easeOut(duration: 0.16))) {
             ForEach(protection.excludedVolumes, id: \.self) { name in
                 HStack(spacing: 8) {
                     Image(systemName: "externaldrive")
@@ -33,14 +33,9 @@ struct DiskExclusionsList: View {
                         .font(.system(size: 12))
                         .lineLimit(1)
                     Spacer()
-                    Button {
+                    ListRemoveButton(label: strings.removeButton) {
                         protection.removeExcludedVolume(name)
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(strings.removeButton)
                 }
             }
 
@@ -59,7 +54,7 @@ struct DiskExclusionsList: View {
                         customDraft = ""
                         showingCustomField = false
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
             } else {

@@ -171,26 +171,22 @@ struct QuitProtectionSettings: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text(strings.exceptions)
                     .font(.subheadline.weight(.semibold))
-                let values = service.exceptions(for: shortcut)
+                let values: [String] = service.exceptions(for: shortcut)
                 if values.isEmpty {
                     Text(strings.noExceptions)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(values, id: \.self) { bundleID in
+                    ForEach(values, id: \.self) { (bundleID: String) in
                         HStack(spacing: 8) {
                             Image(nsImage: InstalledApps.icon(for: bundleID))
                                 .resizable()
                                 .frame(width: 20, height: 20)
                             Text(InstalledApps.name(for: bundleID))
                             Spacer()
-                            Button {
+                            ListRemoveButton(label: l10n.s.actionRemove) {
                                 service.removeException(bundleID, for: shortcut)
-                            } label: {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundStyle(.secondary)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }

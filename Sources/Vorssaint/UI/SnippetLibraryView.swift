@@ -50,13 +50,9 @@ struct SnippetLibraryView: View {
                 .font(.system(size: 15))
                 .focused($searchFocused)
             if !library.query.isEmpty {
-                Button {
+                ClearIconButton(label: text.librarySearchPlaceholder) {
                     library.query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 16)

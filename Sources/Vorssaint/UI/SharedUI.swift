@@ -313,3 +313,86 @@ extension View {
         padding(.leading, 25)
     }
 }
+
+/// A consistent, accessible minus-circle removal button used across Settings exception and exclusion lists.
+struct ListRemoveButton: View {
+    let label: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    init(label: String, action: @escaping () -> Void) {
+        self.label = label
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "minus.circle.fill")
+                .foregroundStyle(isHovered ? Color.red.opacity(0.85) : Color.secondary)
+                .scaleEffect(isHovered ? 1.10 : 1.0)
+                .animation(.easeOut(duration: 0.12), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(label)
+        .accessibilityLabel(label)
+    }
+}
+
+/// An accessible clear button (xmark.circle.fill) with subtle hover scale and highlight.
+struct ClearIconButton: View {
+    let label: String
+    var disabled: Bool = false
+    let action: () -> Void
+    @State private var isHovered = false
+
+    init(label: String, disabled: Bool = false, action: @escaping () -> Void) {
+        self.label = label
+        self.disabled = disabled
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark.circle.fill")
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(isHovered && !disabled ? Color.primary : Color.secondary)
+                .scaleEffect(isHovered && !disabled ? 1.08 : 1.0)
+                .animation(.easeOut(duration: 0.12), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .onHover { isHovered = $0 }
+        .help(label)
+        .accessibilityLabel(label)
+    }
+}
+
+/// An accessible circular close button (xmark.circle.fill) with subtle hover scale and highlight.
+struct PanelCloseButton: View {
+    let action: () -> Void
+    var label: String?
+    @State private var isHovered = false
+
+    init(label: String? = nil, action: @escaping () -> Void) {
+        self.label = label
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(isHovered ? Color.primary : Color.secondary)
+                .scaleEffect(isHovered ? 1.08 : 1.0)
+                .animation(.easeOut(duration: 0.12), value: isHovered)
+                .frame(width: 22, height: 22)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(label ?? L10n.shared.s.uninstallerCancel)
+        .accessibilityLabel(label ?? L10n.shared.s.uninstallerCancel)
+    }
+}
+

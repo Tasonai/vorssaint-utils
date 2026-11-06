@@ -1228,14 +1228,9 @@ private struct SidebarSearchField: View {
                 .focused(isFocused)
                 .onExitCommand { query = "" }
             if !query.isEmpty {
-                Button {
+                ClearIconButton(label: l10n.s.urlCleanerClearButton) {
                     query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(l10n.s.urlCleanerClearButton)
             }
         }
         .padding(.vertical, 5)

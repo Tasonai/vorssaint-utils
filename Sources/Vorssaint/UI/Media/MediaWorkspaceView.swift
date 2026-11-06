@@ -278,14 +278,7 @@ struct MediaWorkspaceView: View {
                     .foregroundStyle(.secondary)
             }
             if let onClose {
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.plain)
-                .help(l10n.s.uninstallerCancel)
+                PanelCloseButton(action: onClose)
             }
         }
     }
@@ -348,17 +341,9 @@ struct MediaWorkspaceView: View {
             .frame(maxWidth: .infinity, minHeight: compact ? 52 : 62, alignment: .leading)
 
             if !inputURLs.isEmpty {
-                Button {
+                ClearIconButton(label: l10n.s.mediaCancel) {
                     clearInput()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: compact ? 14 : 16, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: compact ? 24 : 28, height: compact ? 24 : 28)
-                        .contentShape(Circle())
                 }
-                .buttonStyle(.plain)
-                .help(l10n.s.mediaCancel)
                 .padding(.trailing, compact ? 8 : 10)
             }
         }

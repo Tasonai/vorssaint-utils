@@ -25,7 +25,7 @@ struct QuitAllExceptionsList: View {
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
+        DisclosureGroup(isExpanded: $isExpanded.animation(.easeOut(duration: 0.16))) {
             ForEach(sortedExceptions, id: \.self) { bundleID in
                 HStack(spacing: 9) {
                     Image(nsImage: InstalledApps.icon(for: bundleID))
@@ -38,14 +38,9 @@ struct QuitAllExceptionsList: View {
                         Image(systemName: "lock.fill")
                             .foregroundStyle(.tertiary)
                     } else {
-                        Button {
+                        ListRemoveButton(label: l10n.s.actionRemove) {
                             service.removeQuitAllException(bundleID)
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(l10n.s.actionRemove)
                     }
                 }
             }

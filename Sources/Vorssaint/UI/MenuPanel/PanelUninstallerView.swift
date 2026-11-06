@@ -77,19 +77,12 @@ struct PanelUninstallerView: View {
             Label(l10n.s.uninstallerName, systemImage: "trash")
                 .font(.system(size: 12, weight: .semibold))
             Spacer()
-            Button {
+            PanelCloseButton {
                 // Closing means cancel: a scan left running would come back
                 // on the next open. A removal in progress is left alone.
                 if uninstaller.phase == .scanning { uninstaller.reset() }
                 onClose()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
             }
-            .buttonStyle(.plain)
-            .help(l10n.s.uninstallerCancel)
         }
     }
 

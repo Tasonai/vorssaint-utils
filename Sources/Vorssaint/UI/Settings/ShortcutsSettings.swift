@@ -402,17 +402,9 @@ private struct CentralWindowLayoutShortcutRow: View {
                             captureAction: save
                         )
                         .frame(width: 108)
-                        Button {
+                        ClearIconButton(label: l10n.s.shortcutClear, disabled: shortcut == nil) {
                             clear()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(shortcut == nil)
-                        .help(l10n.s.shortcutClear)
-                        .accessibilityLabel(l10n.s.shortcutClear)
                         Button(l10n.s.shortcutReset) {
                             rawValue = action.defaultShortcut?.storageValue
                                 ?? WindowLayoutAction.clearedShortcutStorageValue

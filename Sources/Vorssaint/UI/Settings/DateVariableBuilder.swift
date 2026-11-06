@@ -106,14 +106,9 @@ struct DateVariableBuilder: View {
                         Text(timeZoneIdentifier)
                             .font(.body.monospaced())
                         Spacer()
-                        Button {
+                        ClearIconButton(label: text.dateTimeTimezoneClear) {
                             self.timeZoneIdentifier = nil
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
                         }
-                        .buttonStyle(.plain)
-                        .help(text.dateTimeTimezoneClear)
-                        .accessibilityLabel(text.dateTimeTimezoneClear)
                     }
                 } else {
                     Text(text.dateTimeTimezoneDeviceDefault)
@@ -143,22 +138,22 @@ struct DateVariableBuilder: View {
                         // Lazy: a broad query like "america" matches well
                         // over a hundred zones, and the list is no longer
                         // capped.
-                        LazyVStack(alignment: .leading, spacing: 0) {
+                        LazyVStack(alignment: .leading, spacing: 2) {
                             ForEach(matches, id: \.self) { identifier in
-                                Button {
+                                TimeZoneMatchRow(identifier: identifier) {
                                     timeZoneIdentifier = identifier
                                     timeZoneQuery = ""
-                                } label: {
-                                    Text(identifier)
-                                        .font(.body.monospaced())
-                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .buttonStyle(.plain)
-                                .padding(.vertical, 2)
                             }
                         }
+                        .padding(4)
                     }
-                    .frame(height: min(140, CGFloat(matches.count) * 22))
+                    .frame(height: min(140, CGFloat(matches.count) * 26 + 8))
+                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+                    }
                 }
             }
 
@@ -197,3 +192,29 @@ struct DateVariableBuilder: View {
         .padding(16)
     }
 }
+
+private struct TimeZoneMatchRow: View {
+    let identifier: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(identifier)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(isHovered ? Color.accentColor : Color.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isHovered ? Color.accentColor.opacity(0.12) : Color.clear)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+    }
+}
+

@@ -192,6 +192,12 @@ struct CommandBarView: View {
         .environment(\.colorScheme, shownAs == .window ? colorScheme : .dark)
         .background(backdrop)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            if shownAs == .window {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+            }
+        }
         .onAppear {
             focusSearch()
             service.barDidAppear()
@@ -267,14 +273,9 @@ struct CommandBarView: View {
                 .accessibilityLabel(text.pageTitle)
             if service.isCompactHome { compactHints }
             if !service.query.isEmpty {
-                Button {
+                CommandBarClearButton {
                     service.query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 16)
@@ -514,32 +515,11 @@ struct CommandBarView: View {
     }
 
     private func categoryChip(_ source: CommandBarSource?, label: String) -> some View {
-        let isActive = service.activeCategory == source
-        return Button {
+        CommandBarCategoryChip(source: source,
+                               label: label,
+                               isActive: service.activeCategory == source) {
             service.setCategory(source)
-        } label: {
-            HStack(spacing: 3) {
-                if let source {
-                    Image(systemName: source.symbolName)
-                        .font(.system(size: 8.5, weight: .semibold))
-                }
-                Text(label)
-                    .font(.system(size: 10, weight: isActive ? .semibold : .regular))
-            }
-            // Tinted, never filled: white on a pale accent (yellow, orange in
-            // light appearance) leaves the label invisible, and every other
-            // selected surface in the panel is already accent at low opacity.
-            .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(isActive
-                                       ? Color.accentColor.opacity(0.18)
-                                       : Color.primary.opacity(0.06)))
-            .overlay(Capsule().strokeBorder(Color.accentColor.opacity(isActive ? 0.45 : 0),
-                                            lineWidth: 1))
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -1297,3 +1277,55 @@ private struct CommandBarMascot: View {
             }
     }
 }
+
+private struct CommandBarClearButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        ClearIconButton(label: String(localized: "Clear search", table: "CommandBar"), action: action)
+    }
+}
+
+private struct CommandBarCategoryChip: View {
+    let source: CommandBarSource?
+    let label: String
+    let isActive: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                if let source {
+                    Image(systemName: source.symbolName)
+                        .font(.system(size: 8.5, weight: .semibold))
+                }
+                Text(label)
+                    .font(.system(size: 10, weight: isActive ? .semibold : .regular))
+            }
+            .foregroundStyle(isActive ? Color.accentColor : (isHovered ? Color.primary : Color.secondary))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(
+                Capsule().fill(
+                    isActive
+                        ? Color.accentColor.opacity(0.18)
+                        : (isHovered ? Color.primary.opacity(0.10) : Color.primary.opacity(0.06))
+                )
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    isActive
+                        ? Color.accentColor.opacity(0.45)
+                        : (isHovered ? Color.primary.opacity(0.15) : Color.clear),
+                    lineWidth: 1
+                )
+            )
+            .animation(.easeOut(duration: 0.14), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+    }
+}
+

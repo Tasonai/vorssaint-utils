@@ -423,11 +423,28 @@ struct WindowPreviewsCard: View {
 
     /// A preview thumbnail drawn at the size it stands for.
     private func sizeChoice(_ value: String, title: String, scale: CGFloat) -> some View {
-        let selected = previewSize == value
-        return Button {
+        SwitcherSizeChoice(
+            value: value,
+            title: title,
+            scale: scale,
+            selected: previewSize == value
+        ) {
             previewSize = value
             AppSwitcher.shared.syncWithPreferences()
-        } label: {
+        }
+    }
+}
+
+private struct SwitcherSizeChoice: View {
+    let value: String
+    let title: String
+    let scale: CGFloat
+    let selected: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
             VStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(selected ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.3))
@@ -441,20 +458,31 @@ struct WindowPreviewsCard: View {
                     .frame(height: 42)
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(selected ? Color.accentColor : .primary)
+                    .foregroundStyle(selected ? Color.accentColor : (isHovered ? Color.primary : Color.secondary))
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
             .padding(8)
-            .background(selected ? Color.accentColor.opacity(0.10) : Color.secondary.opacity(0.05),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(
+                selected
+                    ? Color.accentColor.opacity(0.10)
+                    : (isHovered ? Color.primary.opacity(0.08) : Color.secondary.opacity(0.05)),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(selected ? Color.accentColor.opacity(0.55) : .clear, lineWidth: 1)
+                    .strokeBorder(
+                        selected
+                            ? Color.accentColor.opacity(0.55)
+                            : (isHovered ? Color.primary.opacity(0.18) : Color.primary.opacity(0.06)),
+                        lineWidth: 1
+                    )
             }
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.14), value: isHovered)
         .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -469,6 +497,7 @@ private struct SwitcherLayoutChoice: View {
     let caption: String
     let selected: Bool
     let action: () -> Void
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
@@ -479,7 +508,7 @@ private struct SwitcherLayoutChoice: View {
                     .background(Color.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(selected ? Color.accentColor : .primary)
+                    .foregroundStyle(selected ? Color.accentColor : (isHovered ? Color.primary : Color.secondary))
                 Text(caption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -488,15 +517,26 @@ private struct SwitcherLayoutChoice: View {
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(10)
-            .background(selected ? Color.accentColor.opacity(0.10) : Color.secondary.opacity(0.05),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(
+                selected
+                    ? Color.accentColor.opacity(0.10)
+                    : (isHovered ? Color.primary.opacity(0.08) : Color.secondary.opacity(0.05)),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(selected ? Color.accentColor.opacity(0.55) : .clear, lineWidth: 1)
+                    .strokeBorder(
+                        selected
+                            ? Color.accentColor.opacity(0.55)
+                            : (isHovered ? Color.primary.opacity(0.18) : Color.primary.opacity(0.06)),
+                        lineWidth: 1
+                    )
             }
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.14), value: isHovered)
         .accessibilityLabel("\(title). \(caption)")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }

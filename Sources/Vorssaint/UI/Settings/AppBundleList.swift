@@ -86,14 +86,9 @@ struct AppBundleList<Accessory: View>: View {
                     }
                     Spacer(minLength: 8)
                     accessory(bundleID)
-                    Button {
+                    ListRemoveButton(label: removeLabel) {
                         onRemove(bundleID)
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(removeLabel)
                 }
             }
 

@@ -76,15 +76,7 @@ struct RecentCapturesView: View {
             .accessibilityLabel(text.clear)
             .disabled(visibleEntries.isEmpty)
             if let onClose {
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.plain)
-                .help(l10n.s.uninstallerCancel)
-                .accessibilityLabel(l10n.s.uninstallerCancel)
+                PanelCloseButton(action: onClose)
             }
         }
     }

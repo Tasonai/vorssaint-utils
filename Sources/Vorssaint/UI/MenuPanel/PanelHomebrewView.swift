@@ -83,14 +83,7 @@ struct PanelHomebrewView: View {
             Label(l10n.s.homebrewName, systemImage: "shippingbox")
                 .font(.system(size: 12, weight: .semibold))
             Spacer()
-            Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.plain)
-            .help(l10n.s.uninstallerCancel)
+            PanelCloseButton(action: onClose)
         }
     }
 

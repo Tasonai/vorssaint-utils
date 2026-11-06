@@ -63,13 +63,9 @@ struct AutoQuitSettings: View {
                                 Image(systemName: "lock.fill")
                                     .foregroundStyle(.tertiary)
                             } else {
-                                Button {
+                                ListRemoveButton(label: l10n.s.actionRemove) {
                                     service.removeException(bundleID)
-                                } label: {
-                                    Image(systemName: "minus.circle.fill")
-                                        .foregroundStyle(.secondary)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -95,14 +91,9 @@ struct AutoQuitSettings: View {
                             .resizable().frame(width: 20, height: 20)
                         Text(InstalledApps.name(for: bundleID))
                         Spacer()
-                        Button {
+                        ListRemoveButton(label: dockAppsText.removeButton) {
                             service.removeDockApp(bundleID)
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(dockAppsText.removeButton)
                     }
                 }
                 .disabled(!enabled)

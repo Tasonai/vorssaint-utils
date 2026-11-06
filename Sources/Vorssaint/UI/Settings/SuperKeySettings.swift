@@ -15,7 +15,7 @@ struct SuperKeySettings: View {
 
     private var text: SuperKeyStrings { FeatureStrings.superKey(l10n.language) }
 
-    private struct ModifierChoice: Identifiable {
+    fileprivate struct ModifierChoice: Identifiable {
         let modifier: GlobalShortcutModifiers
         let symbol: String
         let name: String
@@ -148,31 +148,15 @@ struct SuperKeySettings: View {
 
     private func modifierKeyCap(_ choice: ModifierChoice) -> some View {
         let selected = selectedModifiers.contains(choice.modifier)
-        return Button {
+        return SuperKeyModifierKeyCap(
+            symbol: choice.symbol,
+            name: choice.name,
+            isSelected: selected,
+            isEnabled: enabled,
+            canToggle: !selected || canRemove(choice.modifier)
+        ) {
             toggle(choice.modifier)
-        } label: {
-            Text(choice.symbol)
-                .font(.system(size: 12, weight: .medium))
-                .frame(minWidth: 30, minHeight: 30)
-                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(selected
-                            ? Color.accentColor.opacity(0.14)
-                            : Color.primary.opacity(0.04))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .strokeBorder(selected
-                            ? Color.accentColor.opacity(0.45)
-                            : Color.primary.opacity(0.1))
-                )
         }
-        .buttonStyle(.plain)
-        .disabled(!enabled || (selected && !canRemove(choice.modifier)))
-        .help(choice.name)
-        .accessibilityLabel(choice.name)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var selectedModifiers: GlobalShortcutModifiers {
@@ -217,3 +201,43 @@ struct SuperKeySettings: View {
         }
     }
 }
+
+private struct SuperKeyModifierKeyCap: View {
+    let symbol: String
+    let name: String
+    let isSelected: Bool
+    let isEnabled: Bool
+    let canToggle: Bool
+    let onToggle: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onToggle) {
+            Text(symbol)
+                .font(.system(size: 12, weight: .medium))
+                .frame(minWidth: 30, minHeight: 30)
+                .foregroundStyle(isSelected ? Color.accentColor : (isHovered ? Color.primary : Color.secondary))
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(isSelected
+                            ? Color.accentColor.opacity(0.14)
+                            : (isHovered ? Color.primary.opacity(0.08) : Color.primary.opacity(0.04)))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(isSelected
+                            ? Color.accentColor.opacity(0.45)
+                            : (isHovered ? Color.primary.opacity(0.20) : Color.primary.opacity(0.10)))
+                )
+                .scaleEffect(isHovered && isEnabled && canToggle ? 1.05 : 1.0)
+                .animation(.easeOut(duration: 0.12), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled || !canToggle)
+        .onHover { isHovered = $0 }
+        .help(name)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+

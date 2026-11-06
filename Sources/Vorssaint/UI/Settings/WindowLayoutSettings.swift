@@ -487,17 +487,9 @@ private struct WindowLayoutActionRow: View {
                                        captureAction: save)
                     .frame(width: 108)
                     .disabled(!shortcutEnabled)
-                Button {
+                ClearIconButton(label: l10n.s.shortcutClear, disabled: !shortcutEnabled || shortcut == nil) {
                     clear()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .disabled(!shortcutEnabled || shortcut == nil)
-                .help(l10n.s.shortcutClear)
-                .accessibilityLabel(l10n.s.shortcutClear)
                 Button(l10n.s.shortcutReset) {
                     rawValue = action.defaultShortcut?.storageValue
                         ?? WindowLayoutAction.clearedShortcutStorageValue

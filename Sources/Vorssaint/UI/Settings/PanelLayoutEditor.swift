@@ -303,23 +303,14 @@ private struct MenuBarPanelMiniature: View {
     private var tabStrip: some View {
         HStack(spacing: 1) {
             ForEach(sections) { id in
-                let isActive = active == id
-                Button {
+                PanelLayoutTabButton(
+                    id: id,
+                    isActive: active == id,
+                    activeFill: activeFill,
+                    title: id.title(l10n.s)
+                ) {
                     onSelect(id)
-                } label: {
-                    Image(systemName: id.symbolName)
-                        .font(.system(size: 9, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 20)
-                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(isActive ? Color.accentColor : Color.secondary.opacity(0.86))
-                .background(isActive ? activeFill : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                .help(id.title(l10n.s))
-                .accessibilityLabel(id.title(l10n.s))
-                .accessibilityAddTraits(isActive ? .isSelected : [])
             }
         }
         .padding(3)
@@ -449,3 +440,36 @@ private struct PanelOrderDropDelegate: DropDelegate {
         return true
     }
 }
+
+private struct PanelLayoutTabButton: View {
+    let id: PanelSectionID
+    let isActive: Bool
+    let activeFill: Color
+    let title: String
+    let onSelect: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onSelect) {
+            Image(systemName: id.symbolName)
+                .font(.system(size: 9, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 20)
+                .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isActive ? Color.accentColor : (isHovered ? Color.primary : Color.secondary.opacity(0.86)))
+        .background(
+            isActive
+                ? activeFill
+                : (isHovered ? Color.primary.opacity(0.06) : Color.clear),
+            in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+        )
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .onHover { isHovered = $0 }
+        .help(title)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+}
+
