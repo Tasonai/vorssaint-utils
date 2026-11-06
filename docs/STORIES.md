@@ -62,6 +62,16 @@
   - **UX**: Dragging files towards the top notch reveals a spring-loaded quick-stash shelf target with distinct item counter badge and glowing dashed drop border.
   - **Status**: done
 
-- [todo] **Story 3.3**: Menu bar notch collision avoidance on compact MacBooks
+- [x] **Story 3.3**: Menu bar notch collision avoidance on compact MacBooks
   - **UX**: Prevent active application menus from hiding under the physical MacBook notch by automatically compressing menu bar spacing or shifting status items.
+  - **Status**: done
+
+## Milestone 4: Quick Launch & Command Bar Evolution
+
+- [todo] **Story 4.1**: Quick note & scratchpad quick-access sheet in Dynamic Island
+  - **UX**: 1-click access to persistent scratchpad notes directly from the expanded Island header.
+  - **Status**: todo
+
+- [todo] **Story 4.2**: Command Bar fuzzy calculator & currency unit conversion inline preview
+  - **UX**: Instant evaluation of arithmetic expressions and currency/unit conversions in Command Bar.
   - **Status**: todo
