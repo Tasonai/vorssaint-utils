@@ -9,3 +9,8 @@
 - **Issue**: `ShelfService.Item` was tightly coupled inside `ShelfService.swift` (2,781 lines), requiring all shelf UI and action engines to reference the monolithic service.
 - **Fix**: Extracted `ShelfItem` into an independent domain model file `Sources/Vorssaint/Services/Shelf/ShelfItem.swift` with `typealias ShelfService.Item = ShelfItem`. Added unit tests in `Tests/ShelfItemTests.swift`.
 - **Rule**: Core domain entities and payload models must be declared as standalone value types rather than nested types within service coordinators.
+
+## 2026-11-06: Shelf Edge Drag Gesture Detector Extraction
+- **Issue**: `ShelfService.swift` (2,781 lines) combined global mouse event monitoring, dock process detection, edge proximity math, and panel coordinate calculation for edge-peeking dropshelfs.
+- **Fix**: Extracted `ShelfEdgeDragMonitor` into `Sources/Vorssaint/Services/Shelf/ShelfEdgeDragMonitor.swift` with dedicated state machine and frame calculation methods. Added unit tests in `Tests/ShelfEdgeDragMonitorTests.swift`.
+- **Rule**: Global gesture detection, dwell timing, and off-screen reveal math must be decoupled from panel storage services into dedicated gesture monitors.

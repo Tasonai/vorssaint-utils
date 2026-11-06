@@ -899,6 +899,7 @@ def main():
     write("MixerInputVolume.swift", "import Foundation\nimport Combine\nimport CoreAudio\nimport AudioToolbox\n"
           + "extension MixerInputVolumeContract {\n" + input_bodies + "}\n")
     mixer = "Sources/Vorssaint/Services/Audio/AppVolumeMixer.swift"
+    mixer_models = "Sources/Vorssaint/Services/Audio/MixerModels.swift"
     tap_scope = "private final class TapGainEngine:"
     tap_init = declaration(mixer, "    init?(objects:", scope=tap_scope)
     callback_start = "guard AudioDeviceCreateIOProcIDWithBlock(&ioProc, aggregateID, nil, { now, input, _, output, _ in\n"
@@ -914,7 +915,7 @@ def main():
             "output: UnsafeMutablePointer<AudioBufferList>) {\n" + callback + "}\n}\n")
     write("MixerUniversalRouting.swift", "import CoreAudio\nimport Foundation\n"
           + "extension MixerUniversalRoutingContract {\n"
-          + declaration(mixer, "struct MixerApp:") + "}\n"
+          + declaration(mixer_models, "struct MixerApp:") + "}\n"
           + "extension MixerUniversalRoutingContract.Mixer {\n"
           + "".join(declaration(mixer, prefix).replace("private ", "", 1) for prefix in [
               "    private var universalOutputDeviceUID:",
