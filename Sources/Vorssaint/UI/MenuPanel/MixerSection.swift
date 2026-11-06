@@ -94,7 +94,9 @@ struct MixerSection: View {
     private var optionsDisclosure: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                optionsExpanded.toggle()
+                withAnimation(.easeOut(duration: 0.16)) {
+                    optionsExpanded.toggle()
+                }
             } label: {
                 HStack(spacing: 7) {
                     Image(systemName: "chevron.right")
@@ -118,12 +120,17 @@ struct MixerSection: View {
         }
     }
 
+    private var devicePickerWidth: CGFloat {
+        settingsMode ? 172 : 142
+    }
+
     private var universalOutputPicker: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Label {
                     Text(l10n.s.mixerSystemOutputTitle)
                         .font(.system(size: 11.5, weight: .medium))
+                        .lineLimit(1)
                 } icon: {
                     Image(systemName: "speaker.wave.2.fill")
                         .font(.system(size: 10.5, weight: .semibold))
@@ -151,7 +158,7 @@ struct MixerSection: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .controlSize(.small)
-                .frame(width: 164)
+                .frame(width: devicePickerWidth)
                 .disabled(universalOutputDevices.isEmpty)
                 .help(l10n.s.mixerSystemOutputTooltip)
             }
@@ -202,6 +209,7 @@ struct MixerSection: View {
                 Label {
                     Text(l10n.s.mixerSoundEffectsOutputTitle)
                         .font(.system(size: 11.5, weight: .medium))
+                        .lineLimit(1)
                 } icon: {
                     Image(systemName: "bell.fill")
                         .font(.system(size: 10.5, weight: .semibold))
@@ -230,7 +238,7 @@ struct MixerSection: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .controlSize(.small)
-                .frame(width: 164)
+                .frame(width: devicePickerWidth)
                 .disabled(systemSoundOutputDevices.isEmpty)
                 .help(l10n.s.mixerSoundEffectsOutputTooltip)
             }
@@ -294,6 +302,7 @@ struct MixerSection: View {
                 Label {
                     Text(l10n.s.mixerInputTitle)
                         .font(.system(size: 11.5, weight: .medium))
+                        .lineLimit(1)
                 } icon: {
                     Image(systemName: "mic.fill")
                         .font(.system(size: 10.5, weight: .semibold))
@@ -320,7 +329,7 @@ struct MixerSection: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .controlSize(.small)
-                .frame(width: 164)
+                .frame(width: devicePickerWidth)
                 .disabled(inputManager.inputDevices.isEmpty)
                 .help(l10n.s.mixerInputTooltip)
             }

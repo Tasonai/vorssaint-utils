@@ -40,11 +40,24 @@ struct UninstallerView: View {
     @ViewBuilder
     private var content: some View {
         switch uninstaller.phase {
-        case .empty: emptyState
-        case .scanning: busyState(l10n.s.uninstallerScanning)
+        case .empty: settingsScrolling(emptyState)
+        case .scanning: settingsScrolling(busyState(l10n.s.uninstallerScanning))
         case .results: resultsState
-        case .removing: busyState(l10n.s.uninstallerRemoving)
-        case let .done(freed, failed): doneState(freed: freed, failed: failed)
+        case .removing: settingsScrolling(busyState(l10n.s.uninstallerRemoving))
+        case let .done(freed, failed): settingsScrolling(doneState(freed: freed, failed: failed))
+        }
+    }
+
+    /// Keeps every phase inside a scroll container so NavigationSplitView does
+    /// not lose its titlebar safe area when swapping phases, and prevents
+    /// vertical clipping on shorter Settings window heights when permission or
+    /// refusal banners are shown.
+    private func settingsScrolling<Content: View>(_ content: Content) -> some View {
+        GeometryReader { proxy in
+            ScrollView {
+                content
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+            }
         }
     }
 
@@ -113,7 +126,7 @@ struct UninstallerView: View {
                 showingAppPicker = false
             } onSelect: { url in
                 showingAppPicker = false
-                uninstaller.select(appURL: url)
+                _ = uninstaller.select(appURL: url)
             } loadApps: { UninstallerSupport.offeredApplications() }
         }
         .dropDestination(for: URL.self) { urls, _ in

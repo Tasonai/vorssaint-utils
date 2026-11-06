@@ -25,6 +25,10 @@ struct SettingsCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
     }
 }
 
@@ -62,10 +66,10 @@ struct SettingsRow<Accessory: View>: View {
                     if let badge {
                         Text(badge)
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Color.white)
+                            .foregroundStyle(Color.accentColor)
                             .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Capsule().fill(Color.accentColor))
+                            .padding(.vertical, 1.5)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.16)))
                             .accessibilityHidden(true)
                     }
                 }

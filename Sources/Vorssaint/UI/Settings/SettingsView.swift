@@ -356,15 +356,17 @@ struct SettingsView: View {
                 }
             } header: {
                 Button {
-                    if !collapsedSectionIDs.insert(section.id).inserted {
-                        collapsedSectionIDs.remove(section.id)
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        if !collapsedSectionIDs.insert(section.id).inserted {
+                            collapsedSectionIDs.remove(section.id)
+                        }
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: collapsedSectionIDs.contains(section.id)
-                            ? "chevron.right" : "chevron.down")
+                        Image(systemName: "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
                             .frame(width: 12)
+                            .rotationEffect(.degrees(collapsedSectionIDs.contains(section.id) ? 0 : 90))
                         Text(section.title)
                     }
                     .contentShape(Rectangle())

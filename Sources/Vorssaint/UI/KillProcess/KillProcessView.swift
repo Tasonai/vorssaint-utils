@@ -116,7 +116,7 @@ struct KillProcessView: View {
 
     /// Mirrors `row(_:)`'s HStack widths exactly, so each label sits over its
     /// column: the leading `22`pt gap matches the row icon, and the trailing
-    /// `98`pt gap matches the Kill + "..." button cluster.
+    /// hidden action cluster matches the localized Kill + "..." button widths.
     private var columnHeader: some View {
         HStack(spacing: 10) {
             Spacer().frame(width: 22)
@@ -128,10 +128,23 @@ struct KillProcessView: View {
                 .frame(width: 72, alignment: .trailing)
             columnHeaderButton(strings.columnPID, column: .pid)
                 .frame(width: 56, alignment: .trailing)
-            Spacer().frame(width: 98)
+            rowActionsWidthPlaceholder
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
+    }
+
+    private var rowActionsWidthPlaceholder: some View {
+        HStack(spacing: 10) {
+            Button(strings.killButton) {}
+                .frame(minWidth: 44)
+            Image(systemName: "ellipsis")
+                .frame(minWidth: 44)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .hidden()
+        .accessibilityHidden(true)
     }
 
     private func columnHeaderButton(_ title: String, column: KillProcessService.SortBy) -> some View {
@@ -140,6 +153,7 @@ struct KillProcessView: View {
         } label: {
             HStack(spacing: 3) {
                 Text(title)
+                    .lineLimit(1)
                 if service.sortBy == column {
                     Image(systemName: service.sortAscending ? "chevron.up" : "chevron.down")
                         .font(.system(size: 8, weight: .bold))

@@ -606,7 +606,9 @@ struct SystemSection: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 6) {
                     Button {
-                        alertsExpanded.toggle()
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            alertsExpanded.toggle()
+                        }
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "chevron.right")

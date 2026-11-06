@@ -2816,13 +2816,16 @@ struct KeepAwakeCard: View {
     private var optionsDisclosure: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                optionsExpanded.toggle()
+                withAnimation(.easeOut(duration: 0.16)) {
+                    optionsExpanded.toggle()
+                }
             } label: {
                 HStack(spacing: 7) {
-                    Image(systemName: optionsExpanded ? "chevron.down" : "chevron.right")
+                    Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.secondary)
                         .frame(width: 12)
+                        .rotationEffect(.degrees(optionsExpanded ? 90 : 0))
                     Text(l10n.s.keepAwakeOptions)
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -2873,7 +2876,9 @@ struct KeepAwakeCard: View {
     private var automationDisclosure: some View {
         VStack(alignment: .leading, spacing: 7) {
             Button {
-                automationExpanded.toggle()
+                withAnimation(.easeOut(duration: 0.16)) {
+                    automationExpanded.toggle()
+                }
             } label: {
                 HStack(spacing: 7) {
                     Image(systemName: "bolt.fill")
@@ -2886,9 +2891,10 @@ struct KeepAwakeCard: View {
                         .lineLimit(1)
                     Spacer(minLength: 6)
                     automationSummaryBadges
-                    Image(systemName: automationExpanded ? "chevron.down" : "chevron.right")
+                    Image(systemName: "chevron.right")
                         .font(.system(size: 8.5, weight: .bold))
                         .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(automationExpanded ? 90 : 0))
                 }
                 .contentShape(Rectangle())
             }

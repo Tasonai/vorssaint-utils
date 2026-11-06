@@ -225,12 +225,13 @@ struct FanControlCardContent: View {
                 HStack(spacing: 5) {
                     Text(strings.title)
                         .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
                     Text(betaLabel)
                         .font(.system(size: 7.5, weight: .bold))
-                        .foregroundStyle(Color.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.accentColor))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1.5)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.16)))
                 }
                 Text(statusText)
                     .font(.system(size: 10).monospacedDigit())
