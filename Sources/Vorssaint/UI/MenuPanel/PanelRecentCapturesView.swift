@@ -103,14 +103,17 @@ struct RecentCapturesView: View {
     @ViewBuilder
     private var content: some View {
         if visibleEntries.isEmpty {
-            Text(text.empty)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .frame(height: notchSize == nil ? 92 : nil)
-                .frame(maxHeight: notchSize == nil ? nil : .infinity)
-                .panelCard()
+            if notchSize != nil {
+                NotchEmptyView(symbol: "photo.on.rectangle.angled", message: text.empty)
+            } else {
+                Text(text.empty)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 92)
+                    .panelCard()
+            }
         } else if let notchSize {
             let rows = NotchLayout.railRows(count: visibleEntries.count,
                                             perRow: NotchLayout.railCapacity(width: notchSize.width, itemWidth: 236, spacing: 8),

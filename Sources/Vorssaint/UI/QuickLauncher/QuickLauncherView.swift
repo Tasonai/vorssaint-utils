@@ -6,6 +6,7 @@ import SwiftUI
 struct QuickLauncherView: View {
     var notchSize: CGSize? = nil
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.notchBand) private var band
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var launcher = QuickLauncherService.shared
     @ObservedObject private var features = FeatureRuntime.shared
@@ -61,6 +62,11 @@ struct QuickLauncherView: View {
             if notchSize != nil, let utility = launcher.activeUtility {
                 // The way back to the tools names the open one, as a detail's does.
                 NotchBandBackButton(title: title(for: utility), action: launcher.closeUtility)
+            } else if notchSize != nil, !band.besideCamera {
+                Text(NotchModule.tools.title(l10n.language))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1)
             }
         }, trailing: {
             if notchSize != nil, launcher.activeUtility == nil {
@@ -263,6 +269,17 @@ struct QuickLauncherView: View {
                     RoundedRectangle(cornerRadius: notchSize == nil ? 12 : 16, style: .continuous)
                         .fill(iconBackground(item, isSelected: isSelected, isHovered: isHovered))
                         .frame(width: notchSize == nil ? 46 : 32, height: notchSize == nil ? 46 : 32)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: notchSize == nil ? 12 : 16, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.16), .white.opacity(0.04)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        }
                         .overlay(
                             Image(systemName: icon(for: item))
                                 .font(.system(size: notchSize == nil ? 19 : 16, weight: .semibold))
@@ -365,8 +382,15 @@ struct QuickLauncherView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
-                                Capsule(style: .continuous).fill(notchSize != nil ? .black : Color.accentColor.opacity(0.13))
+                                Capsule(style: .continuous)
+                                    .fill(notchSize != nil ? Color.white.opacity(0.10) : Color.accentColor.opacity(0.13))
                             )
+                            .overlay {
+                                if notchSize != nil {
+                                    Capsule(style: .continuous)
+                                        .strokeBorder(.white.opacity(0.14), lineWidth: 0.5)
+                                }
+                            }
                     }
                     .buttonStyle(.plain)
                 }
@@ -488,13 +512,31 @@ struct QuickLauncherView: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(notchSize != nil ? .black : Color.primary.opacity(0.05))
+                .fill(notchSize != nil ? Color.white.opacity(0.07) : Color.primary.opacity(0.05))
         )
+        .overlay {
+            if notchSize != nil {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+            }
+        }
     }
 
     // MARK: - Item metadata
 
     private func title(for item: QuickLauncherItem) -> String {
+        if notchSize != nil, l10n.language == .ru {
+            switch item {
+            case .keepAwake: return "Не спать"
+            case .micMute: return "Микрофон"
+            case .cleaning: return "Клавиатура"
+            case .screenRecorder:
+                let strings = FeatureStrings.recorder(l10n.language)
+                return recorder.isRecording ? strings.stopButton : "Запись"
+            case .cameraPreview: return "Камера"
+            default: break
+            }
+        }
         switch item {
         case .keepAwake: return l10n.s.keepAwakeTitle
         case .toggles: return FeatureStrings.quickToggles(l10n.language).pageTitle

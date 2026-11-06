@@ -145,8 +145,10 @@ struct NotchDownloadsView: View {
                             downloadCard(item)
                         }
                     }
+                    .padding(.vertical, 2)
                 }
-                .scrollIndicators(.automatic)
+                .scrollIndicators(.never)
+                .notchScrollEdgeFade()
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // The watched folder heads the island's top row, so the cards start at
@@ -228,7 +230,7 @@ struct NotchDownloadsView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, item.completed ? 8 : 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.white.opacity(isHovered ? 0.09 : 0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .modifier(NotchControlSurface(cornerRadius: 14, selected: isHovered, interactive: false))
         .clipped()
         .onHover { hovering in
             hoveredDownloadID = hovering ? item.id : (hoveredDownloadID == item.id ? nil : hoveredDownloadID)

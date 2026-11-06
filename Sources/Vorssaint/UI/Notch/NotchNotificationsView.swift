@@ -127,7 +127,7 @@ private struct NotchNotificationRow: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.white.opacity(isHovered ? 0.08 : 0.06), in: RoundedRectangle(cornerRadius: 14))
+        .modifier(NotchControlSurface(cornerRadius: 14, selected: isHovered, interactive: false))
         .clipped()
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .contain)
@@ -184,8 +184,7 @@ struct NotchNotificationPreviewView: View {
             }
             HStack(spacing: 8) {
                 if let item, notifications.canOpen(item) {
-                    Button(text.open) { service.activateNotice(notice) }
-                        .buttonStyle(.bordered).controlSize(.small)
+                    NotchPillButton(title: text.open, prominent: true) { service.activateNotice(notice) }
                         .disabled(notifications.openingID != nil)
                 }
                 if notifications.openingID == notice.notificationID { ProgressView().controlSize(.small) }

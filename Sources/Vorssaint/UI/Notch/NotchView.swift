@@ -575,7 +575,14 @@ struct NotchView: View {
                     .notchBand(leading: { NotchCameraChooser() }, trailing: { NotchCameraStopButton() })
             case .notifications:
                 NotchNotificationsView(size: pageSize)
-                    .notchBand(trailing: { NotchClearNotificationsButton() })
+                    .notchBand(leading: {
+                        if service.expandedGeometry.cameraWidth == 0 {
+                            Text(NotchModule.notifications.title(l10n.language))
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .lineLimit(1)
+                        }
+                    }, trailing: { NotchClearNotificationsButton() })
             case .downloads: NotchDownloadsView(size: pageSize)
             case .calendar: NotchCalendarView(size: pageSize)
             case .controls: NotchControlsView(service: service, size: pageSize)
@@ -589,7 +596,14 @@ struct NotchView: View {
                         .notchBand(trailing: { service.captureActions?.fixedSize() })
                 } else {
                     RecentCapturesView(onClose: nil, notchSize: pageSize)
-                        .notchBand(trailing: { NotchClearCapturesButton() })
+                        .notchBand(leading: {
+                            if service.expandedGeometry.cameraWidth == 0 {
+                                Text(NotchModule.captures.title(l10n.language))
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                    .lineLimit(1)
+                            }
+                        }, trailing: { NotchClearCapturesButton() })
                 }
             case .files: NotchFilesView(service: service)
             case .system:

@@ -405,7 +405,7 @@ struct MenuPanelView: View {
         .padding(4)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(notchSize != nil ? .black : PanelSurface.cardFill(for: colorScheme))
+                .fill(notchSize != nil ? Color.white.opacity(0.065) : PanelSurface.cardFill(for: colorScheme))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -414,7 +414,7 @@ struct MenuPanelView: View {
     }
 
     private var navigationActiveFill: Color {
-        if notchSize != nil { return .black }
+        if notchSize != nil { return Color.white.opacity(0.16) }
         return colorScheme == .light ? Color.accentColor.opacity(0.13) : Color.accentColor.opacity(0.20)
     }
 
@@ -497,7 +497,7 @@ struct MenuPanelView: View {
                 .frame(maxWidth: .infinity, minHeight: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(notchSize != nil ? .black : PanelSurface.cardFill(for: colorScheme))
+                        .fill(notchSize != nil ? Color.white.opacity(0.065) : PanelSurface.cardFill(for: colorScheme))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
