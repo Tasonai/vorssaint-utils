@@ -26,7 +26,9 @@ struct AudioPriorityDisclosure: View {
         VStack(alignment: .leading, spacing: 8) {
             if showsHeader {
                 Button {
-                    expanded.toggle()
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        expanded.toggle()
+                    }
                 } label: {
                     HStack(spacing: 7) {
                         Image(systemName: "list.number")

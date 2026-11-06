@@ -225,6 +225,7 @@ struct PanelHomebrewView: View {
                     Label(l10n.s.homebrewCheckPackages, systemImage: "arrow.clockwise")
                         .font(.system(size: 10.5, weight: .medium))
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -236,6 +237,7 @@ struct PanelHomebrewView: View {
                     Label(l10n.s.homebrewUpdateHomebrew, systemImage: "arrow.triangle.2.circlepath")
                         .font(.system(size: 10.5, weight: .medium))
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -271,6 +273,7 @@ struct PanelHomebrewView: View {
                     Label(l10n.s.homebrewUpgradeAll, systemImage: "arrow.up.circle")
                         .font(.system(size: 10.5, weight: .medium))
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

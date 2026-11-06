@@ -58,6 +58,7 @@ struct WallpaperSection: View {
                         .foregroundStyle(.orange)
                 }
             }
+            .panelCard()
             .onAppear {
                 // own folders can change on disk; keep Apple catalog cache
                 service.beginViewing(viewerID)
@@ -114,18 +115,34 @@ struct WallpaperSection: View {
                 .controlSize(.small)
             }
 
-            HStack(spacing: 8) {
-                Button(text.addImage) { service.addImages(inNotch: inNotch) }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(isRemovingSources)
-                Button(text.addFolder) { service.addFolder(inNotch: inNotch) }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(isRemovingSources)
+            HStack(spacing: 6) {
+                Button {
+                    service.addImages(inNotch: inNotch)
+                } label: {
+                    Text(text.addImage)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isRemovingSources)
+                Button {
+                    service.addFolder(inNotch: inNotch)
+                } label: {
+                    Text(text.addFolder)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isRemovingSources)
                 if canManageSources || isRemovingSources {
-                    Button(isRemovingSources ? text.doneRemoving : text.removeAdded) {
+                    Button {
                         isRemovingSources.toggle()
+                    } label: {
+                        Text(isRemovingSources ? text.doneRemoving : text.removeAdded)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)

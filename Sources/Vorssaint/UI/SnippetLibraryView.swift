@@ -26,6 +26,10 @@ struct SnippetLibraryView: View {
         .frame(width: 460)
         .background(HUDBackdrop(cornerRadius: 22, contrast: .high))
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+        )
         .onChange(of: library.presentationID) { _, _ in
             searchFocused = true
         }
@@ -160,11 +164,10 @@ struct SnippetLibraryView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                if selected {
-                    Image(systemName: "return")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Image(systemName: "return")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .opacity(selected ? 1 : 0)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

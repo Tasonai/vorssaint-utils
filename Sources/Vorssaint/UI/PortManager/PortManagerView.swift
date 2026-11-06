@@ -25,6 +25,8 @@ struct PortManagerView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).help(strings.refresh)
             }
@@ -119,7 +121,8 @@ struct PortManagerView: View {
                     .truncationMode(.middle)
             }
             Spacer(minLength: 4)
-            if AppFeature.killProcess.isAvailable, hoveredPortID == entry.id {
+            if AppFeature.killProcess.isAvailable {
+                let isHovered = hoveredPortID == entry.id
                 HStack(spacing: 4) {
                     Button(strings.kill) { force = false; pending = entry }
                         .buttonStyle(.bordered).controlSize(.mini)
@@ -131,6 +134,8 @@ struct PortManagerView: View {
                         .disabled(entry.startedAt == nil
                                   || KillProcessService.isProtected(pid: entry.pid, name: entry.processName))
                 }
+                .opacity(isHovered ? 1 : 0)
+                .allowsHitTesting(isHovered)
             }
         }
         .padding(.vertical, 3)

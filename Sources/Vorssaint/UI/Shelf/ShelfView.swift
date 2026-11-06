@@ -52,7 +52,7 @@ struct ShelfView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(isDropTargeted ? Color.accentColor : Color.white.opacity(0.12),
+                .strokeBorder(isDropTargeted ? Color.accentColor : Color.primary.opacity(0.14),
                               lineWidth: isDropTargeted ? 2 : 1)
         )
         .overlay(alignment: .topLeading) {
@@ -121,10 +121,10 @@ struct ShelfView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .frame(width: 30, height: 30)
                 .background(
-                    Circle().fill(Color.white.opacity(pasteButtonHovered ? 0.18 : 0.11))
+                    Circle().fill(Color.primary.opacity(pasteButtonHovered ? 0.14 : 0.08))
                 )
                 .overlay(
-                    Circle().strokeBorder(Color.white.opacity(pasteButtonHovered ? 0.75 : 0.32), lineWidth: 1)
+                    Circle().strokeBorder(Color.primary.opacity(pasteButtonHovered ? 0.42 : 0.18), lineWidth: 1)
                 )
                 .contentShape(Circle())
         }
@@ -143,12 +143,12 @@ struct ShelfView: View {
                 .background(
                     Circle().fill(shelf.isPinned
                                   ? Color.accentColor.opacity(pinButtonHovered ? 0.30 : 0.20)
-                                  : Color.white.opacity(pinButtonHovered ? 0.18 : 0.11))
+                                  : Color.primary.opacity(pinButtonHovered ? 0.14 : 0.08))
                 )
                 .overlay(
                     Circle().strokeBorder(shelf.isPinned
                                           ? Color.accentColor.opacity(0.65)
-                                          : Color.white.opacity(pinButtonHovered ? 0.75 : 0.32),
+                                          : Color.primary.opacity(pinButtonHovered ? 0.42 : 0.18),
                                           lineWidth: 1)
                 )
                 .contentShape(Circle())
@@ -167,11 +167,11 @@ struct ShelfView: View {
                 .frame(width: 30, height: 30)
                 .background(
                     Circle()
-                        .fill(Color.white.opacity(closeButtonHovered ? 0.18 : 0.11))
+                        .fill(Color.primary.opacity(closeButtonHovered ? 0.14 : 0.08))
                 )
                 .overlay(
                     Circle()
-                        .strokeBorder(Color.white.opacity(closeButtonHovered ? 0.75 : 0.32), lineWidth: 1)
+                        .strokeBorder(Color.primary.opacity(closeButtonHovered ? 0.42 : 0.18), lineWidth: 1)
                 )
                 .contentShape(Circle())
         }
@@ -182,12 +182,13 @@ struct ShelfView: View {
     }
 
     private var bottomBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Text(l10n.s.shelfHint)
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
-            Spacer(minLength: 8)
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 6)
             actionsMenuButton
             shareButton
             clearButton
@@ -363,11 +364,11 @@ struct ShelfView: View {
         .help(shelf.selection.isEmpty ? l10n.s.shelfClearAll : l10n.s.shelfRemoveSelected)
     }
 
-    /// The shared face of the footer's two buttons.
+    /// The shared face of the footer's buttons.
     private func footerButtonFace(systemImage: String, tint: Color, hovered: Bool) -> some View {
         Image(systemName: systemImage)
             .font(.system(size: 12, weight: .semibold))
-            .frame(width: 42, height: 28)
+            .frame(width: 36, height: 28)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(tint.opacity(hovered ? 0.20 : 0.07))

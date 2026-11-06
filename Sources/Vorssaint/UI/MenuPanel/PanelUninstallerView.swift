@@ -128,7 +128,7 @@ struct PanelUninstallerView: View {
             showingAppPicker = false
         } onSelect: { url in
             showingAppPicker = false
-            uninstaller.select(appURL: url)
+            _ = uninstaller.select(appURL: url)
         } loadApps: { UninstallerSupport.offeredApplications() }
         .panelCard()
     }
@@ -235,14 +235,19 @@ struct PanelUninstallerView: View {
     }
 
     private var leftoverList: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(AppUninstaller.Category.allCases, id: \.self) { category in
-                let group = uninstaller.items.filter { $0.category == category }
-                if !group.isEmpty {
-                    categoryGroup(group, category: category)
+        ScrollView(showsIndicators: uninstaller.items.count > 6) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(AppUninstaller.Category.allCases, id: \.self) { category in
+                    let group = uninstaller.items.filter { $0.category == category }
+                    if !group.isEmpty {
+                        categoryGroup(group, category: category)
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxHeight: 240)
+        .fixedSize(horizontal: false, vertical: uninstaller.items.count <= 6)
     }
 
     private func categoryGroup(_ group: [AppUninstaller.Leftover],

@@ -124,6 +124,7 @@ struct PanelPortManagerView: View {
                 }
             }
             .frame(maxHeight: 260)
+            .panelCard()
         }
     }
 
@@ -181,7 +182,7 @@ struct PanelPortManagerView: View {
                     .truncationMode(.middle)
             }
             Spacer(minLength: 4)
-            if AppFeature.killProcess.isAvailable, isHovered {
+            if AppFeature.killProcess.isAvailable {
                 HStack(spacing: 4) {
                     Button(strings.kill) { confirmTermination(entry, force: false) }
                         .buttonStyle(.bordered).controlSize(.mini)
@@ -193,6 +194,8 @@ struct PanelPortManagerView: View {
                         .disabled(entry.startedAt == nil
                                   || KillProcessService.isProtected(pid: entry.pid, name: entry.processName))
                 }
+                .opacity(isHovered ? 1 : 0)
+                .allowsHitTesting(isHovered)
             }
         }
         .padding(.vertical, 5)

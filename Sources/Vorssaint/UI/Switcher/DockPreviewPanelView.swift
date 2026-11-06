@@ -181,7 +181,7 @@ private struct DockPreviewPanelContent: View {
         // still draws the panel's shape once the frost stops doing it.
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(minimalPreviews ? Color.clear : Color.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(minimalPreviews ? Color.clear : Color.primary.opacity(0.12), lineWidth: 1)
         )
     }
 
