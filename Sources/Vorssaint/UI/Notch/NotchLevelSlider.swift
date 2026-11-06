@@ -248,12 +248,26 @@ private final class NotchLevelCell: NSSliderCell {
         track.fill()
         let span = maxValue - minValue
         let fraction = span > 0 ? min(1, max(0, ((drawnValue ?? doubleValue) - minValue) / span)) : 0
-        fill.withAlphaComponent(isEnabled ? 0.92 : 0.3).setFill()
-        if isFader {
-            let height = track.height * fraction
-            NSRect(x: track.minX, y: flipped ? track.maxY - height : track.minY, width: track.width, height: height).fill()
-        } else {
-            NSRect(x: track.minX, y: track.minY, width: track.width * fraction, height: track.height).fill()
+        if fraction > 0 {
+            let fillRect: NSRect
+            if isFader {
+                let height = max(track.width, track.height * fraction)
+                fillRect = NSRect(x: track.minX, y: flipped ? track.maxY - height : track.minY,
+                                  width: track.width, height: min(track.height, height))
+            } else {
+                let width = max(track.height, track.width * fraction)
+                fillRect = NSRect(x: track.minX, y: track.minY,
+                                  width: min(track.width, width), height: track.height)
+            }
+            let fillPath = NSBezierPath(roundedRect: fillRect, xRadius: radius, yRadius: radius)
+            let startColor = fill.withAlphaComponent(isEnabled ? 0.82 : 0.26)
+            let endColor = fill.withAlphaComponent(isEnabled ? 0.98 : 0.34)
+            if let gradient = NSGradient(starting: startColor, ending: endColor) {
+                gradient.draw(in: fillPath, angle: isFader ? (flipped ? -90 : 90) : 0)
+            } else {
+                endColor.setFill()
+                fillPath.fill()
+            }
         }
         if let marker, span > 0, marker > minValue, marker < maxValue {
             let position = (marker - minValue) / span
@@ -265,6 +279,9 @@ private final class NotchLevelCell: NSSliderCell {
                 NSRect(x: track.minX + track.width * position - 0.5, y: track.minY, width: 1, height: track.height).fill()
             }
         }
+        NSColor.white.withAlphaComponent(0.08).setStroke()
+        outline.lineWidth = 1
+        outline.stroke()
         NSGraphicsContext.restoreGraphicsState()
     }
 

@@ -426,10 +426,47 @@ struct NotchActionTile: View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: symbol).font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(active ? accent.glyph : .white.opacity(0.85))
+                    .foregroundStyle(active ? accent.glyph : .white.opacity(0.9))
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: 40, height: 40)
-                    .background(active ? accent.fill : Color.white.opacity(0.075), in: Circle())
+                    .background {
+                        if active {
+                            Circle()
+                                .fill(accent.fill.opacity(0.32))
+                                .blur(radius: 7)
+                                .scaleEffect(1.12)
+                        }
+                    }
+                    .background(
+                        Circle()
+                            .fill(
+                                active
+                                    ? LinearGradient(
+                                        colors: [accent.fill, accent.fill.opacity(0.86)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                    : LinearGradient(
+                                        colors: [Color.white.opacity(0.115), Color.white.opacity(0.055)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                            )
+                    )
+                    .overlay {
+                        Circle()
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        .white.opacity(active ? 0.35 : 0.18),
+                                        .white.opacity(active ? 0.10 : 0.04)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 0.5
+                            )
+                    }
                     .animation(reduceMotion ? nil : .smooth(duration: 0.26), value: symbol)
                 label
                     .frame(maxWidth: .infinity)

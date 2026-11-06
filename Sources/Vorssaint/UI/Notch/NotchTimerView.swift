@@ -324,18 +324,46 @@ struct NotchTimerView: View {
 
     private func clock(_ value: String, size: CGFloat) -> some View {
         Text(value)
-            .font(.system(size: size, weight: .thin)).monospacedDigit()
+            .font(.system(size: size, weight: .light, design: .rounded)).monospacedDigit()
             .foregroundStyle(.orange)
+            .shadow(color: .orange.opacity(size > 40 ? 0.22 : 0), radius: 10, y: 2)
             .lineLimit(1).minimumScaleFactor(0.5)
     }
 
     private func roundButton(symbol: String, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 23, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.orange)
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: 52, height: 52)
-                .background(Color.orange.opacity(0.28), in: Circle())
+                .background {
+                    Circle()
+                        .fill(Color.orange.opacity(0.24))
+                        .blur(radius: 10)
+                        .scaleEffect(1.1)
+                }
+                .background(
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.34), Color.orange.opacity(0.18)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .overlay {
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.55), Color.orange.opacity(0.16)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 0.75
+                        )
+                }
                 .contentShape(Circle())
         }
         .buttonStyle(NotchButtonStyle(cornerRadius: 26))

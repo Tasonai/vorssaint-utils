@@ -127,25 +127,56 @@ struct NotchSystemView: View {
         }
     }
 
+    private func cardAccent(_ card: Card) -> Color {
+        if card.wantsAttention { return .orange }
+        switch card.kind {
+        case .cpu: return .cyan
+        case .gpu: return .indigo
+        case .memory: return .mint
+        case .battery: return .green
+        case .network: return .blue
+        case .disk: return .purple
+        case .power: return .yellow
+        case .fan: return .teal
+        case .connectedDevices: return .cyan
+        }
+    }
+
     private func cardButton(_ card: Card) -> some View {
-        Button { select(card.kind) } label: {
+        let accent = cardAccent(card)
+        return Button { select(card.kind) } label: {
             VStack(alignment: .leading, spacing: 6) {
-                Label(card.title, systemImage: card.symbol)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 5) {
+                    Image(systemName: card.symbol)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(accent)
+                    Text(card.title)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 Text(card.value ?? "…")
-                    .font(.system(size: card.detail == nil ? 22 : 15, weight: .medium, design: .rounded))
+                    .font(.system(size: card.detail == nil ? 22 : 15, weight: .semibold, design: .rounded))
                     .monospacedDigit().contentTransition(.numericText()).lineLimit(1).minimumScaleFactor(0.75)
                     .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: card.value)
                 if let detail = card.detail {
                     Text(detail).font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
                 } else if let level = card.level {
-                    NotchMeter(value: level, tint: card.wantsAttention ? .orange : .white)
+                    NotchMeter(value: level, tint: accent)
                 }
             }
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: NotchLayout.systemCardHeight)
+            .background(alignment: .topLeading) {
+                Circle()
+                    .fill(accent.opacity(card.wantsAttention ? 0.18 : 0.09))
+                    .frame(width: 56, height: 56)
+                    .blur(radius: 16)
+                    .offset(x: -10, y: -10)
+                    .allowsHitTesting(false)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .modifier(NotchControlSurface(cornerRadius: 18))
         }
         .buttonStyle(NotchButtonStyle(cornerRadius: 18))
