@@ -943,6 +943,10 @@ final class NotchService: ObservableObject {
             capturesAudio: captureControls?.selectedTool.capturesAudio == true)
     }
 
+    var isPrivacyIndicatorActive: Bool {
+        CameraMicrophonePrivacyMonitor.shared.isAnyActive
+    }
+
     var surfaceSize: CGSize {
         if let capsule = capsuleSurfaceSize { return capsule }
         if fullscreenCompact { return geometry.bareCutout }
@@ -967,12 +971,15 @@ final class NotchService: ObservableObject {
             // where the emphasis has the least room.
             let named = namedMusicWings
             if let named { resting.width += named.leading - named.trailing }
+            if isPrivacyIndicatorActive {
+                resting.width += 14
+            }
             return hoverEmphasized
                 ? NotchHoverEmphasis.size(from: resting, geometry: geometry,
                                           reach: named.map { ($0.leading - $0.trailing) / 2 } ?? 0)
                 : resting
         }
-        let resting = geometry.restingSize(showsContent: idleContent != .none || mascotShows(on: geometry))
+        let resting = geometry.restingSize(showsContent: idleContent != .none || mascotShows(on: geometry) || isPrivacyIndicatorActive)
         return hoverEmphasized ? NotchHoverEmphasis.size(from: resting, geometry: geometry) : resting
     }
 
@@ -1003,7 +1010,7 @@ final class NotchService: ObservableObject {
         if peeking || showsCompactActivityPicker { return nil }
         // At rest the charge or the allowance fits inside the bare capsule.
         let resting = compactActivity.map { capsuleStripSize(for: $0, companion: compactCompanion) }
-            ?? geometry.restingSize(showsContent: false)
+            ?? geometry.restingSize(showsContent: idleContent != .none || isPrivacyIndicatorActive)
         return hoverEmphasized ? NotchHoverEmphasis.size(from: resting, geometry: geometry) : resting
     }
 
@@ -1035,8 +1042,12 @@ final class NotchService: ObservableObject {
     /// The closed strip an activity takes on its own: a capsule as wide as
     /// what it shows, or the hanging strip around the camera.
     func compactStripSize(for activity: NotchCompactActivity, companion: NotchCompactActivity? = nil) -> CGSize {
-        geometry.floats ? capsuleStripSize(for: activity, companion: companion)
+        var size = geometry.floats ? capsuleStripSize(for: activity, companion: companion)
             : compactGeometry(for: activity, companion: companion).compactActivitySize
+        if isPrivacyIndicatorActive {
+            size.width += 14
+        }
+        return size
     }
 
     /// Measured from what the capsule's views show, with their own measures,

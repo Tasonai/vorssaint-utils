@@ -238,6 +238,7 @@ struct NotchCapsuleRestingView: View {
                 case .none:
                     EmptyView()
                 }
+                NotchPrivacyDots()
             }
             .foregroundStyle(.white.opacity(0.9))
         }

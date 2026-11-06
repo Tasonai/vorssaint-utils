@@ -1816,6 +1816,7 @@ enum NotchTests {
         NotchLockScreenTests.run(suite)
         NowPlayingOpenContract.run(suite)
         NotchClipboardPageTests.run(suite)
+        NotchPrivacyTests.run(suite)
         for language in AppLanguage.allCases {
             let strings = Mirror(reflecting: FeatureStrings.notchClipboardSize(language)).children.compactMap { $0.value as? String }
             suite.expect(strings.count == 4 && strings.allSatisfy { !$0.isEmpty && !$0.contains("—") },

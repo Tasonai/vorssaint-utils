@@ -199,6 +199,10 @@ struct NotchView: View {
                 // cover and bars jumped out at once while the shape still grew.
                 let strip = service.compactStripSize(for: activity, companion: service.compactCompanion)
                 activityStrip(activity, size: strip)
+                    .overlay(alignment: .trailing) {
+                        NotchPrivacyDots()
+                            .padding(.trailing, floats ? 10 : 8)
+                    }
                     .modifier(NotchMascotActivityVisit(service: service,
                                                        track: service.mascotTrack(overActivityStrip: strip),
                                                        ownStrip: true))
@@ -369,14 +373,17 @@ struct NotchView: View {
                 // The island's own marks follow the page's controls while they
                 // fit their side, never pushing them under the camera; the menu
                 // offers the same actions either way.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 6) { items.trailing; trailingSections(band); updateControl(band); pinMark }
-                    HStack(spacing: 6) {
-                        items.trailing; trailingSections(band)
-                        NotchUpdateControl(action: service.showUpdate, compact: true); pinMark
+                HStack(spacing: 8) {
+                    NotchPrivacyHeaderBadge()
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 6) { items.trailing; trailingSections(band); updateControl(band); pinMark }
+                        HStack(spacing: 6) {
+                            items.trailing; trailingSections(band)
+                            NotchUpdateControl(action: service.showUpdate, compact: true); pinMark
+                        }
+                        HStack(spacing: 6) { items.trailing; trailingSections(band); pinMark }
+                        HStack(spacing: 6) { items.trailing; trailingSections(band) }
                     }
-                    HStack(spacing: 6) { items.trailing; trailingSections(band); pinMark }
-                    HStack(spacing: 6) { items.trailing; trailingSections(band) }
                 }
             }
         }
@@ -690,7 +697,7 @@ struct NotchRestingStrip: View {
     var body: some View {
         ZStack {
             HStack(spacing: 0) {
-                if service.idleContent != .none, geometry.restingWingWidth > 0 {
+                if service.idleContent != .none || CameraMicrophonePrivacyMonitor.shared.isAnyActive, geometry.restingWingWidth > 0 {
                     // Each wing keeps its width even when it has nothing to
                     // show, or the other one slides toward the camera.
                     ZStack(alignment: .trailing) {
@@ -718,24 +725,26 @@ struct NotchRestingStrip: View {
                     Color.clear.frame(width: geometry.cameraWidth)
                     ZStack(alignment: .leading) {
                         Color.clear
-                        switch service.idleContent {
-                        case .music:
-                            if music.playback?.isPlaying == true {
-                                NotchLiveEqualizerBars(bars: 3, barWidth: 2, height: 11,
-                                                       tint: music.artworkTint?.color ?? .white)
+                        HStack(spacing: 4) {
+                            switch service.idleContent {
+                            case .music:
+                                if music.playback?.isPlaying == true {
+                                    NotchLiveEqualizerBars(bars: 3, barWidth: 2, height: 11,
+                                                           tint: music.artworkTint?.color ?? .white)
+                                }
+                            case .battery:
+                                if let percent = service.power.chargePercent {
+                                    Text("\(percent)%").font(.system(size: 9, weight: .medium)).monospacedDigit()
+                                        .foregroundStyle(batteryTint)
+                                        .lineLimit(1)
+                                }
+                            case .agents:
+                                NotchAgentRestingWing(leading: false)
+                            case .none: EmptyView()
                             }
-                        case .battery:
-                            if let percent = service.power.chargePercent {
-                                Text("\(percent)%").font(.system(size: 9, weight: .medium)).monospacedDigit()
-                                    .foregroundStyle(batteryTint)
-                                    .lineLimit(1)
-                                    .padding(.trailing, restingBatteryInset)
-                            }
-                        case .agents:
-                            NotchAgentRestingWing(leading: false)
-                                .padding(.trailing, restingBatteryInset)
-                        case .none: EmptyView()
+                            NotchPrivacyDots()
                         }
+                        .padding(.trailing, restingBatteryInset)
                     }
                     .frame(width: geometry.restingWingWidth)
                     .opacity(wingStepsAside(.right) ? 0 : 1)
