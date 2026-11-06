@@ -293,7 +293,7 @@ struct NotchCapsuleMusicStrip: View {
         // cover and bars say enough.
         let named = service.capsuleMusicTitleShown || (live ? service.musicStripNamesSong : snapshot?.namesSong == true)
         let defaultSize = CapsuleLayout.musicSurface(title: named ? title : nil, geometry: geometry)
-        let companionExtra: CGFloat = activeCompanion != nil ? 26 : 0
+        let companionExtra: CGFloat = activeCompanion != nil ? 34 : 0
         let effectiveSize = size ?? CGSize(width: defaultSize.width + companionExtra, height: defaultSize.height)
         NotchCapsuleRow(size: effectiveSize,
                         geometry: geometry, leading: 0, trailing: 0) {
@@ -328,10 +328,6 @@ struct NotchCapsuleMusicStrip: View {
                     .onHover { if live { service.hoverMusicStrip(.bars, entered: $0) } }
 
                     if let companion = activeCompanion {
-                        Capsule()
-                            .fill(.white.opacity(0.18))
-                            .frame(width: 1.5, height: max(8, CapsuleLayout.barsHeight(geometry) * 0.75))
-                            .padding(.horizontal, 2)
                         Button {
                             switch companion {
                             case .agents: service.open(.agents)
@@ -339,9 +335,16 @@ struct NotchCapsuleMusicStrip: View {
                             default: break
                             }
                         } label: {
-                            NotchCapsuleCompanionMark(companion: companion, geometry: geometry)
+                            HStack(spacing: 3) {
+                                NotchCapsuleCompanionMark(companion: companion, geometry: geometry)
+                            }
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(.white.opacity(0.14)))
+                            .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 0.5))
                         }
                         .buttonStyle(.plain)
+                        .padding(.leading, 3)
                         .transition(reduceMotion ? .identity : .scale.combined(with: .opacity))
                     }
                 }
@@ -367,7 +370,10 @@ struct NotchCapsuleTimerStrip: View {
     /// Another display's capsule, when the island shows on every display.
     var displayGeometry: NotchGeometry? = nil
     @ObservedObject private var timer = NotchTimerService.shared
+    @ObservedObject private var music = NotchMusicService.shared
     @ObservedObject private var l10n = L10n.shared
+    @AppStorage(DefaultsKey.notchSplitCapsuleEnabled) private var splitCapsuleEnabled = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var geometry: NotchGeometry { displayGeometry ?? service.geometry }
     private var companion: NotchCompactActivity? { service.compactCompanion }
@@ -382,6 +388,22 @@ struct NotchCapsuleTimerStrip: View {
                         for: timer.session, at: timer.now)), by: 1)) { _ in reading }
                 } else {
                     reading
+                }
+                if splitCapsuleEnabled && companion == nil && music.playback?.isPlaying == true {
+                    Button {
+                        service.open(.music)
+                    } label: {
+                        HStack(spacing: 3) {
+                            NotchLiveEqualizerBars(isPlaying: true, bars: 3, barWidth: 2, height: 10, tint: .white)
+                        }
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(.white.opacity(0.14)))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 3)
+                    .transition(reduceMotion ? .identity : .scale.combined(with: .opacity))
                 }
             }
         }
@@ -509,16 +531,19 @@ struct NotchCapsuleAgentStrip: View {
                         }
                 }
                 if splitCapsuleEnabled && NotchMusicService.shared.playback?.isPlaying == true {
-                    Capsule()
-                        .fill(.white.opacity(0.18))
-                        .frame(width: 1.5, height: 10)
-                        .padding(.horizontal, 1)
                     Button {
                         service.open(.music)
                     } label: {
-                        NotchLiveEqualizerBars(isPlaying: true, bars: 3, barWidth: 2, height: 10, tint: .white)
+                        HStack(spacing: 3) {
+                            NotchLiveEqualizerBars(isPlaying: true, bars: 3, barWidth: 2, height: 10, tint: .white)
+                        }
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(.white.opacity(0.14)))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 0.5))
                     }
                     .buttonStyle(.plain)
+                    .padding(.leading, 3)
                 }
             }
         }
@@ -545,6 +570,7 @@ struct NotchCapsuleDownloadStrip: View {
     var displayGeometry: NotchGeometry? = nil
     @ObservedObject private var downloads = NotchDownloadService.shared
     @ObservedObject private var l10n = L10n.shared
+    @AppStorage(DefaultsKey.notchSplitCapsuleEnabled) private var splitCapsuleEnabled = true
 
     var body: some View {
         let item = downloads.items.first { $0.active && !$0.completed }
@@ -563,6 +589,21 @@ struct NotchCapsuleDownloadStrip: View {
                         .frame(width: CapsuleLayout.downloadPercentWidth(l10n.language), alignment: .trailing)
                 } else {
                     ProgressView().controlSize(.mini).frame(width: CapsuleLayout.spinnerWidth)
+                }
+                if splitCapsuleEnabled && NotchMusicService.shared.playback?.isPlaying == true {
+                    Button {
+                        service.open(.music)
+                    } label: {
+                        HStack(spacing: 3) {
+                            NotchLiveEqualizerBars(isPlaying: true, bars: 3, barWidth: 2, height: 10, tint: .white)
+                        }
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(.white.opacity(0.14)))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 3)
                 }
             }
         }

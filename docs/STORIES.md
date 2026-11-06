@@ -22,10 +22,10 @@
   - **UX**: Natural spring curve (`response: 0.38`, `dampingFraction: 0.72`) with squash-and-stretch vertical momentum during open/close.
   - **Status**: done
 
-- [doing] **Story 1.6**: Split Island dual-pill presentation for concurrent activities
+- [x] **Story 1.6**: Split Island dual-pill presentation for concurrent activities
   - **UX**: When music and timer/agent are active simultaneously, island renders as dual pills with central gap.
-  - **Status**: in-progress
+  - **Status**: done
 
-- [todo] **Story 1.7**: Edge peek gesture detector extraction from `ShelfService`
+- [doing] **Story 1.7**: Edge peek gesture detector extraction from `ShelfService`
   - **Arch**: Decouple global mouse drag monitoring and dock proximity math into `ShelfEdgeDragMonitor`.
-  - **Status**: todo
+  - **Status**: in-progress
