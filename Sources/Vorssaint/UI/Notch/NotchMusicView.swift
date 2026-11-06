@@ -249,7 +249,7 @@ struct NotchMusicView: View {
     /// kept when its button is not offered so play stays in the middle.
     private func transportRow<Leading: View, Middle: View>(
         @ViewBuilder leading: () -> Leading, @ViewBuilder middle: (CGFloat) -> Middle) -> some View {
-        let slot = size.width / 5
+        let slot = max(0, size.width - (band.besideCamera ? 0 : 12)) / 5
         // An empty place keeps its width: a missing button must not pull the
         // transport off the island's middle.
         return HStack(spacing: 0) {
@@ -298,13 +298,15 @@ struct NotchMusicView: View {
                 }
             } accessory: {
                 // Which player the buttons drive, by its icon, when there is a choice.
-                if service.sources.count > 1 || !service.sourceIsAutomatic {
+                if band.besideCamera, service.sources.count > 1 || !service.sourceIsAutomatic {
                     sourceMenu(playback)
                 }
                 // Quiet beside the song, as the timeline's times are. The
                 // bars rest flat while paused, so the title keeps its width.
-                NotchLiveEqualizerBars(isPlaying: playback.isPlaying, bars: 4, barWidth: 2.5, height: 15,
-                                       tint: service.artworkTint != nil ? accent.opacity(0.85) : .white.opacity(0.5))
+                if band.besideCamera || (!showsLyrics && !showsQueue && !band.pageSectionsButton) {
+                    NotchLiveEqualizerBars(isPlaying: playback.isPlaying, bars: 4, barWidth: 2.5, height: 15,
+                                           tint: service.artworkTint != nil ? accent.opacity(0.85) : .white.opacity(0.5))
+                }
                 if band.besideCamera { sectionsButton }
             } corner: {
                 extraButtons
@@ -313,7 +315,11 @@ struct NotchMusicView: View {
             NotchMusicTimeline(playback: playback, service: service, tint: accent, timesBeside: true)
                 .padding(.top, NotchLayout.musicHeadSpacing)
             transportRow {
-                if !preview && shuffle.isOffered { shuffleButton }
+                if !preview && shuffle.isOffered {
+                    shuffleButton
+                } else if !band.besideCamera, service.sources.count > 1 || !service.sourceIsAutomatic {
+                    sourceMenu(playback)
+                }
             } middle: { slot in
                 NotchMusicTransport(playback: playback, slot: slot)
             }
@@ -321,6 +327,8 @@ struct NotchMusicView: View {
             volumeRow
             Color.clear.frame(height: NotchLayout.musicBottomRoom)
         }
+        .padding(.horizontal, band.besideCamera ? 0 : 6)
+        .padding(.top, band.besideCamera ? 0 : 3)
         .modifier(NotchMusicSwipeFeedback())
     }
 
@@ -758,15 +766,16 @@ struct NotchMusicControlsView: View {
         let player = isIdle ? NotchPreferredPlayer.current() : nil
         let idleOpens = player != nil
         let openTitle = player.map { NotchPreferredPlayer.openTitle(for: $0) } ?? ""
-        HStack(spacing: 12) {
+        let cardHeight = max(56, height - 6)
+        HStack(spacing: 14) {
             // With nothing playing, the cover opens the music app instead.
             Button {
                 if isIdle, NotchPreferredPlayer.open() { return }
                 notch.select(.music)
             } label: {
-                NotchArtwork(image: music.artwork, size: max(40, height - 24), source: music.playback?.track)
+                NotchArtwork(image: music.artwork, size: max(38, cardHeight - 22), source: music.playback?.track)
             }
-            .buttonStyle(NotchButtonStyle(cornerRadius: 16))
+            .buttonStyle(NotchButtonStyle(cornerRadius: 14))
             .accessibilityLabel(idleOpens ? openTitle : text.mediaNowPlaying)
             .help(idleOpens ? openTitle : text.mediaNowPlaying)
             ViewThatFits(in: .horizontal) {
@@ -785,9 +794,9 @@ struct NotchMusicControlsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .frame(maxWidth: .infinity)
-        .frame(height: height)
+        .frame(height: cardHeight)
         .background {
             if let tint = music.artworkTint?.color, music.playback != nil {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -802,6 +811,7 @@ struct NotchMusicControlsView: View {
             }
         }
         .modifier(NotchControlSurface(cornerRadius: 18))
+        .frame(height: height)
         .onAppear { if !preview { music.refreshAutomation() } }
     }
 

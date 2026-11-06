@@ -26,6 +26,7 @@ struct NotchControlsView: View {
         if items.isEmpty {
             NotchEmptyView(symbol: "slider.horizontal.3", message: FeatureStrings.notch(l10n.language).empty)
         } else {
+            let horizontalPad: CGFloat = size.width >= 356 ? 6 : 0
             VStack(spacing: NotchLayout.rowSpacing) {
                 if layout.levelRow > 0 {
                     NotchLevelRow(levels: belowLevels) { level($0) }
@@ -35,12 +36,13 @@ struct NotchControlsView: View {
                 }
                 if layout.shortcutRows > 0 {
                     NotchRail(items: shortcuts, rows: layout.shortcutRows, itemWidth: NotchLayout.shortcutWidth,
-                              width: size.width, spacing: NotchLayout.shortcutSpacing,
+                              width: size.width - horizontalPad * 2, spacing: NotchLayout.shortcutSpacing,
                               leastSpacing: NotchLayout.shortcutLeastSpacing, rowSpacing: layout.shortcutRowSpacing) { item in
                         shortcut(item)
                     }
                 }
             }
+            .padding(.horizontal, horizontalPad)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .notchBand(leading: {
                 NotchBandLevels(band: band, levels: bandLevels, side: .leading) { level($0) }
@@ -123,14 +125,14 @@ extension NotchControlItem {
         case .volume: return FeatureStrings.notch(l10n.language).volume
         case .brightness: return FeatureStrings.notch(l10n.language).brightness
         case .keyboardLight: return FeatureStrings.brightness(l10n.language).keyboardLight
-        case .keepAwake: return l10n.language == .ru ? "Бодрствование" : l10n.s.keepAwakeTitle
+        case .keepAwake: return l10n.language == .ru ? "Не спать" : l10n.s.keepAwakeTitle
         case .microphone: return l10n.language == .ru ? "Микрофон" : l10n.s.micMuteName
-        case .screenshot: return FeatureStrings.recentCaptures(l10n.language).screenshot
-        case .recording: return FeatureStrings.recorder(l10n.language).pageTitle
-        case .speedTest: return l10n.s.speedTestRun
+        case .screenshot: return l10n.language == .ru ? "Снимок" : FeatureStrings.recentCaptures(l10n.language).screenshot
+        case .recording: return l10n.language == .ru ? "Запись" : FeatureStrings.recorder(l10n.language).pageTitle
+        case .speedTest: return l10n.language == .ru ? "Скорость" : l10n.s.speedTestRun
         case .panel: return FeatureStrings.notch(l10n.language).panel
-        case .mixer: return l10n.s.mixerSection
-        case .commandBar: return FeatureStrings.commandBar(l10n.language).pageTitle
+        case .mixer: return l10n.language == .ru ? "Микшер" : l10n.s.mixerSection
+        case .commandBar: return l10n.language == .ru ? "Команды" : FeatureStrings.commandBar(l10n.language).pageTitle
         case .scratchpad: return FeatureStrings.scratchpad(l10n.language).pageTitle
         case .music: return NotchModule.music.title(l10n.language)
         case .timer: return NotchModule.timer.title(l10n.language)
@@ -612,7 +614,7 @@ private struct NotchRecorderButton: View {
     @ObservedObject private var l10n = L10n.shared
     var body: some View {
         NotchActionTile(symbol: recorder.isRecording ? "stop.circle.fill" : "record.circle",
-                        title: FeatureStrings.recorder(l10n.language).pageTitle,
+                        title: NotchControlItem.recording.title(l10n),
                         active: recorder.isRecording, accent: .alert) {
             service.perform { recorder.toggle() }
         }

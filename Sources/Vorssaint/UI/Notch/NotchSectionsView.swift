@@ -116,16 +116,16 @@ struct NotchSectionsView: View {
                         Circle()
                             .strokeBorder(moduleTint.opacity(current || highlighted ? 0.38 : 0.18), lineWidth: 0.5)
                     }
-                Text(module.title(l10n.language))
+                Text(displayTitle(for: module))
                     .font(.system(size: 11, weight: current ? .semibold : .medium))
                     .foregroundStyle(.white.opacity(current || highlighted ? 1 : 0.88))
                     .lineLimit(2)
                     .minimumScaleFactor(0.88)
                     .multilineTextAlignment(.center)
-                    .frame(height: 26)
+                    .frame(height: 22)
             }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity)
             .frame(height: NotchLayout.sectionTileHeight)
             .background(
@@ -151,13 +151,13 @@ struct NotchSectionsView: View {
                     Text("⌥⌘" + module.shortcutKey.uppercased())
                         .font(.system(size: 8.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.55))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 5)
                 } else if current {
                     Circle()
                         .fill(moduleTint)
                         .frame(width: 5, height: 5)
-                        .padding(6)
+                        .padding(7)
                 }
             }
             .contentShape(shape)
@@ -169,6 +169,11 @@ struct NotchSectionsView: View {
         // A stepped-away row sits under the header, clipped; it keeps no
         // tooltip there.
         .help(visible ? module.title(l10n.language) + "  ⌥⌘" + module.shortcutKey.uppercased() : "")
+    }
+
+    private func displayTitle(for module: NotchModule) -> String {
+        if l10n.language == .ru, module == .mixer { return "Микшер" }
+        return module.title(l10n.language)
     }
 
     private func tint(for module: NotchModule) -> Color {

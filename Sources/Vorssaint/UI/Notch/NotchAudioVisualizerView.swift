@@ -23,7 +23,7 @@ struct NotchExpandedAudioBadge: View {
     }
 
     private var isRedundantOnCurrentPage: Bool {
-        notch.showingSections || notch.selected == .music || notch.selected == .mixer
+        notch.showingSections || notch.selected == .controls || notch.selected == .music || notch.selected == .mixer
     }
 
     var body: some View {

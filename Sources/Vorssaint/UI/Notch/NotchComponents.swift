@@ -474,6 +474,7 @@ struct NotchBandRow<Leading: View, Trailing: View>: View {
             // way (the island's own marks first) is told how much there is.
             .layoutPriority(band.besideCamera ? 0 : 1)
         }
+        .padding(.horizontal, band.besideCamera ? 0 : 4)
         .frame(height: band.height)
     }
 
