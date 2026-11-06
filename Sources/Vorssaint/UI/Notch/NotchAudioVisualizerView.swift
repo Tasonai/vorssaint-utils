@@ -31,7 +31,7 @@ struct NotchExpandedAudioBadge: View {
             if isMusicPlaying {
                 let trackTitle = music.playback?.track.title ?? FeatureStrings.radialMenu(l10n.language).mediaNowPlaying
                 Button {
-                    _ = NotchService.shared.toggleMusicStripSong()
+                    notch.select(.music)
                 } label: {
                     NotchLiveEqualizerBars(isPlaying: true, bars: 4, barWidth: 2, height: 10, tint: .white)
                         .padding(.horizontal, 7)
@@ -46,7 +46,7 @@ struct NotchExpandedAudioBadge: View {
                 .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: isMusicPlaying)
             } else if let playingApp = activePlayingApp {
                 Button {
-                    mixer.toggleMute(playingApp)
+                    notch.select(.mixer)
                 } label: {
                     NotchLiveEqualizerBars(isPlaying: true, bars: 4, barWidth: 2, height: 10, tint: .white)
                         .padding(.horizontal, 7)
@@ -55,8 +55,8 @@ struct NotchExpandedAudioBadge: View {
                         .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
-                .help("\(playingApp.name): \(l10n.s.actionMute)")
-                .accessibilityLabel("\(playingApp.name): \(l10n.s.actionMute)")
+                .help("\(playingApp.name) — \(l10n.s.mixerSection)")
+                .accessibilityLabel("\(playingApp.name) — \(l10n.s.mixerSection)")
                 .transition(.opacity.combined(with: .scale))
                 .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: playingApp.id)
             }
