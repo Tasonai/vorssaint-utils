@@ -25,8 +25,7 @@ struct NotchCameraView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(text.cameraHint).font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Button(text.startCamera, action: service.showEmbedded)
-                            .buttonStyle(.borderedProminent)
+                        NotchPillButton(title: text.startCamera, prominent: true, action: service.showEmbedded)
                     }
                 }
                 .padding(.horizontal, 12)

@@ -587,6 +587,22 @@ struct NotchSurfaceBackground: View {
             if showsTranslucent, presentation.restingBlack < 1 {
                 translucentOrBlack
             }
+            if presentation.openness > 0.01 {
+                NotchBackdropShape(contour: presentation.contour)
+                    .stroke(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .clear, location: 0.22),
+                                .init(color: .white.opacity(0.08 * presentation.openness), location: 0.65),
+                                .init(color: .white.opacity(0.13 * presentation.openness), location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 0.5
+                    )
+            }
         }
         .environment(\.colorScheme, .dark)
         .allowsHitTesting(false)

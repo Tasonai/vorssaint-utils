@@ -191,7 +191,7 @@ private struct NotchWatchAreaCard: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .modifier(NotchControlSurface(cornerRadius: 14, interactive: false))
         .accessibilityElement(children: .combine)
     }
 }

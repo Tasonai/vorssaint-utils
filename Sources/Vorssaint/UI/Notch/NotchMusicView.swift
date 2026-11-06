@@ -269,6 +269,15 @@ struct NotchMusicView: View {
             head(corner: !band.besideCamera && (showsLyrics || showsQueue || band.pageSectionsButton)) {
                 Button { RadialNowPlayingApplication.open(playback.track) } label: {
                     NotchArtwork(image: service.artwork, size: NotchLayout.musicArtworkSize, source: playback.track)
+                        .background {
+                            if service.artworkTint != nil {
+                                Circle()
+                                    .fill(accent.opacity(playback.isPlaying ? 0.28 : 0.12))
+                                    .blur(radius: 18)
+                                    .scaleEffect(1.25)
+                                    .allowsHitTesting(false)
+                            }
+                        }
                         .scaleEffect(playback.isPlaying || reduceMotion ? 1 : 0.94)
                         .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: playback.isPlaying)
                 }
@@ -295,7 +304,7 @@ struct NotchMusicView: View {
                 // Quiet beside the song, as the timeline's times are. The
                 // bars rest flat while paused, so the title keeps its width.
                 NotchLiveEqualizerBars(isPlaying: playback.isPlaying, bars: 4, barWidth: 2.5, height: 15,
-                                       tint: .white.opacity(0.5))
+                                       tint: service.artworkTint != nil ? accent.opacity(0.85) : .white.opacity(0.5))
                 if band.besideCamera { sectionsButton }
             } corner: {
                 extraButtons
@@ -779,6 +788,19 @@ struct NotchMusicControlsView: View {
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity)
         .frame(height: height)
+        .background {
+            if let tint = music.artworkTint?.color, music.playback != nil {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [tint.opacity(music.playback?.isPlaying == true ? 0.16 : 0.07), .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .allowsHitTesting(false)
+            }
+        }
         .modifier(NotchControlSurface(cornerRadius: 18))
         .onAppear { if !preview { music.refreshAutomation() } }
     }
