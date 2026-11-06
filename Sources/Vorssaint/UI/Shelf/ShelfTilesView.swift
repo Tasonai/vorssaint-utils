@@ -416,6 +416,9 @@ final class ShelfTileView: NSView, NSDraggingSource {
         label.frame = NSRect(x: 3, y: 59, width: 72, height: 24)
         label.font = .systemFont(ofSize: 10)
         label.alignment = .center
+        label.usesSingleLineMode = false
+        label.cell?.wraps = true
+        label.cell?.truncatesLastVisibleLine = true
         label.lineBreakMode = .byTruncatingMiddle
         label.maximumNumberOfLines = 2
         label.textColor = .secondaryLabelColor

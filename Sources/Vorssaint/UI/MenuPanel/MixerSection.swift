@@ -891,6 +891,7 @@ private struct MixerRow: View {
     let togglePin: () -> Void
     let moveUp: (() -> Void)?
     let moveDown: (() -> Void)?
+    @State private var isHovered = false
 
     private var arrangementStrings: MixerFeatureStrings { FeatureStrings.mixer(l10n.language) }
     private var sharingStrings: MixerScreenSharingStrings { .localized(l10n.language) }
@@ -946,6 +947,7 @@ private struct MixerRow: View {
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
                         .fixedSize()
+                        .opacity(isHovered ? 1 : 0)
                         .help(arrangementStrings.actions)
                         .accessibilityLabel("\(arrangementStrings.actions): \(app.name)")
                     }
@@ -1002,7 +1004,7 @@ private struct MixerRow: View {
                         }
                         .buttonStyle(.plain)
                         .help(l10n.s.mixerResetTooltip)
-                        .opacity(isAtUnity ? 0 : 1)
+                        .opacity(!isAtUnity && (isHovered || isBoosting) ? 1 : 0)
                         .disabled(isAtUnity)
 
                         Button {
@@ -1035,6 +1037,7 @@ private struct MixerRow: View {
             }
         }
         .padding(.vertical, 2)
+        .onHover { isHovered = $0 }
         .accessibilityAction(named: Text(arrangementStrings.moveUp)) { moveUp?() }
         .accessibilityAction(named: Text(arrangementStrings.moveDown)) { moveDown?() }
         .contextMenu {

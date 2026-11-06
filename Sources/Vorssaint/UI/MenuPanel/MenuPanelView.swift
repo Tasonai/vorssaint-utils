@@ -206,26 +206,11 @@ struct MenuPanelView: View {
     }
 
     private var navigablePanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             UpdateBanner()
                 .reportHeight($updateBannerHeight)
             header
             sectionNavigation
-
-            HStack(spacing: 6) {
-                Image(systemName: activeSection.symbolName)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                Text(activeSection.title(l10n.s))
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                Spacer()
-            }
-            .padding(.horizontal, 4)
-            .padding(.top, 2)
-            .animation(.spring(response: 0.24, dampingFraction: 0.85), value: activeSection)
 
             OverlayScrollView(measuredHeight: $navigableContentHeight) {
                 VStack(alignment: .leading, spacing: 12) {

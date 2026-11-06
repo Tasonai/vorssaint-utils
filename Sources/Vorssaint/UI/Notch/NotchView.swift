@@ -817,9 +817,9 @@ extension NotchModule: PanelOrderItem {
         case .calendar: return FeatureStrings.notchCalendar(language).title
         case .controls: return FeatureStrings.notch(language).controls
         case .mixer: return Strings.localized(language).mixerSection
-        case .music: return FeatureStrings.radialMenu(language).mediaNowPlaying
+        case .music: return FeatureStrings.notch(language).music
         case .clipboard: return FeatureStrings.clipboard(language).title
-        case .captures: return FeatureStrings.recentCaptures(language).title
+        case .captures: return FeatureStrings.notch(language).captures
         case .files: return FeatureStrings.notch(language).files
         case .system: return FeatureStrings.notch(language).system
         case .tools: return FeatureStrings.notch(language).tools

@@ -8,6 +8,7 @@ import SwiftUI
 /// Displays live animated equalizer bars and current audio source (music or playing application)
 /// with 1-click controls.
 struct NotchExpandedAudioBadge: View {
+    @ObservedObject private var notch = NotchService.shared
     @ObservedObject private var music = NotchMusicService.shared
     @ObservedObject private var mixer = AppVolumeMixer.shared
     @ObservedObject private var l10n = L10n.shared
@@ -21,50 +22,44 @@ struct NotchExpandedAudioBadge: View {
         music.playback?.isPlaying == true
     }
 
+    private var isRedundantOnCurrentPage: Bool {
+        notch.showingSections || notch.selected == .music || notch.selected == .mixer
+    }
+
     var body: some View {
-        if isMusicPlaying {
-            let trackTitle = music.playback?.track.title ?? FeatureStrings.radialMenu(l10n.language).mediaNowPlaying
-            Button {
-                _ = NotchService.shared.toggleMusicStripSong()
-            } label: {
-                HStack(spacing: 5) {
+        if !isRedundantOnCurrentPage {
+            if isMusicPlaying {
+                let trackTitle = music.playback?.track.title ?? FeatureStrings.radialMenu(l10n.language).mediaNowPlaying
+                Button {
+                    _ = NotchService.shared.toggleMusicStripSong()
+                } label: {
                     NotchLiveEqualizerBars(isPlaying: true, bars: 4, barWidth: 2, height: 10, tint: .white)
-                    Text(trackTitle)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(1)
-                        .frame(maxWidth: 120, alignment: .leading)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(.white.opacity(0.10)))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
                 }
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(.white.opacity(0.12)))
-                .overlay(Capsule().strokeBorder(.white.opacity(0.16), lineWidth: 0.5))
-            }
-            .buttonStyle(.plain)
-            .help(trackTitle)
-            .transition(.opacity.combined(with: .scale))
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: isMusicPlaying)
-        } else if let playingApp = activePlayingApp {
-            Button {
-                mixer.toggleMute(playingApp)
-            } label: {
-                HStack(spacing: 5) {
+                .buttonStyle(.plain)
+                .help(trackTitle)
+                .accessibilityLabel(trackTitle)
+                .transition(.opacity.combined(with: .scale))
+                .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: isMusicPlaying)
+            } else if let playingApp = activePlayingApp {
+                Button {
+                    mixer.toggleMute(playingApp)
+                } label: {
                     NotchLiveEqualizerBars(isPlaying: true, bars: 4, barWidth: 2, height: 10, tint: .white)
-                    Text(playingApp.name)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(1)
-                        .frame(maxWidth: 100, alignment: .leading)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(.white.opacity(0.10)))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
                 }
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(.white.opacity(0.12)))
-                .overlay(Capsule().strokeBorder(.white.opacity(0.16), lineWidth: 0.5))
+                .buttonStyle(.plain)
+                .help("\(playingApp.name): \(l10n.s.actionMute)")
+                .accessibilityLabel("\(playingApp.name): \(l10n.s.actionMute)")
+                .transition(.opacity.combined(with: .scale))
+                .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: playingApp.id)
             }
-            .buttonStyle(.plain)
-            .help("\(playingApp.name): \(l10n.s.actionMute)")
-            .transition(.opacity.combined(with: .scale))
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: playingApp.id)
         }
     }
 }

@@ -64,30 +64,21 @@ struct NotchPrivacyDots: View {
     }
 }
 
-/// Interactive badge for the expanded Dynamic Island header row
-/// showing device details and a 1-click microphone mute button.
+/// Compact Apple-style privacy pill for the expanded Dynamic Island header row.
+/// Displays camera/microphone indicators with 1-click microphone mute and full device names in tooltip.
 struct NotchPrivacyHeaderBadge: View {
     @ObservedObject private var monitor = CameraMicrophonePrivacyMonitor.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         if monitor.isAnyActive {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 if monitor.isCameraActive {
-                    HStack(spacing: 3) {
-                        Image(systemName: "video.fill")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.green)
-                        if let name = monitor.activeCameraName {
-                            Text(name)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.85))
-                                .lineLimit(1)
-                        }
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.green.opacity(0.12), in: Capsule())
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .frame(width: 18, height: 18)
+                        .background(Color.green.opacity(0.14), in: Circle())
                 }
 
                 if monitor.isMicrophoneActive {
@@ -95,38 +86,36 @@ struct NotchPrivacyHeaderBadge: View {
                         NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
                         monitor.toggleMicrophoneMute()
                     } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: monitor.isMicrophoneMuted ? "mic.slash.fill" : "mic.fill")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(monitor.isMicrophoneMuted ? .red : .orange)
-                            if let name = monitor.activeMicrophoneName {
-                                Text(name)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.85))
-                                    .lineLimit(1)
-                            }
-                            Text(monitor.isMicrophoneMuted ? "Вкл" : "Заглушить")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(monitor.isMicrophoneMuted ? .green : .white.opacity(0.7))
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1.5)
-                                .background(Color.white.opacity(0.15), in: Capsule())
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            (monitor.isMicrophoneMuted ? Color.red.opacity(0.15) : Color.orange.opacity(0.12)),
-                            in: Capsule()
-                        )
+                        Image(systemName: monitor.isMicrophoneMuted ? "mic.slash.fill" : "mic.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(monitor.isMicrophoneMuted ? .red : .orange)
+                            .frame(width: 18, height: 18)
+                            .background(
+                                (monitor.isMicrophoneMuted ? Color.red.opacity(0.16) : Color.orange.opacity(0.14)),
+                                in: Circle()
+                            )
                     }
                     .buttonStyle(.plain)
-                    .help(monitor.isMicrophoneMuted ? "Включить микрофон" : "Заглушить микрофон")
                 }
             }
+            .help(tooltipText)
             .transition(.opacity.combined(with: .scale))
             .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: monitor.isCameraActive)
             .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: monitor.isMicrophoneActive)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: monitor.isMicrophoneMuted)
         }
+    }
+
+    private var tooltipText: String {
+        var items: [String] = []
+        if monitor.isCameraActive {
+            items.append("Камера: \(monitor.activeCameraName ?? "Активна")")
+        }
+        if monitor.isMicrophoneActive {
+            let micName = monitor.activeMicrophoneName ?? "Микрофон"
+            let action = monitor.isMicrophoneMuted ? "Включить микрофон" : "Заглушить микрофон"
+            items.append("\(micName) — \(action)")
+        }
+        return items.joined(separator: "\n")
     }
 }

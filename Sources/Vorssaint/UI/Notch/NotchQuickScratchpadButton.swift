@@ -8,9 +8,14 @@ struct NotchQuickScratchpadButton: View {
     @ObservedObject var service: NotchService
     @ObservedObject private var pad = ScratchpadService.shared
     @ObservedObject private var l10n = L10n.shared
+    @Environment(\.notchBand) private var band
 
     private var isSelected: Bool {
         service.selected == .scratchpad && !service.showingSections
+    }
+
+    private var shouldShowInHeader: Bool {
+        !service.showingSections && service.selected != .scratchpad && !band.besideCamera
     }
 
     private var title: String {
@@ -18,40 +23,42 @@ struct NotchQuickScratchpadButton: View {
     }
 
     var body: some View {
-        Button(action: toggleScratchpad) {
-            Image(systemName: isSelected ? "square.and.pencil.circle.fill" : "square.and.pencil")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isSelected ? Color.yellow : Color.white.opacity(0.72))
-                .frame(width: 24, height: 24)
-                .background {
-                    if isSelected {
-                        Circle().fill(Color.yellow.opacity(0.18))
+        if shouldShowInHeader {
+            Button(action: toggleScratchpad) {
+                Image(systemName: isSelected ? "square.and.pencil.circle.fill" : "square.and.pencil")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.yellow : Color.white.opacity(0.72))
+                    .frame(width: 24, height: 24)
+                    .background {
+                        if isSelected {
+                            Circle().fill(Color.yellow.opacity(0.18))
+                        }
                     }
-                }
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .help(title)
-        .accessibilityLabel(title)
-        .contextMenu {
-            Button {
-                pad.createPad(defaultName: FeatureStrings.scratchpad(l10n.language).pageTitle)
-                service.open(.scratchpad)
-            } label: {
-                Label(FeatureStrings.scratchpad(l10n.language).newPad, systemImage: "plus")
+                    .contentShape(Circle())
             }
+            .buttonStyle(.plain)
+            .help(title)
+            .accessibilityLabel(title)
+            .contextMenu {
+                Button {
+                    pad.createPad(defaultName: FeatureStrings.scratchpad(l10n.language).pageTitle)
+                    service.open(.scratchpad)
+                } label: {
+                    Label(FeatureStrings.scratchpad(l10n.language).newPad, systemImage: "plus")
+                }
 
-            if !pad.pads.isEmpty {
-                Divider()
-                ForEach(pad.pads) { item in
-                    Button {
-                        pad.selectPad(item.id)
-                        service.open(.scratchpad)
-                    } label: {
-                        HStack {
-                            Text(item.name)
-                            if item.id == pad.selectedPadID {
-                                Image(systemName: "checkmark")
+                if !pad.pads.isEmpty {
+                    Divider()
+                    ForEach(pad.pads) { item in
+                        Button {
+                            pad.selectPad(item.id)
+                            service.open(.scratchpad)
+                        } label: {
+                            HStack {
+                                Text(item.name)
+                                if item.id == pad.selectedPadID {
+                                    Image(systemName: "checkmark")
+                                }
                             }
                         }
                     }

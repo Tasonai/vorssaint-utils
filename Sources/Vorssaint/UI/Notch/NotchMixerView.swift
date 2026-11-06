@@ -492,6 +492,7 @@ private struct NotchAppFader: View {
     let moveForward: (() -> Void)?
     @ObservedObject private var mixer = AppVolumeMixer.shared
     @ObservedObject private var l10n = L10n.shared
+    @State private var isHovered = false
     private var strings: MixerFeatureStrings { FeatureStrings.mixer(l10n.language) }
     private var percent: Int { MixerRoutingSupport.displayPercent(forVolume: app.volume) }
     private var sharingStrings: MixerScreenSharingStrings { .localized(l10n.language) }
@@ -511,7 +512,9 @@ private struct NotchAppFader: View {
                 .frame(height: 32)
                 .help(app.supportsVolumeOverride && !app.isBypassed ? sharingStrings.sharingWarning : app.name)
                 .overlay(alignment: .trailing) {
-                    if app.persistenceID != nil || !app.isBypassed { actionsMenu }
+                    if app.persistenceID != nil || !app.isBypassed {
+                        actionsMenu.opacity(isHovered ? 1 : 0)
+                    }
                 }
                 .overlay(alignment: .leading) {
                     if isPinned {
@@ -567,6 +570,7 @@ private struct NotchAppFader: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: height, alignment: .top)
+        .onHover { isHovered = $0 }
         .contextMenu { actions }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(app.name)
