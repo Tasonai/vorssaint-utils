@@ -3,6 +3,7 @@
 
 import AppKit
 import Foundation
+import PDFKit
 import QuickLookUI
 import UniformTypeIdentifiers
 import Vision
@@ -189,6 +190,106 @@ enum ShelfActionsEngine {
         NotchFeedbackService.shared.performSelection()
         let msg = L10n.shared.language == .ru ? "Пути скопированы" : "Paths copied"
         QuickToolHUD.show(icon: "doc.on.doc", message: msg)
+    }
+
+    /// Merges multiple images or PDF files into a single consolidated PDF document.
+    static func mergeToPDF(urls: [URL], addToShelf: Bool = true, completion: ((URL?) -> Void)? = nil) {
+        guard !urls.isEmpty else { completion?(nil); return }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let pdfDoc = PDFDocument()
+            var pageIndex = 0
+
+            for url in urls {
+                let ext = url.pathExtension.lowercased()
+                if ext == "pdf", let sourceDoc = PDFDocument(url: url) {
+                    for i in 0..<sourceDoc.pageCount {
+                        if let page = sourceDoc.page(at: i) {
+                            pdfDoc.insert(page, at: pageIndex)
+                            pageIndex += 1
+                        }
+                    }
+                } else if let image = NSImage(contentsOf: url),
+                          let page = PDFPage(image: image) {
+                    pdfDoc.insert(page, at: pageIndex)
+                    pageIndex += 1
+                }
+            }
+
+            guard pageIndex > 0 else {
+                DispatchQueue.main.async { completion?(nil) }
+                return
+            }
+
+            let parentDir = urls[0].deletingLastPathComponent()
+            let targetURL = uniqueURL(in: parentDir, name: "Merged", ext: "pdf")
+            if pdfDoc.write(to: targetURL) {
+                DispatchQueue.main.async {
+                    NotchFeedbackService.shared.performSelection()
+                    if addToShelf {
+                        ShelfService.shared.addFiles([targetURL])
+                    }
+                    let msg = L10n.shared.language == .ru ? "PDF объединён" : "PDF merged"
+                    QuickToolHUD.show(icon: "doc.on.doc.fill", message: msg)
+                    completion?(targetURL)
+                }
+            } else {
+                DispatchQueue.main.async { completion?(nil) }
+            }
+        }
+    }
+
+    enum RenamePattern {
+        case sequential(prefix: String)
+        case slugify
+    }
+
+    /// Renames the given files according to the chosen pattern.
+    static func batchRename(urls: [URL], pattern: RenamePattern, completion: (([URL]) -> Void)? = nil) {
+        guard !urls.isEmpty else { completion?([]) ; return }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            var newURLs: [URL] = []
+            let fm = FileManager.default
+            for (idx, url) in urls.enumerated() {
+                let dir = url.deletingLastPathComponent()
+                let ext = url.pathExtension
+                let nameWithoutExt = url.deletingPathExtension().lastPathComponent
+
+                let newName: String
+                switch pattern {
+                case .sequential(let prefix):
+                    let p = prefix.isEmpty ? "File" : prefix
+                    newName = "\(p)_\(idx + 1)"
+                case .slugify:
+                    let cleaned = nameWithoutExt
+                        .lowercased()
+                        .replacingOccurrences(of: " ", with: "_")
+                        .components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-")).inverted)
+                        .joined()
+                    newName = cleaned.isEmpty ? "file_\(idx + 1)" : cleaned
+                }
+
+                let target = uniqueURL(in: dir, name: newName, ext: ext)
+                if target.path != url.path {
+                    do {
+                        try fm.moveItem(at: url, to: target)
+                        newURLs.append(target)
+                    } catch {
+                        newURLs.append(url)
+                    }
+                } else {
+                    newURLs.append(url)
+                }
+            }
+
+            DispatchQueue.main.async {
+                NotchFeedbackService.shared.performSelection()
+                let msg = L10n.shared.language == .ru ? "Файлы переименованы" : "Files renamed"
+                QuickToolHUD.show(icon: "pencil.line", message: msg)
+                completion?(newURLs)
+            }
+        }
     }
 
     private static func uniqueURL(in directory: URL, name: String, ext: String) -> URL {

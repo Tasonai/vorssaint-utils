@@ -218,6 +218,27 @@ struct ShelfView: View {
                 }
             }
 
+            if urls.count > 1 || urls.contains(where: { $0.pathExtension.lowercased() == "pdf" }) {
+                Button {
+                    ShelfActionsEngine.mergeToPDF(urls: shelf.fileURLsForActions())
+                } label: {
+                    Label(isRussian ? "Объединить в PDF" : "Merge to PDF", systemImage: "doc.on.doc.fill")
+                }
+            }
+
+            if urls.count > 1 {
+                Menu {
+                    Button(isRussian ? "Пронумеровать (File_1, File_2...)" : "Number (File_1, File_2...)") {
+                        ShelfActionsEngine.batchRename(urls: shelf.fileURLsForActions(), pattern: .sequential(prefix: "File"))
+                    }
+                    Button(isRussian ? "Веб-формат (snake_case)" : "Web safe (snake_case)") {
+                        ShelfActionsEngine.batchRename(urls: shelf.fileURLsForActions(), pattern: .slugify)
+                    }
+                } label: {
+                    Label(isRussian ? "Пакетное переименование" : "Batch Rename", systemImage: "pencil.line")
+                }
+            }
+
             Button {
                 ShelfActionsEngine.copyFilePaths(urls: shelf.fileURLsForActions())
             } label: {

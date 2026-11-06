@@ -636,6 +636,32 @@ final class ShelfTileView: NSView, NSDraggingSource {
             menu.addItem(ocrItem)
         }
 
+        if urls.count > 1 || urls.contains(where: { $0.pathExtension.lowercased() == "pdf" }) {
+            let pdfTitle = isRussian ? "Объединить в PDF" : "Merge to PDF"
+            let pdfItem = NSMenuItem(title: pdfTitle, action: #selector(mergeSelectedToPDF), keyEquivalent: "")
+            pdfItem.target = self
+            pdfItem.image = NSImage(systemSymbolName: "doc.on.doc.fill", accessibilityDescription: nil)
+            menu.addItem(pdfItem)
+        }
+
+        if urls.count > 1 {
+            let renameMenu = NSMenu(title: isRussian ? "Переименовать" : "Rename")
+            let numItem = NSMenuItem(title: isRussian ? "Пронумеровать (File_1, File_2...)" : "Number (File_1, File_2...)",
+                                     action: #selector(renameSequential), keyEquivalent: "")
+            numItem.target = self
+            renameMenu.addItem(numItem)
+
+            let webItem = NSMenuItem(title: isRussian ? "Веб-формат (snake_case)" : "Web safe (snake_case)",
+                                     action: #selector(renameSnakeCase), keyEquivalent: "")
+            webItem.target = self
+            renameMenu.addItem(webItem)
+
+            let renameItem = NSMenuItem(title: isRussian ? "Пакетное переименование" : "Batch Rename", action: nil, keyEquivalent: "")
+            renameItem.image = NSImage(systemSymbolName: "pencil.line", accessibilityDescription: nil)
+            renameItem.submenu = renameMenu
+            menu.addItem(renameItem)
+        }
+
         let copyPathTitle = urls.count > 1
             ? (isRussian ? "Скопировать пути" : "Copy File Paths")
             : (isRussian ? "Скопировать путь" : "Copy File Path")
@@ -745,6 +771,24 @@ final class ShelfTileView: NSView, NSDraggingSource {
         if let imageURL = urls.first(where: { ShelfInteractionSupport.editableImage(in: [$0]) != nil }) {
             ShelfActionsEngine.extractTextOCR(from: imageURL)
         }
+    }
+
+    @objc private func mergeSelectedToPDF() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        ShelfActionsEngine.mergeToPDF(urls: urls)
+    }
+
+    @objc private func renameSequential() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        ShelfActionsEngine.batchRename(urls: urls, pattern: .sequential(prefix: "File"))
+    }
+
+    @objc private func renameSnakeCase() {
+        ShelfService.shared.noteInteraction()
+        let urls = ShelfService.shared.fileURLsForActions(startingAt: item)
+        ShelfActionsEngine.batchRename(urls: urls, pattern: .slugify)
     }
 
     @objc private func copyFilePaths() {
