@@ -58,6 +58,10 @@
   - **UX**: When user adjusts volume or screen brightness via keyboard keys, show smooth mini-bar animation inside Dynamic Island wings with distinct semantic tints (solar amber for brightness, cool cyan for keyboard backlight, alert coral for mute, spring physics).
   - **Status**: done
 
-- [todo] **Story 3.2**: Shelf quick-drop target zone in Dynamic Island
-  - **UX**: Dragging files towards the top notch reveals a spring-loaded quick-stash shelf target.
+- [x] **Story 3.2**: Shelf quick-drop target zone in Dynamic Island
+  - **UX**: Dragging files towards the top notch reveals a spring-loaded quick-stash shelf target with distinct item counter badge and glowing dashed drop border.
+  - **Status**: done
+
+- [todo] **Story 3.3**: Menu bar notch collision avoidance on compact MacBooks
+  - **UX**: Prevent active application menus from hiding under the physical MacBook notch by automatically compressing menu bar spacing or shifting status items.
   - **Status**: todo

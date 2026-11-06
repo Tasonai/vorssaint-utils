@@ -104,28 +104,8 @@ struct NotchView: View {
                 expanded
             }
         } else if service.dragPlaceholder {
-            Group {
-                if service.mascotOn {
-                    // The companion stands by the hint and watches the file come.
-                    HStack(spacing: 8) {
-                        NotchMascotView(look: NotchMascotSupport.look(), size: 20, followsDrag: true)
-                            .frame(width: 20, height: 20)
-                            .accessibilityHidden(true)
-                        Text(text.dropHint)
-                    }
-                } else {
-                    Label(text.dropHint, systemImage: "tray.and.arrow.down")
-                }
-            }
-                .font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(.white.opacity(0.24),
-                                      style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
-                        .allowsHitTesting(false)
-                }
-                .padding(.horizontal, 18)
+            NotchShelfDropTargetView(service: service)
+                .padding(.horizontal, 14)
                 .padding(.top, service.geometry.safeContentTop)
         } else if let notice = service.notice ?? (service.peeking ? nil : service.departingNotice) {
             if service.noticeExpanded, let content = notice.notification {
