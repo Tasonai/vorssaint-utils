@@ -55,6 +55,10 @@ struct SettingsRow<Accessory: View>: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(title)
+                        .font(.system(size: 13, weight: .regular))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.9)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let badge {
                         Text(badge)
                             .font(.system(size: 8, weight: .bold))
@@ -69,6 +73,7 @@ struct SettingsRow<Accessory: View>: View {
                     Text(caption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(4)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -227,6 +232,7 @@ struct TrailingSwitchToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 12) {
             configuration.label
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 12)
             Toggle(isOn: configuration.$isOn) { EmptyView() }
                 .labelsHidden()

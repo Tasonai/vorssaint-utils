@@ -92,6 +92,7 @@ struct MenuPanelView: View {
     @State private var selectedSection: PanelSectionID = PanelLayout.order.first ?? .keepAwake
     @State private var selectedMetric: MetricDetailKind?
     @FocusState private var focusedSection: PanelSectionID?
+    @Namespace private var sectionNavigationNamespace
 
     /// Cap the panel to the usable screen height so it never overflows the menu
     /// bar; taller content scrolls inside. Measured against the display the
@@ -205,11 +206,26 @@ struct MenuPanelView: View {
     }
 
     private var navigablePanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             UpdateBanner()
                 .reportHeight($updateBannerHeight)
             header
             sectionNavigation
+
+            HStack(spacing: 6) {
+                Image(systemName: activeSection.symbolName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                Text(activeSection.title(l10n.s))
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            .padding(.top, 2)
+            .animation(.spring(response: 0.24, dampingFraction: 0.85), value: activeSection)
 
             OverlayScrollView(measuredHeight: $navigableContentHeight) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -373,8 +389,10 @@ struct MenuPanelView: View {
             ForEach(visibleSections) { id in
                 let isActive = activeSection == id
                 Button {
-                    selectedSection = id
-                    focusedSection = id
+                    withAnimation(.spring(response: 0.26, dampingFraction: 0.82)) {
+                        selectedSection = id
+                        focusedSection = id
+                    }
                 } label: {
                     Image(systemName: id.symbolName)
                         .font(.system(size: 13.5, weight: .semibold))
@@ -385,10 +403,13 @@ struct MenuPanelView: View {
                 .buttonStyle(.plain)
                 .focused($focusedSection, equals: id)
                 .foregroundStyle(isActive ? (notchSize != nil ? Color.white : Color.accentColor) : Color.secondary.opacity(0.86))
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isActive ? navigationActiveFill : Color.clear)
-                )
+                .background {
+                    if isActive {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(navigationActiveFill)
+                            .matchedGeometryEffect(id: "navActivePill", in: sectionNavigationNamespace)
+                    }
+                }
                 .help(id.title(l10n.s))
                 // Icon-only tabs: VoiceOver reads the section name, not the
                 // symbol's, and hears which one is showing.
