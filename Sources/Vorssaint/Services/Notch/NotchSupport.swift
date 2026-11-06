@@ -2278,6 +2278,9 @@ struct NotchGeometry: Equatable {
     /// The 28-point controls a page that wraps the camera hands the row,
     /// as the player's lyrics and queue toggles while a song plays.
     var pageTrailingControls = 0
+    /// Custom shape offsets for the notch silhouette (e.g. iPhone 12 vs MacBook styling).
+    var notchCornerRadiusFit: CGFloat = 0
+    var notchShoulderFit: CGFloat = 0
     private var allowsActivityFooter = true
     private var minimumCompactWidth: CGFloat = 0
     /// Narrower wings than this are dropped rather than drawn cramped.
@@ -2287,9 +2290,12 @@ struct NotchGeometry: Equatable {
          menuBarHeight: CGFloat = 24, compactSideRoom: CGFloat? = nil,
          customWidth: Double = NotchSize.defaultWidth, customHeight: Double = NotchSize.defaultHeight,
          cameraFit: NotchCameraFit = .zero, silhouette: NotchSilhouette = .notch, capsuleFit: NotchCapsuleFit = .zero,
-         hideMenuBarGap: Bool = false, outline: Bool = false, barEdge: CGFloat = 0) {
+         hideMenuBarGap: Bool = false, outline: Bool = false, barEdge: CGFloat = 0,
+         notchCornerRadiusFit: CGFloat = 0, notchShoulderFit: CGFloat = 0) {
         self.screen = screen
         self.layout = layout
+        self.notchCornerRadiusFit = notchCornerRadiusFit
+        self.notchShoulderFit = notchShoulderFit
         self.customWidth = NotchSize.clamped(customWidth, to: NotchSize.widthRange, fallback: NotchSize.defaultWidth)
         self.customHeight = NotchSize.clamped(customHeight, to: NotchSize.heightRange, fallback: NotchSize.defaultHeight)
         let barHeight = menuBarHeight.isFinite ? min(64, max(16, menuBarHeight)) : 24

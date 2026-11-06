@@ -916,6 +916,9 @@ enum DefaultsKey {
     static let notchCapsuleFitWidth = "notchCapsuleFitWidth"
     static let notchCapsuleFitHeight = "notchCapsuleFitHeight"
     static let notchCapsuleFitDrop = "notchCapsuleFitDrop"
+    // Custom notch geometry (iPhone 12 / MacBook shaping)
+    static let notchCornerRadiusFit = "notchCornerRadiusFit"
+    static let notchShoulderFit = "notchShoulderFit"
     static let notchOpenOnHover = "notchOpenOnHover"
     static let notchShortcutEnabled = "notchShortcutEnabled"
     static let notchShortcut = "notchShortcut"
@@ -1526,6 +1529,8 @@ enum Defaults {
         DefaultsKey.notchCapsuleFitWidth: 0.0,
         DefaultsKey.notchCapsuleFitHeight: 0.0,
         DefaultsKey.notchCapsuleFitDrop: 0.0,
+        DefaultsKey.notchCornerRadiusFit: 0.0,
+        DefaultsKey.notchShoulderFit: 0.0,
         DefaultsKey.notchOpenOnHover: false,
         DefaultsKey.notchShortcutEnabled: false,
         DefaultsKey.notchShortcut: GlobalShortcut.notchDefault.storageValue,

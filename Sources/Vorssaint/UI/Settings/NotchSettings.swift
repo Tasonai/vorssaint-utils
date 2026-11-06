@@ -90,6 +90,8 @@ struct NotchSettings: View {
     @AppStorage(DefaultsKey.notchCapsuleFitWidth) private var capsuleFitWidth = 0.0
     @AppStorage(DefaultsKey.notchCapsuleFitHeight) private var capsuleFitHeight = 0.0
     @AppStorage(DefaultsKey.notchCapsuleFitDrop) private var capsuleFitDrop = 0.0
+    @AppStorage(DefaultsKey.notchCornerRadiusFit) private var cornerRadiusFit = 0.0
+    @AppStorage(DefaultsKey.notchShoulderFit) private var shoulderFit = 0.0
     @AppStorage(DefaultsKey.notchHapticFeedback) private var hapticFeedback = true
     @AppStorage(DefaultsKey.notchAcousticsEnabled) private var acousticFeedback = true
     @AppStorage(DefaultsKey.notchSplitCapsuleEnabled) private var splitCapsule = true
@@ -255,34 +257,70 @@ struct NotchSettings: View {
                           isOn: liquidGlassIsOn ? .constant(true) : $translucentBackground)
                     .disabled(liquidGlassIsOn)
             }
-            // Only a display without a camera can float the island.
-            if NotchSupport.hasDisplayWithoutNotch {
-                SettingsCard(title: text.withoutNotch) {
-                    HStack(spacing: 10) {
-                        silhouetteChoice(.capsule, title: text.capsuleShape)
-                        silhouetteChoice(.notch, title: text.notchShape)
-                    }
-                    // An island kept on a camera, or away with the lid closed,
-                    // shows neither shape, so the card says where to change that.
-                    if enabled, !NotchService.reachesDisplayWithoutNotch(NotchDisplay(rawValue: display) ?? .automatic) {
-                        Text(text.withoutNotchUnreached).font(.caption).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Button(text.showOnAllDisplays) { display = NotchDisplay.all.rawValue }
-                    }
+            // Displays without a camera or any display where silhouette can be styled.
+            SettingsCard(title: NotchSupport.hasDisplayWithoutNotch ? text.withoutNotch : (l10n.language == .ru ? "Силуэт острова" : "Island Silhouette")) {
+                HStack(spacing: 10) {
+                    silhouetteChoice(.capsule, title: text.capsuleShape)
+                    silhouetteChoice(.notch, title: text.notchShape)
                 }
-                if NotchSilhouette(rawValue: silhouette) ?? .capsule == .capsule {
-                    SettingsCard(title: text.capsuleFit) {
-                        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                            // Even widths keep the capsule centred on whole points.
-                            fitSlider(text.width, card: text.capsuleFit, value: $capsuleFitWidth,
-                                      range: NotchCapsuleFit.widthRange, step: 2)
-                            fitSlider(text.height, card: text.capsuleFit, value: $capsuleFitHeight,
-                                      range: NotchCapsuleFit.heightRange, step: 1)
-                            fitSlider(text.fromTop, card: text.capsuleFit, value: $capsuleFitDrop,
-                                      range: NotchCapsuleFit.dropRange, step: 1)
-                        }
-                        Text(text.capsuleFitHint).font(.caption).foregroundStyle(.secondary)
+                // An island kept on a camera, or away with the lid closed,
+                // shows neither shape, so the card says where to change that.
+                if enabled, !NotchService.reachesDisplayWithoutNotch(NotchDisplay(rawValue: display) ?? .automatic) {
+                    Text(text.withoutNotchUnreached).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(text.showOnAllDisplays) { display = NotchDisplay.all.rawValue }
+                }
+            }
+            if NotchSilhouette(rawValue: silhouette) ?? .capsule == .capsule {
+                SettingsCard(title: text.capsuleFit) {
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                        // Even widths keep the capsule centred on whole points.
+                        fitSlider(text.width, card: text.capsuleFit, value: $capsuleFitWidth,
+                                  range: NotchCapsuleFit.widthRange, step: 2)
+                        fitSlider(text.height, card: text.capsuleFit, value: $capsuleFitHeight,
+                                  range: NotchCapsuleFit.heightRange, step: 1)
+                        fitSlider(text.fromTop, card: text.capsuleFit, value: $capsuleFitDrop,
+                                  range: NotchCapsuleFit.dropRange, step: 1)
                     }
+                    Text(text.capsuleFitHint).font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                SettingsCard(title: l10n.language == .ru ? "Геометрия чёлки" : "Notch Geometry") {
+                    HStack(spacing: 8) {
+                        choice(l10n.language == .ru ? "MacBook" : "MacBook",
+                               symbol: "laptopcomputer",
+                               selected: cornerRadiusFit == 0 && shoulderFit == 0) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                cornerRadiusFit = 0
+                                shoulderFit = 0
+                            }
+                        }
+                        choice(l10n.language == .ru ? "iPhone 12" : "iPhone 12",
+                               symbol: "iphone",
+                               selected: cornerRadiusFit == 8 && shoulderFit == -6) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                cornerRadiusFit = 8
+                                shoulderFit = -6
+                            }
+                        }
+                    }
+
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                        fitSlider(l10n.language == .ru ? "Скругление углов" : "Corner Radius",
+                                  card: "notchRadius",
+                                  value: $cornerRadiusFit,
+                                  range: -6...14,
+                                  step: 1)
+                        fitSlider(l10n.language == .ru ? "Плечи (уши)" : "Shoulder Flare",
+                                  card: "notchShoulder",
+                                  value: $shoulderFit,
+                                  range: -8...10,
+                                  step: 1)
+                    }
+                    Text(l10n.language == .ru
+                         ? "Пресет «iPhone 12» делает чёлку глубже и круглее, «MacBook» — строгой со стандартными плечами."
+                         : "iPhone 12 preset makes the notch rounded with steep shoulders; MacBook keeps it native.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
             SettingsCard {
@@ -835,7 +873,7 @@ struct NotchSettings: View {
         let selected = (NotchSilhouette(rawValue: silhouette) ?? .capsule) == item
         return Button { silhouette = item.rawValue } label: {
             VStack(spacing: 10) {
-                NotchSilhouetteSample(silhouette: item)
+                NotchSilhouetteSample(silhouette: item, shoulderFit: shoulderFit, radiusFit: cornerRadiusFit)
                 Text(title).font(.system(size: 11, weight: .medium)).lineLimit(2).multilineTextAlignment(.center)
             }.frame(maxWidth: .infinity, minHeight: 68).padding(8)
                 .foregroundStyle(selected ? Color.accentColor : .primary)
@@ -1083,10 +1121,13 @@ extension NotchControlItem: PanelOrderItem {}
 /// the resting island in it.
 private struct NotchSilhouetteSample: View {
     let silhouette: NotchSilhouette
+    var shoulderFit: CGFloat = 0
+    var radiusFit: CGFloat = 0
 
     var body: some View {
         let geometry = NotchGeometry(screen: CGRect(x: 0, y: 0, width: 1440, height: 900), safeAreaTop: 0,
-                                     cameraWidth: 0, menuBarHeight: 24, silhouette: silhouette)
+                                     cameraWidth: 0, menuBarHeight: 24, silhouette: silhouette,
+                                     notchCornerRadiusFit: radiusFit, notchShoulderFit: shoulderFit)
         let island = geometry.restingSize(showsContent: false)
         ZStack(alignment: .top) {
             Rectangle().fill(.primary.opacity(0.08)).frame(height: geometry.menuBarHeight)

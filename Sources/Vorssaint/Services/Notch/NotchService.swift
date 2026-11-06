@@ -3641,7 +3641,9 @@ final class NotchService: ObservableObject {
                              capsuleFit: NotchCapsuleFit.current(),
                              hideMenuBarGap: UserDefaults.standard.bool(forKey: DefaultsKey.notchHideMenuBarGap),
                              outline: UserDefaults.standard.bool(forKey: DefaultsKey.notchOutlineEnabled),
-                             barEdge: 1 / max(1, screen.backingScaleFactor))
+                             barEdge: 1 / max(1, screen.backingScaleFactor),
+                             notchCornerRadiusFit: UserDefaults.standard.double(forKey: DefaultsKey.notchCornerRadiusFit),
+                             notchShoulderFit: UserDefaults.standard.double(forKey: DefaultsKey.notchShoulderFit))
     }
 
     private func updateFullscreenVisibility(displayID: CGDirectDisplayID) {

@@ -93,6 +93,7 @@ final class NotchWindowHost: NSObject, CAAnimationDelegate {
             return self.currentGeometry.screen.midX - self.panel.frame.minX - self.canvas.convert(CGPoint.zero, to: nil).x
         }
         canvas.setFloatingGap(geometry.floatingGap)
+        canvas.setNotchGeometryFit(shoulder: geometry.notchShoulderFit, radius: geometry.notchCornerRadiusFit)
         canvas.layoutSubtreeIfNeeded()
         appliedFrame = panel.frame
         overlaySpace?.add(panel)
@@ -262,6 +263,7 @@ final class NotchWindowHost: NSObject, CAAnimationDelegate {
         // Choosing the capsule or the notch redraws the island at once, even
         // at a size it already has.
         canvas.setFloatingGap(geometry.floatingGap)
+        canvas.setNotchGeometryFit(shoulder: geometry.notchShoulderFit, radius: geometry.notchCornerRadiusFit)
         hidesWhenSettled = hideWhenSettled
         if relocationHidden { panel.holdsWave = !hideWhenSettled }
         if hideWhenSettled {
@@ -1158,6 +1160,8 @@ private final class NotchCanvas: NSView {
     private let edgeMask = CALayer()
     /// Nil hangs the island from the top edge; a capsule floats this far inside it.
     private(set) var floatingGap: CGFloat?
+    private(set) var notchShoulderFit: CGFloat = 0
+    private(set) var notchCornerRadiusFit: CGFloat = 0
     /// The size the silhouette's model path was drawn for.
     private var silhouetteSize = CGSize.zero
     private var outlineEnabled = false
@@ -1272,6 +1276,16 @@ private final class NotchCanvas: NSView {
         edgeMask.frame.origin.y = gap == nil ? Self.outlineTopGap : -10_000
         CATransaction.commit()
         backdropPresentation.floatingGap = gap ?? 0
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+    }
+
+    /// Updates custom notch geometry offsets (e.g. iPhone 12 vs MacBook flare and radii).
+    func setNotchGeometryFit(shoulder: CGFloat, radius: CGFloat) {
+        guard notchShoulderFit != shoulder || notchCornerRadiusFit != radius else { return }
+        notchShoulderFit = shoulder
+        notchCornerRadiusFit = radius
+        stopMotion()
         needsLayout = true
         layoutSubtreeIfNeeded()
     }
@@ -1462,7 +1476,9 @@ private final class NotchCanvas: NSView {
     func silhouettePath(for size: CGSize, offset: CGFloat = 0) -> CGPath {
         var translation = CGAffineTransform(translationX: islandX(size) + offset - silhouette.frame.minX, y: 0)
         let path = NotchShape(attached: true, radius: NotchLayout.surfaceRadius(height: size.height),
-                              floatingGap: floatingGap)
+                              floatingGap: floatingGap,
+                              shoulderFit: notchShoulderFit,
+                              radiusFit: notchCornerRadiusFit)
             .path(in: CGRect(origin: .zero, size: size)).cgPath
         return path.copy(using: &translation) ?? path
     }
