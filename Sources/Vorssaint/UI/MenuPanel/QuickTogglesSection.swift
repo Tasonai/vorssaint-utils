@@ -252,7 +252,7 @@ struct QuickTogglesList: View {
                                 isEditing: editing,
                                 showsDragHandle: true,
                                 visibility: visibilityBinding(item),
-                                captionStaysVisible: true,
+                                captionStaysVisible: reportsState(item),
                                 action: {
                                     QuickTogglesService.shared.toggleHiddenFiles()
                                 })
@@ -263,7 +263,7 @@ struct QuickTogglesList: View {
                                 isEditing: editing,
                                 showsDragHandle: true,
                                 visibility: visibilityBinding(item),
-                                captionStaysVisible: true,
+                                captionStaysVisible: reportsState(item),
                                 action: {
                                     QuickTogglesService.shared.toggleDesktopIcons()
                                 })

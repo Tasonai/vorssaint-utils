@@ -299,9 +299,9 @@ struct QuickLauncherView: View {
                                 .frame(width: 8, height: 8)
                                 .offset(x: 3, y: -3)
                         }
-                        // Keys 1-9 activate the first nine tiles; the badge is
-                        // the only hint that shortcut exists.
-                        if notchSize == nil, let index, index < 9 {
+                        // Keys 1-9 activate the first nine tiles; show the badge
+                        // only on the hovered or selected tile to keep the grid clean.
+                        if notchSize == nil, let index, index < 9, isSelected || isHovered {
                             Image(systemName: "\(index + 1).circle.fill")
                                 .font(.system(size: 13))
                                 .foregroundStyle(.white, isSelected ? Color.accentColor : Color.secondary.opacity(0.8))
@@ -317,6 +317,7 @@ struct QuickLauncherView: View {
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2, reservesSpace: true)
+                    .minimumScaleFactor(0.85)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, titleInset)
             }

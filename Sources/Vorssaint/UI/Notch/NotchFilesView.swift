@@ -182,13 +182,9 @@ struct NotchFilesView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Two lines of quiet guidance, or how many tiles are selected.
+    /// Quiet selection summary when tiles are selected; the empty shelf already shows drop guidance.
     @ViewBuilder private var shelfHint: some View {
-        if shelf.selection.isEmpty {
-            Text(l10n.s.shelfHint)
-                .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
-                .help(l10n.s.shelfHint)
-        } else {
+        if !shelf.selection.isEmpty {
             Text(String(format: l10n.s.shelfSelectedFormat, shelf.selection.count))
                 .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
         }

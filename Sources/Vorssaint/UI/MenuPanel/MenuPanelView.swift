@@ -2783,19 +2783,13 @@ struct KeepAwakeCard: View {
                     }
                 }
 
-                // Shown in both states so starting or stopping never changes
-                // the card's height (the panel would jump). Battery protection
-                // ends a session the moment it starts, so say why a chip
+                // Battery protection ends a session the moment it starts, so say why a chip
                 // seems to do nothing.
                 TimelineView(.periodic(from: .now, by: 30)) { _ in
                     if let percent = awake.batteryProtectionPercent() {
                         Label(batteryNote(percent), systemImage: "battery.25percent")
                             .font(.system(size: 10))
                             .foregroundStyle(.orange)
-                    } else {
-                        Text(chipHint)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
                     }
                 }
 
@@ -3090,25 +3084,6 @@ struct KeepAwakeCard: View {
         case .uk: return "Заряд \(percent)%. Підключіть живлення або знизьте поріг заряду, щоб почати"
         case .zhHans: return "电量 \(percent)%。接通电源或调低电量下限即可开始"
         case .zhTW, .zhHK: return "電量 \(percent)%。接上電源或調低電量下限即可開始"
-        }
-    }
-
-    private var chipHint: String {
-        switch l10n.language {
-        case .enUS: return "Click a chip to start. Click it again to stop"
-        case .ptBR: return "Clique em um chip para iniciar. Clique de novo para parar"
-        case .tr: return "Başlatmak için bir çipe tıklayın. Durdurmak için tekrar tıklayın"
-        case .ru: return "Нажмите на чип, чтобы начать. Нажмите снова, чтобы остановить"
-        case .es: return "Haz clic en un chip para empezar. Vuelve a hacer clic para detener"
-        case .sk: return "Kliknutím na čip spustíte. Ďalším kliknutím zastavíte"
-        case .de: return "Chip anklicken zum Starten. Erneut anklicken zum Beenden"
-        case .fr: return "Cliquer sur une puce pour démarrer. Cliquer à nouveau pour arrêter"
-        case .it: return "Fai clic su un chip per iniziare. Fai di nuovo clic per fermare"
-        case .ja: return "チップをクリックで開始、もう一度クリックで停止"
-        case .ko: return "칩을 클릭하면 시작하고, 다시 클릭하면 멈춥니다"
-        case .uk: return "Натисніть на чип, щоб почати. Натисніть ще раз, щоб зупинити"
-        case .zhHans: return "点按一个标签即可开始，再次点按即可停止"
-        case .zhTW, .zhHK: return "點按一個標籤即可開始，再次點按即可停止"
         }
     }
 

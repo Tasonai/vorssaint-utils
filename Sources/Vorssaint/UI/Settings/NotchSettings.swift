@@ -257,70 +257,38 @@ struct NotchSettings: View {
                           isOn: liquidGlassIsOn ? .constant(true) : $translucentBackground)
                     .disabled(liquidGlassIsOn)
             }
-            // Displays without a camera or any display where silhouette can be styled.
-            SettingsCard(title: NotchSupport.hasDisplayWithoutNotch ? text.withoutNotch : (l10n.language == .ru ? "Силуэт острова" : "Island Silhouette")) {
-                HStack(spacing: 10) {
-                    silhouetteChoice(.capsule, title: text.capsuleShape)
-                    silhouetteChoice(.notch, title: text.notchShape)
-                }
-                // An island kept on a camera, or away with the lid closed,
-                // shows neither shape, so the card says where to change that.
-                if enabled, !NotchService.reachesDisplayWithoutNotch(NotchDisplay(rawValue: display) ?? .automatic) {
-                    Text(text.withoutNotchUnreached).font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button(text.showOnAllDisplays) { display = NotchDisplay.all.rawValue }
-                }
-            }
-            if NotchSilhouette(rawValue: silhouette) ?? .capsule == .capsule {
-                SettingsCard(title: text.capsuleFit) {
-                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                        // Even widths keep the capsule centred on whole points.
-                        fitSlider(text.width, card: text.capsuleFit, value: $capsuleFitWidth,
-                                  range: NotchCapsuleFit.widthRange, step: 2)
-                        fitSlider(text.height, card: text.capsuleFit, value: $capsuleFitHeight,
-                                  range: NotchCapsuleFit.heightRange, step: 1)
-                        fitSlider(text.fromTop, card: text.capsuleFit, value: $capsuleFitDrop,
-                                  range: NotchCapsuleFit.dropRange, step: 1)
+            // Only a display without a camera needs a simulated shape.
+            if NotchSupport.hasDisplayWithoutNotch {
+                SettingsCard(title: text.withoutNotch) {
+                    HStack(spacing: 10) {
+                        silhouetteChoice(.capsule, title: text.capsuleShape)
+                        silhouetteChoice(.notch, title: text.notchShape)
                     }
-                    Text(text.capsuleFitHint).font(.caption).foregroundStyle(.secondary)
+                    // An island kept on a camera, or away with the lid closed,
+                    // shows neither shape, so the card says where to change that.
+                    if enabled, !NotchService.reachesDisplayWithoutNotch(NotchDisplay(rawValue: display) ?? .automatic) {
+                        Text(text.withoutNotchUnreached).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button(text.showOnAllDisplays) { display = NotchDisplay.all.rawValue }
+                    }
                 }
-            } else {
-                SettingsCard(title: l10n.language == .ru ? "Геометрия чёлки" : "Notch Geometry") {
-                    HStack(spacing: 8) {
-                        choice(l10n.language == .ru ? "MacBook" : "MacBook",
-                               symbol: "laptopcomputer",
-                               selected: cornerRadiusFit == 0 && shoulderFit == 0) {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                                cornerRadiusFit = 0
-                                shoulderFit = 0
-                            }
+                if NotchSilhouette(rawValue: silhouette) ?? .capsule == .capsule {
+                    SettingsCard(title: text.capsuleFit) {
+                        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                            // Even widths keep the capsule centred on whole points.
+                            fitSlider(text.width, card: text.capsuleFit, value: $capsuleFitWidth,
+                                      range: NotchCapsuleFit.widthRange, step: 2)
+                            fitSlider(text.height, card: text.capsuleFit, value: $capsuleFitHeight,
+                                      range: NotchCapsuleFit.heightRange, step: 1)
+                            fitSlider(text.fromTop, card: text.capsuleFit, value: $capsuleFitDrop,
+                                      range: NotchCapsuleFit.dropRange, step: 1)
                         }
-                        choice(l10n.language == .ru ? "iPhone 12" : "iPhone 12",
-                               symbol: "iphone",
-                               selected: cornerRadiusFit == 8 && shoulderFit == -6) {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                                cornerRadiusFit = 8
-                                shoulderFit = -6
-                            }
-                        }
+                        Text(text.capsuleFitHint).font(.caption).foregroundStyle(.secondary)
                     }
-
-                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                        fitSlider(l10n.language == .ru ? "Скругление углов" : "Corner Radius",
-                                  card: "notchRadius",
-                                  value: $cornerRadiusFit,
-                                  range: -6...14,
-                                  step: 1)
-                        fitSlider(l10n.language == .ru ? "Плечи (уши)" : "Shoulder Flare",
-                                  card: "notchShoulder",
-                                  value: $shoulderFit,
-                                  range: -8...10,
-                                  step: 1)
+                } else if !NotchSupport.hasNotchedDisplay {
+                    SettingsCard(title: l10n.language == .ru ? "Форма выреза" : "Notch Shape") {
+                        notchShapeControls
                     }
-                    Text(l10n.language == .ru
-                         ? "Пресет «iPhone 12» делает чёлку глубже и круглее, «MacBook» — строгой со стандартными плечами."
-                         : "iPhone 12 preset makes the notch rounded with steep shoulders; MacBook keeps it native.")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
             SettingsCard {
@@ -329,6 +297,8 @@ struct NotchSettings: View {
             // Only a physical camera has an outline to match.
             if NotchSupport.hasNotchedDisplay {
                 SettingsCard(title: text.cameraFit) {
+                    notchShapeControls
+                    Divider()
                     switchRow("rectangle.topthird.inset.filled", text.hideMenuBarGap,
                               caption: text.hideMenuBarGapHint, isOn: $hideMenuBarGap)
                     Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
@@ -342,6 +312,44 @@ struct NotchSettings: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder private var notchShapeControls: some View {
+        HStack(spacing: 8) {
+            choice("MacBook",
+                   symbol: "laptopcomputer",
+                   selected: cornerRadiusFit == 0 && shoulderFit == 0) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                    cornerRadiusFit = 0
+                    shoulderFit = 0
+                }
+            }
+            choice("iPhone 12",
+                   symbol: "iphone",
+                   selected: cornerRadiusFit == 8 && shoulderFit == -6) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                    cornerRadiusFit = 8
+                    shoulderFit = -6
+                }
+            }
+        }
+        DisclosureGroup(l10n.language == .ru ? "Тонкая настройка изгиба" : "Fine-tune curves") {
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                fitSlider(l10n.language == .ru ? "Скругление" : "Corner Radius",
+                          card: "notchRadius",
+                          value: $cornerRadiusFit,
+                          range: -6...14,
+                          step: 1)
+                fitSlider(l10n.language == .ru ? "Плечи" : "Shoulder Flare",
+                          card: "notchShoulder",
+                          value: $shoulderFit,
+                          range: -8...10,
+                          step: 1)
+            }
+            .padding(.top, 6)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(.secondary)
     }
 
     /// Whether the open island draws Liquid Glass, by the island's own rule.

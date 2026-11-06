@@ -123,8 +123,8 @@ extension NotchControlItem {
         case .volume: return FeatureStrings.notch(l10n.language).volume
         case .brightness: return FeatureStrings.notch(l10n.language).brightness
         case .keyboardLight: return FeatureStrings.brightness(l10n.language).keyboardLight
-        case .keepAwake: return l10n.s.keepAwakeTitle
-        case .microphone: return l10n.s.micMuteName
+        case .keepAwake: return l10n.language == .ru ? "Бодрствование" : l10n.s.keepAwakeTitle
+        case .microphone: return l10n.language == .ru ? "Микрофон" : l10n.s.micMuteName
         case .screenshot: return FeatureStrings.recentCaptures(l10n.language).screenshot
         case .recording: return FeatureStrings.recorder(l10n.language).pageTitle
         case .speedTest: return l10n.s.speedTestRun
@@ -551,7 +551,7 @@ private struct NotchAwakeButton: View {
     @ObservedObject private var l10n = L10n.shared
     var body: some View {
         NotchActionTile(symbol: service.isActive ? "cup.and.saucer.fill" : "cup.and.saucer",
-                        title: l10n.s.keepAwakeTitle, active: service.isActive,
+                        title: NotchControlItem.keepAwake.title(l10n), active: service.isActive,
                         accent: .awake, action: service.toggle)
     }
 }
@@ -560,8 +560,11 @@ private struct NotchMicButton: View {
     @ObservedObject private var service = MicMuteService.shared
     @ObservedObject private var l10n = L10n.shared
     var body: some View {
+        let title = l10n.language == .ru
+            ? "Микрофон"
+            : (service.isMuted ? l10n.s.micUnmuteName : l10n.s.micMuteName)
         NotchActionTile(symbol: service.isMuted ? "mic.slash.fill" : "mic.fill",
-                        title: service.isMuted ? l10n.s.micUnmuteName : l10n.s.micMuteName,
+                        title: title,
                         active: service.isMuted, accent: .alert, action: service.toggle)
     }
 }
