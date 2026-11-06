@@ -1179,7 +1179,7 @@ def main():
     shelf = "Sources/Vorssaint/Services/Shelf/ShelfService.swift"
     write("ShelfDragCompletion.swift", "import AppKit\n\nextension ShelfDragCompletionContract {\n"
           + "final class Service {\nstatic var shared = Service()\n"
-          + declaration(shelf, "    struct Item:")
+          + "typealias Item = ShelfItem\n"
           + "var items: [Item] = []\nvar selection: Set<UUID> = []\n"
           + "var activeInternalDragIDs: [UUID] = []\nvar internalDragHoldsPackageContent = false\n"
           + "weak var internalDragWindow: NSWindow?\nvar internalDragWasMerged = false\n"
