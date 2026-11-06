@@ -68,9 +68,9 @@
 
 ## Milestone 4: Quick Launch & Command Bar Evolution
 
-- [todo] **Story 4.1**: Quick note & scratchpad quick-access sheet in Dynamic Island
-  - **UX**: 1-click access to persistent scratchpad notes directly from the expanded Island header.
-  - **Status**: todo
+- [x] **Story 4.1**: Quick note & scratchpad quick-access sheet in Dynamic Island
+  - **UX**: 1-click access to persistent scratchpad notes directly from the expanded Island header with active pad indicator and quick pad switcher context menu.
+  - **Status**: done
 
 - [todo] **Story 4.2**: Command Bar fuzzy calculator & currency unit conversion inline preview
   - **UX**: Instant evaluation of arithmetic expressions and currency/unit conversions in Command Bar.

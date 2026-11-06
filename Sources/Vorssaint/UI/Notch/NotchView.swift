@@ -356,6 +356,7 @@ struct NotchView: View {
                 HStack(spacing: 8) {
                     NotchPrivacyHeaderBadge()
                     NotchExpandedAudioBadge()
+                    NotchQuickScratchpadButton(service: service)
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 6) { items.trailing; trailingSections(band); updateControl(band); pinMark }
                         HStack(spacing: 6) {
