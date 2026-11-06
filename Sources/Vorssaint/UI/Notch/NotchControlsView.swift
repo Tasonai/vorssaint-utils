@@ -156,13 +156,7 @@ struct NotchAudioControls: View {
             NotchLevelChooser(title: l10n.s.mixerSystemOutputTitle, items: outputItems)
                 .accessibilityValue(deviceName)
         }
-        .padding(.horizontal, 8)
         .frame(height: 28)
-        .background(.white.opacity(0.055), in: Capsule(style: .continuous))
-        .overlay {
-            Capsule(style: .continuous)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
-        }
         .help(mixer.outputSwitchError ?? deviceName)
     }
 
@@ -303,13 +297,7 @@ private struct NotchBrightnessControls: View {
                     .accessibilityValue(display.name)
             }
         }
-        .padding(.horizontal, 8)
         .frame(height: 28)
-        .background(.white.opacity(0.055), in: Capsule(style: .continuous))
-        .overlay {
-            Capsule(style: .continuous)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
-        }
         .help(display?.name ?? FeatureStrings.brightness(l10n.language).noDisplays)
         .onAppear { service.refresh() }
     }
@@ -355,13 +343,7 @@ private struct NotchKeyboardLightControls: View {
             glyph
             slider
         }
-        .padding(.horizontal, 8)
         .frame(height: 28)
-        .background(.white.opacity(0.055), in: Capsule(style: .continuous))
-        .overlay {
-            Capsule(style: .continuous)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
-        }
         .help(title)
         .onAppear { service.refreshKeyboardLight() }
     }
@@ -441,19 +423,18 @@ struct NotchActionTile: View {
     let action: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
-        let cardShape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         Button(action: action) {
-            VStack(spacing: 5) {
-                Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(active ? accent.glyph : .white.opacity(0.92))
+            VStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(active ? accent.glyph : .white.opacity(0.9))
                     .contentTransition(.symbolEffect(.replace))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 40, height: 40)
                     .background {
                         if active {
                             Circle()
-                                .fill(accent.fill.opacity(0.35))
-                                .blur(radius: 6)
-                                .scaleEffect(1.14)
+                                .fill(accent.fill.opacity(0.32))
+                                .blur(radius: 7)
+                                .scaleEffect(1.12)
                         }
                     }
                     .background(
@@ -466,7 +447,7 @@ struct NotchActionTile: View {
                                         endPoint: .bottom
                                     )
                                     : LinearGradient(
-                                        colors: [Color.white.opacity(0.12), Color.white.opacity(0.06)],
+                                        colors: [Color.white.opacity(0.115), Color.white.opacity(0.055)],
                                         startPoint: .top,
                                         endPoint: .bottom
                                     )
@@ -487,41 +468,17 @@ struct NotchActionTile: View {
                             )
                     }
                     .animation(reduceMotion ? nil : .smooth(duration: 0.26), value: symbol)
+                    .animation(reduceMotion ? nil : .smooth(duration: 0.26), value: active)
                 label
                     .frame(maxWidth: .infinity)
-                    .frame(height: 24, alignment: .center)
+                    .frame(height: 28, alignment: .top)
             }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 4)
             .frame(maxWidth: .infinity)
             .frame(height: NotchLayout.shortcutHeight)
-            .background(
-                cardShape.fill(
-                    LinearGradient(
-                        colors: active
-                            ? [accent.fill.opacity(0.18), accent.fill.opacity(0.08)]
-                            : [Color.white.opacity(0.065), Color.white.opacity(0.03)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            )
-            .overlay {
-                cardShape.strokeBorder(
-                    LinearGradient(
-                        colors: active
-                            ? [accent.fill.opacity(0.42), accent.fill.opacity(0.14)]
-                            : [Color.white.opacity(0.12), Color.white.opacity(0.04)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: active ? 0.8 : 0.5
-                )
-            }
-            .animation(reduceMotion ? nil : .smooth(duration: 0.26), value: active)
-            .contentShape(cardShape)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(NotchButtonStyle(cornerRadius: 16))
+        .buttonStyle(NotchButtonStyle(cornerRadius: 14))
         .accessibilityLabel(title)
         .accessibilityValue(reading ?? "")
         .accessibilityAddTraits(active ? .isSelected : [])
