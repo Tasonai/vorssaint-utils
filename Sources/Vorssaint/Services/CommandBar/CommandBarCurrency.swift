@@ -338,7 +338,7 @@ enum CommandBarCurrency {
             formatter.minimumFractionDigits = 2
         }
 
-        let numStr = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
+        let numStr = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", locale: locale, value)
         if currency.isPrefixSymbol {
             return "\(currency.symbol)\(numStr)"
         } else {
@@ -368,7 +368,7 @@ enum CommandBarCurrency {
             formatter.minimumFractionDigits = 2
         }
 
-        let rateStr = formatter.string(from: NSNumber(value: rate)) ?? String(format: "%.2f", rate)
+        let rateStr = formatter.string(from: NSNumber(value: rate)) ?? String(format: "%.2f", locale: locale, rate)
         return "1 \(source.code) ≈ \(rateStr) \(target.code)"
     }
 }

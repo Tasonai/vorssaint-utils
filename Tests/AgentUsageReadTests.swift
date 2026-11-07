@@ -106,11 +106,15 @@ enum AgentUsageReadTests {
         catch { suite.expect(false, "the streaming fixture creates its folder: \(error)"); return }
         let now = Date()
         let timestamp = now.timeIntervalSince1970
+        let isoFormatter = ISO8601DateFormatter()
+        let isoStep0 = isoFormatter.string(from: now.addingTimeInterval(-15))
+        let isoStep1 = isoFormatter.string(from: now.addingTimeInterval(-10))
+        let isoStep2 = isoFormatter.string(from: now.addingTimeInterval(-5))
         let cases: [(AgentProvider, [String])] = [
             (.antigravity, [
-                #"{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-30T05:27:55Z","content":"Command Working Directory: /tmp/example\nWork"}"#,
-                #"{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"RUNNING","created_at":"2026-10-30T05:28:00Z","input_tokens":10,"output_tokens":2,"tool_calls":[{"name":"cmd"}]}"#,
-                #"{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-30T05:28:10Z","input_tokens":10,"output_tokens":5}"#
+                #"{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"\#(isoStep0)","content":"Command Working Directory: /tmp/example\nWork"}"#,
+                #"{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"RUNNING","created_at":"\#(isoStep1)","input_tokens":10,"output_tokens":2,"tool_calls":[{"name":"cmd"}]}"#,
+                #"{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"\#(isoStep2)","input_tokens":10,"output_tokens":5}"#
             ]),
             (.claude, [
                 #"{"type":"user","timestamp":\#(timestamp),"sessionId":"s","message":{"content":"work"}}"#,
@@ -397,7 +401,12 @@ enum AgentUsageReadTests {
                 suite.expect(false, "the startup fixture has a root for \(provider)")
                 return
             }
-            let file = root.url.appending(path: "session/events.jsonl")
+            let file: URL
+            if provider == .antigravity {
+                file = root.url.appending(path: "session/.system_generated/logs/transcript.jsonl")
+            } else {
+                file = root.url.appending(path: "session/events.jsonl")
+            }
             do {
                 try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: file)

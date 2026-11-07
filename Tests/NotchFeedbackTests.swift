@@ -5,8 +5,8 @@ import Foundation
 
 enum NotchFeedbackTests {
     static func run(_ suite: TestSuite) {
-        let defaults = UserDefaults(suiteName: "test-notch-feedback")!
-        defaults.removePersistentDomain(forName: "test-notch-feedback")
+        let defaults = UserDefaults(suiteName: "vorss.tests.notch-feedback")!
+        defaults.removePersistentDomain(forName: "vorss.tests.notch-feedback")
         let service = NotchFeedbackService(defaults: defaults)
 
         suite.expect(service.isHapticsEnabled && service.isAcousticsEnabled,

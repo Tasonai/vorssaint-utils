@@ -607,6 +607,7 @@ private struct NotchAppFader: View {
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
+                .fixedSize()
                 .offset(x: -2, y: 1)
                 .help(routeDescription)
                 .accessibilityLabel(routeDescription)
