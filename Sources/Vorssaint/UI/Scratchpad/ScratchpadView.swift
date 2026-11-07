@@ -16,6 +16,7 @@ struct ScratchpadView: View {
     @State private var renameDraft = ""
 
     @State private var hoveredPadID: UUID?
+    @State private var isPinHovered = false
 
     private var text: ScratchpadFeatureStrings { FeatureStrings.scratchpad(l10n.language) }
     private var isEmpty: Bool { service.text.isEmpty }
@@ -264,25 +265,19 @@ struct ScratchpadView: View {
             } label: {
                 Image(systemName: service.isPinned ? "pin.fill" : "pin")
                     .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(service.isPinned ? Color.accentColor : (isPinHovered ? Color.primary : Color.secondary))
+                    .scaleEffect(isPinHovered ? 1.08 : 1.0)
                     .frame(width: 22, height: 22)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(service.isPinned ? Color.accentColor : Color.secondary)
+            .onHover { isPinHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isPinHovered)
             .help(service.isPinned ? text.closeOnClickOutside : text.keepOpen)
             .accessibilityLabel(service.isPinned ? text.closeOnClickOutside : text.keepOpen)
-            Button {
+            PanelCloseButton(label: l10n.s.menuClose) {
                 ScratchpadService.shared.hide()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .help(l10n.s.menuClose)
-            .accessibilityLabel(l10n.s.menuClose)
         }
         .padding(.trailing, 12)
         .frame(height: 34)
