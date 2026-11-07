@@ -2005,21 +2005,31 @@ final class WindowLayoutService: ObservableObject {
     private func showEdgeSnapPreview(frame: CGRect) {
         edgeSnapPreviewGeneration += 1
         let panel: NSPanel
+        let wasVisible: Bool
         if let existing = edgeSnapPreviewPanel {
             panel = existing
+            wasVisible = panel.isVisible && panel.alphaValue > 0.01
         } else {
             panel = makeEdgeSnapPreviewPanel()
             edgeSnapPreviewPanel = panel
+            wasVisible = false
         }
-        panel.setFrame(frame, display: true)
-        if !panel.isVisible {
+        if !wasVisible {
+            panel.setFrame(frame, display: true)
             panel.alphaValue = 0
             panel.orderFrontRegardless()
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.09
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().alphaValue = 1
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.12
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().alphaValue = 1
+            }
+        } else {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.14
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(frame, display: true)
+                panel.animator().alphaValue = 1
+            }
         }
     }
 
@@ -3131,16 +3141,30 @@ private struct WindowPointerGesture {
 }
 
 private final class WindowEdgeSnapPreviewView: NSView {
+    private let effectView: NSVisualEffectView
+
     override init(frame frameRect: NSRect) {
+        effectView = NSVisualEffectView(frame: CGRect(origin: .zero, size: frameRect.size))
+        effectView.material = .hudWindow
+        effectView.blendingMode = .behindWindow
+        effectView.state = .active
+        effectView.autoresizingMask = [.width, .height]
         super.init(frame: frameRect)
         wantsLayer = true
+        addSubview(effectView)
         updateAppearance()
         setAccessibilityElement(false)
     }
 
     required init?(coder: NSCoder) {
+        effectView = NSVisualEffectView(frame: .zero)
+        effectView.material = .hudWindow
+        effectView.blendingMode = .behindWindow
+        effectView.state = .active
+        effectView.autoresizingMask = [.width, .height]
         super.init(coder: coder)
         wantsLayer = true
+        addSubview(effectView)
         updateAppearance()
         setAccessibilityElement(false)
     }
@@ -3155,9 +3179,14 @@ private final class WindowEdgeSnapPreviewView: NSView {
         let accent = NSColor.controlAccentColor
         layer.cornerRadius = 14
         layer.cornerCurve = .continuous
-        layer.backgroundColor = accent.withAlphaComponent(0.16).cgColor
-        layer.borderColor = accent.withAlphaComponent(0.88).cgColor
-        layer.borderWidth = 2
+        layer.masksToBounds = true
+        layer.backgroundColor = accent.withAlphaComponent(0.14).cgColor
+        layer.borderColor = accent.withAlphaComponent(0.70).cgColor
+        layer.borderWidth = 1.5
+        effectView.wantsLayer = true
+        effectView.layer?.cornerRadius = 14
+        effectView.layer?.cornerCurve = .continuous
+        effectView.layer?.masksToBounds = true
     }
 }
 

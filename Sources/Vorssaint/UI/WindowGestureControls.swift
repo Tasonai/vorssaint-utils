@@ -14,6 +14,7 @@ struct WindowEdgeSnapZonePicker: View {
     var compact = false
 
     @ObservedObject private var l10n = L10n.shared
+    @State private var isResetHovered = false
 
     var body: some View {
         HStack(alignment: .top, spacing: compact ? 6 : 9) {
@@ -42,16 +43,27 @@ struct WindowEdgeSnapZonePicker: View {
             } label: {
                 Image(systemName: "arrow.counterclockwise")
                     .font(.system(size: compact ? 10 : 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isResetHovered && !isStandard ? Color.primary : Color.secondary)
                     .frame(width: compact ? 20 : 24, height: compact ? 20 : 24)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(0.045))
+                            .fill(isResetHovered && !isStandard
+                                ? Color.primary.opacity(0.09)
+                                : Color.primary.opacity(0.045))
                     )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(isResetHovered && !isStandard
+                                ? Color.primary.opacity(0.20)
+                                : Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .scaleEffect(isResetHovered && !isStandard ? 1.08 : 1.0)
+                    .animation(.easeOut(duration: 0.12), value: isResetHovered)
             }
             .buttonStyle(.plain)
             .disabled(isStandard)
             .opacity(isStandard ? 0.35 : 1)
+            .onHover { isResetHovered = $0 }
             .help(resetTitle)
             .accessibilityLabel(resetTitle)
         }
@@ -387,28 +399,15 @@ struct WindowGestureModifierPicker: View {
             }
             ForEach(choices) { choice in
                 let selected = modifiers.contains(choice.modifier)
-                Button {
+                WindowGestureModifierKeyCap(
+                    symbol: choice.symbol,
+                    name: choice.name,
+                    selected: selected,
+                    canToggle: !selected || canRemove(choice.modifier),
+                    compact: compact
+                ) {
                     toggle(choice.modifier)
-                } label: {
-                    Text(choice.symbol)
-                        .font(.system(size: compact ? 12 : 14, weight: .semibold, design: .rounded))
-                        .frame(width: compact ? 25 : 30, height: compact ? 22 : 25)
-                        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(selected ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.045))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(selected ? Color.accentColor.opacity(0.45) : Color.primary.opacity(0.1),
-                                        lineWidth: 1)
-                        )
                 }
-                .buttonStyle(.plain)
-                .disabled(selected && !canRemove(choice.modifier))
-                .help(choice.name)
-                .accessibilityLabel(choice.name)
-                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
     }
@@ -492,6 +491,51 @@ struct WindowGestureHints: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Color.primary.opacity(0.045))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
         .accessibilityElement(children: .combine)
     }
 }
+
+private struct WindowGestureModifierKeyCap: View {
+    let symbol: String
+    let name: String
+    let selected: Bool
+    let canToggle: Bool
+    let compact: Bool
+    let onToggle: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onToggle) {
+            Text(symbol)
+                .font(.system(size: compact ? 12 : 14, weight: .semibold, design: .rounded))
+                .frame(width: compact ? 25 : 30, height: compact ? 22 : 25)
+                .foregroundStyle(selected ? Color.accentColor : (isHovered ? Color.primary : Color.secondary))
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(selected
+                            ? Color.accentColor.opacity(0.14)
+                            : (isHovered ? Color.primary.opacity(0.08) : Color.primary.opacity(0.045)))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(selected
+                            ? Color.accentColor.opacity(0.45)
+                            : (isHovered ? Color.primary.opacity(0.20) : Color.primary.opacity(0.10)),
+                            lineWidth: 1)
+                )
+                .scaleEffect(isHovered && canToggle ? 1.05 : 1.0)
+                .animation(.easeOut(duration: 0.12), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .disabled(!canToggle)
+        .onHover { isHovered = $0 }
+        .help(name)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
