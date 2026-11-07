@@ -148,7 +148,8 @@ struct RadialMenuSettings: View {
                     }
                 }
 
-                DisclosureGroup(showList ? text.hideListButton : text.showListButton, isExpanded: $showList) {
+                DisclosureGroup(showList ? text.hideListButton : text.showListButton,
+                                isExpanded: $showList.animation(.easeOut(duration: 0.16))) {
                     if let openSubmenu {
                         Button {
                             openSubmenuID = nil
@@ -578,30 +579,56 @@ private struct RadialMenuColorPicker: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(RadialMenuColor.allCases) { color in
-                Button {
+                RadialMenuColorDot(
+                    color: color,
+                    isSelected: selection == color,
+                    colorScheme: colorScheme,
+                    title: color.title(strings)
+                ) {
                     selection = color
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(color.color(for: colorScheme))
-                            .frame(width: 16, height: 16)
-                        if selection == color {
-                            Circle()
-                                .strokeBorder(Color.white.opacity(colorScheme == .light ? 0.9 : 0.8), lineWidth: 2)
-                                .frame(width: 12, height: 12)
-                            Circle()
-                                .strokeBorder(color.color(for: colorScheme), lineWidth: 1.5)
-                                .frame(width: 20, height: 20)
-                        }
-                    }
-                    .frame(width: 22, height: 22)
-                    .contentShape(Circle())
                 }
-                .buttonStyle(.plain)
-                .help(color.title(strings))
-                .accessibilityLabel(color.title(strings))
             }
         }
+    }
+}
+
+private struct RadialMenuColorDot: View {
+    let color: RadialMenuColor
+    let isSelected: Bool
+    let colorScheme: ColorScheme
+    let title: String
+    let onSelect: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onSelect) {
+            ZStack {
+                Circle()
+                    .fill(color.color(for: colorScheme))
+                    .frame(width: 16, height: 16)
+                if isSelected {
+                    Circle()
+                        .strokeBorder(Color.white.opacity(colorScheme == .light ? 0.9 : 0.8), lineWidth: 2)
+                        .frame(width: 12, height: 12)
+                    Circle()
+                        .strokeBorder(color.color(for: colorScheme), lineWidth: 1.5)
+                        .frame(width: 20, height: 20)
+                } else if isHovered {
+                    Circle()
+                        .strokeBorder(color.color(for: colorScheme).opacity(0.5), lineWidth: 1.5)
+                        .frame(width: 20, height: 20)
+                }
+            }
+            .frame(width: 22, height: 22)
+            .scaleEffect(isHovered ? 1.14 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(title)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -673,6 +700,7 @@ private struct RadialItemRow: View {
     let remove: () -> Void
     let openChildren: (() -> Void)?
     let moveHandler: (RadialMenuItem, RadialMenuItem) -> Void
+    @State private var isHovered = false
 
     private var kindLabel: String {
         switch item.kind {
@@ -697,6 +725,7 @@ private struct RadialItemRow: View {
                     badge
                     VStack(alignment: .leading, spacing: 1) {
                         Text(item.displayName(text))
+                            .foregroundStyle(isHovered ? Color.accentColor : Color.primary)
                         Text(kindLabel)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -706,6 +735,8 @@ private struct RadialItemRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isHovered)
             if let openChildren {
                 Button(action: openChildren) {
                     HStack(spacing: 5) {

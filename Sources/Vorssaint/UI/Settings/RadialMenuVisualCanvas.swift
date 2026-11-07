@@ -27,6 +27,8 @@ struct RadialMenuVisualCanvas: View {
     @State private var dragPosition: CGPoint = .zero
     @State private var targetIndex: Int?
     @State private var showingResetConfirm = false
+    @State private var isBackHovered = false
+    @State private var isHubHovered = false
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -61,15 +63,26 @@ struct RadialMenuVisualCanvas: View {
                 Button {
                     onBack?()
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Image(systemName: "chevron.backward")
                             .font(.system(size: 11, weight: .bold))
                         Text(openSubmenu.displayName(text))
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 12, weight: .semibold))
                     }
-                    .foregroundStyle(profileColor)
+                    .foregroundStyle(isBackHovered ? Color.white : profileColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule().fill(isBackHovered ? profileColor.opacity(0.35) : profileColor.opacity(0.18))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(profileColor.opacity(isBackHovered ? 0.6 : 0.3), lineWidth: 1)
+                    )
+                    .scaleEffect(isBackHovered ? 1.04 : 1.0)
+                    .animation(.easeOut(duration: 0.12), value: isBackHovered)
                 }
                 .buttonStyle(.plain)
+                .onHover { isBackHovered = $0 }
                 .help(text.backButton)
             } else {
                 Text(text.pageTitle)
@@ -266,12 +279,18 @@ struct RadialMenuVisualCanvas: View {
     // MARK: - Center Hub
 
     private var centerHub: some View {
-        ZStack {
+        let isInteractive = openSubmenu != nil || items.isEmpty
+        return ZStack {
             Circle()
                 .fill(Color(red: 0.12, green: 0.13, blue: 0.16))
                 .overlay(
                     Circle()
-                        .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
+                        .strokeBorder(
+                            isHubHovered && isInteractive
+                                ? profileColor.opacity(0.65)
+                                : Color.white.opacity(0.16),
+                            lineWidth: isHubHovered && isInteractive ? 1.2 : 0.8
+                        )
                 )
                 .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
 
@@ -279,6 +298,9 @@ struct RadialMenuVisualCanvas: View {
         }
         .frame(width: hubDiameter, height: hubDiameter)
         .contentShape(Circle())
+        .scaleEffect(isHubHovered && isInteractive ? 1.08 : 1.0)
+        .animation(.easeOut(duration: 0.14), value: isHubHovered)
+        .onHover { isHubHovered = $0 }
         .onTapGesture {
             if openSubmenu != nil {
                 onBack?()
@@ -400,6 +422,7 @@ private struct RadialCanvasChip: View {
             chipIcon
         }
         .frame(width: 44, height: 44)
+        .animation(.easeOut(duration: 0.12), value: isHighlighted)
     }
 
     @ViewBuilder
