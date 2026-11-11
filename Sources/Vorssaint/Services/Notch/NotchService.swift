@@ -166,6 +166,7 @@ final class NotchService: ObservableObject {
     @Published private var captureContentHeight: CGFloat?
     /// Kept after closing, so the next Fan Control detail opens at its size.
     @Published private var fanDetailHeight: CGFloat?
+    private var measuredFanDetailHeight: CGFloat?
     @Published private(set) var power = PowerReading()
     @Published private var musicDetailVisible = false
 
@@ -1986,9 +1987,18 @@ final class NotchService: ObservableObject {
         guard expanded, selectedMetric == .fan, !showingAppPanel, !showingSections,
               height.isFinite, height > 0 else { return }
         let measured = ceil(height)
-        guard fanDetailHeight != measured else { return }
-        fanDetailHeight = measured
-        refreshPresentation()
+        if let current = measuredFanDetailHeight ?? fanDetailHeight, abs(current - measured) <= 0.5 { return }
+        let pendingFanHeight = measuredFanDetailHeight != nil
+        measuredFanDetailHeight = measured
+        guard !pendingFanHeight else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let measured = self.measuredFanDetailHeight else { return }
+            self.measuredFanDetailHeight = nil
+            guard self.expanded, self.selectedMetric == .fan, !self.showingAppPanel, !self.showingSections else { return }
+            if let current = self.fanDetailHeight, abs(current - measured) <= 0.5 { return }
+            self.fanDetailHeight = measured
+            self.refreshPresentation()
+        }
     }
 
     func goBack() {

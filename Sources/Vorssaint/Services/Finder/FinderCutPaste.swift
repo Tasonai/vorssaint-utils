@@ -59,10 +59,21 @@ final class FinderCutPaste: ObservableObject {
     /// pasteboard since, ⌘V is left as a normal paste.
     private var markedChangeCount = 0
 
+    private struct TapState {
+        var cutPasteEnabled = false
+        var pasteImageAsFileEnabled = false
+        var hasMarks = false
+        var markedChangeCount = 0
+        var moveInProgress = false
+        var imagePasteInProgress = false
+    }
+
     // An active keyboard tap makes the window server wait for its callback
     // before delivering the key. Keep that callback on a user-interactive
     // run loop so unrelated typing never queues behind the app's main thread.
     private let tapLifecycleLock = NSLock()
+    private let tapStateLock = NSLock()
+    private var tapState = TapState()
     private var tap: CFMachPort?
     private var tapRunLoop: CFRunLoop?
     private var tapThread: Thread?
@@ -120,7 +131,20 @@ final class FinderCutPaste: ObservableObject {
             removeAppObserver()
             clearMarks()
         }
+        syncTapState()
         refreshPanel()
+    }
+
+    private func syncTapState() {
+        let next = TapState(
+            cutPasteEnabled: cutPasteEnabled,
+            pasteImageAsFileEnabled: pasteImageAsFileEnabled,
+            hasMarks: !marked.isEmpty,
+            markedChangeCount: markedChangeCount,
+            moveInProgress: moveInProgress,
+            imagePasteInProgress: imagePasteInProgress
+        )
+        tapStateLock.withLock { tapState = next }
     }
 
     /// Force-stops the tap regardless of the preference. Used before the app
@@ -130,6 +154,7 @@ final class FinderCutPaste: ObservableObject {
         removeTap()
         removeAppObserver()
         clearMarks()
+        syncTapState()
     }
 
     private func installAppObserver() {
@@ -278,62 +303,75 @@ final class FinderCutPaste: ObservableObject {
               keyCode == Key.x || keyCode == Key.c || keyCode == Key.v
         else { return Unmanaged.passUnretained(event) }
 
-        var verdict: Unmanaged<CGEvent>?
-        DispatchQueue.main.sync {
-            verdict = self.handle(event: event)
-        }
-        return verdict
+        return handle(event: event, flags: flags, keyCode: keyCode)
     }
 
-    /// Runs on the main thread, so reading `marked` and the pasteboard here is
-    /// race-free.
-    private func handle(event: CGEvent) -> Unmanaged<CGEvent>? {
-        // Accessibility gone (e.g. reset): the AX focus check below would hang
-        // inside the tap and freeze the keyboard, so pass the keystroke through.
-        // Cached here to keep a live TCC round-trip off the per-keystroke path;
-        // the live check sits right before the AX focus lookup, where it runs
-        // only for an actual ⌘X/C/V in Finder.
-        guard Permissions.shared.accessibility else { return Unmanaged.passUnretained(event) }
-
-        let flags = event.flags
-        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-
-        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Self.finderBundleID,
+    /// Runs directly on the tap thread using `tapStateLock`, short per-element
+    /// AX timeouts, and metadata-only pasteboard inspection so neither a busy
+    /// main thread, a hung Finder, nor a remote Universal Clipboard item can
+    /// freeze keyboard input across macOS.
+    private func handle(event: CGEvent, flags: CGEventFlags, keyCode: Int64) -> Unmanaged<CGEvent>? {
+        guard let front = NSWorkspace.shared.frontmostApplication,
+              front.bundleIdentifier == Self.finderBundleID,
               AXIsProcessTrusted(),
-              !isEditingText()
+              !Self.isEditingText(finderPID: front.processIdentifier)
         else { return Unmanaged.passUnretained(event) }
+
+        let targetPID = front.processIdentifier
+        let snapshot = tapStateLock.withLock { tapState }
 
         switch keyCode {
         case Key.x:
-            guard cutPasteEnabled else { return Unmanaged.passUnretained(event) }
+            guard snapshot.cutPasteEnabled else { return Unmanaged.passUnretained(event) }
             // Finder has no native cut for files, so swallowing ⌘X is safe.
-            cutAsync()
+            DispatchQueue.main.async { [weak self] in self?.cutAsync() }
             return nil
         case Key.c:
             // Copying something else supersedes a pending cut; let Finder copy.
-            if cutPasteEnabled, !marked.isEmpty { clearMarks() }
+            if snapshot.cutPasteEnabled, snapshot.hasMarks {
+                tapStateLock.withLock {
+                    tapState.hasMarks = false
+                    tapState.markedChangeCount = 0
+                }
+                DispatchQueue.main.async { [weak self] in self?.clearMarks() }
+            }
             return Unmanaged.passUnretained(event)
         case Key.v:
-            if cutPasteEnabled, !marked.isEmpty {
-                if NSPasteboard.general.changeCount == markedChangeCount {
-                    guard !moveInProgress else { return nil }
-                    pasteAsync()
+            let currentChangeCount = NSPasteboard.general.changeCount
+            if snapshot.cutPasteEnabled, snapshot.hasMarks {
+                if currentChangeCount == snapshot.markedChangeCount {
+                    guard !snapshot.moveInProgress else { return nil }
+                    tapStateLock.withLock { tapState.moveInProgress = true }
+                    DispatchQueue.main.async { [weak self] in self?.pasteAsync() }
                     return nil
                 }
                 // Something else wrote to the pasteboard since the cut. Drop
                 // the marks, then let the image path below inspect that new
                 // content before falling back to Finder's normal paste.
-                clearMarks()
+                tapStateLock.withLock {
+                    tapState.hasMarks = false
+                    tapState.markedChangeCount = 0
+                }
+                DispatchQueue.main.async { [weak self] in self?.clearMarks() }
             }
-            guard pasteImageAsFileEnabled,
+            guard snapshot.pasteImageAsFileEnabled,
                   !flags.contains(.maskShift),
-                  !imagePasteInProgress,
-                  let targetPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+                  !snapshot.imagePasteInProgress
             else {
                 return Unmanaged.passUnretained(event)
             }
-            pasteImageAsync(targetPID: targetPID,
-                            expectedChangeCount: NSPasteboard.general.changeCount)
+            // Inspect only advertised UTI metadata (`types`) on the tap thread,
+            // never payload bytes, so Universal Clipboard / Handoff items never
+            // block key delivery over a remote Continuity transfer.
+            let identifiers = (NSPasteboard.general.types ?? []).map(\.rawValue)
+            guard FinderPasteImageSupport.preferredImageType(in: identifiers) != nil else {
+                return Unmanaged.passUnretained(event)
+            }
+            tapStateLock.withLock { tapState.imagePasteInProgress = true }
+            DispatchQueue.main.async { [weak self] in
+                self?.pasteImageAsync(targetPID: targetPID,
+                                      expectedChangeCount: currentChangeCount)
+            }
             return nil
         default:
             return Unmanaged.passUnretained(event)
@@ -347,6 +385,7 @@ final class FinderCutPaste: ObservableObject {
     /// back to Finder as the same standard paste shortcut.
     private func pasteImageAsync(targetPID: pid_t, expectedChangeCount: Int) {
         imagePasteInProgress = true
+        syncTapState()
         GeneralPasteboardAccess.shared.async { [weak self] in
             let pasteboard = NSPasteboard.general
             guard pasteboard.changeCount == expectedChangeCount else {
@@ -407,6 +446,7 @@ final class FinderCutPaste: ObservableObject {
 
     private func finishImagePaste(targetPID: pid_t, result: ImagePasteResult) {
         imagePasteInProgress = false
+        syncTapState()
         switch result {
         case .notImage:
             postNormalPaste(ifStillFrontmost: targetPID)
@@ -436,17 +476,20 @@ final class FinderCutPaste: ObservableObject {
 
     /// True when the keyboard focus is in an editable text control, so cut/copy/
     /// paste shortcuts must be left to the system (e.g. renaming a file).
-    private func isEditingText() -> Bool {
-        let system = AXUIElementCreateSystemWide()
-        // No cap here: on the system-wide element a timeout is the default for
-        // every question this process asks, whoever asks it (#938).
+    /// Queries Finder's own application element rather than the system-wide
+    /// element (#938) and enforces a 0.12 s timeout on both the app and focused
+    /// element so a hung Finder cannot stall keyboard input for 6 seconds.
+    private static func isEditingText(finderPID: pid_t) -> Bool {
+        let finderApp = AXUIElementCreateApplication(finderPID)
+        AXUIElementSetMessagingTimeout(finderApp, 0.12)
         var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(system, "AXFocusedUIElement" as CFString, &focused) == .success,
+        guard AXUIElementCopyAttributeValue(finderApp, "AXFocusedUIElement" as CFString, &focused) == .success,
               let focused,
               // Type-check before casting: this runs inside the event tap, so
               // an unexpected CF type must degrade gracefully, never crash.
               CFGetTypeID(focused) == AXUIElementGetTypeID() else { return false }
         let element = focused as! AXUIElement
+        AXUIElementSetMessagingTimeout(element, 0.12)
         var roleRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, "AXRole" as CFString, &roleRef) == .success,
               let role = roleRef as? String else { return false }
@@ -480,6 +523,7 @@ final class FinderCutPaste: ObservableObject {
         pb.writeObjects(urls as [NSURL])
         markedChangeCount = pb.changeCount
         lastResult = nil
+        syncTapState()
         refreshPanel()
     }
 
@@ -488,6 +532,7 @@ final class FinderCutPaste: ObservableObject {
     private func pasteAsync() {
         guard !moveInProgress else { return }
         moveInProgress = true
+        syncTapState()
         operationGeneration += 1
         let generation = operationGeneration
         let urls = marked.map(\.url)
@@ -633,6 +678,7 @@ final class FinderCutPaste: ObservableObject {
         if marked.isEmpty {
             markedChangeCount = 0
         }
+        syncTapState()
         guard moved > 0 || failed > 0 else {
             refreshPanel()
             return
@@ -711,6 +757,7 @@ final class FinderCutPaste: ObservableObject {
         if shouldClearPasteboard {
             NSPasteboard.general.clearContents()
         }
+        syncTapState()
         refreshPanel()
     }
 

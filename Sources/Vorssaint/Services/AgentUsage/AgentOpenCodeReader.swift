@@ -79,7 +79,7 @@ enum AgentOpenCodeReader {
         guard sqlite3_open_v2(cursor.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK else {
             return
         }
-        sqlite3_busy_timeout(db, 2000)
+        sqlite3_busy_timeout(db, 250)
 
         // OpenCode 1 keeps a session_message table of its own since 1.15,
         // so only the session_v2 table tells OpenCode 2 apart.

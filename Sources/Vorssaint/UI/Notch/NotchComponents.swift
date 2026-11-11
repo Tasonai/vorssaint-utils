@@ -414,9 +414,26 @@ extension EnvironmentValues {
 /// the row holds what the page needs at hand, and the island adds its own
 /// around them: the way back on its leading side, an update or the pin on
 /// its trailing side.
-struct NotchBandItems {
+struct NotchBandItems: Equatable {
     var leading: AnyView?
     var trailing: AnyView?
+    fileprivate var leadingStamp: UInt64 = 0
+    fileprivate var trailingStamp: UInt64 = 0
+
+    static func == (lhs: NotchBandItems, rhs: NotchBandItems) -> Bool {
+        lhs.leadingStamp == rhs.leadingStamp && lhs.trailingStamp == rhs.trailingStamp
+    }
+
+    private static let stampLock = NSLock()
+    private static var lastStamp: UInt64 = 0
+
+    fileprivate static func nextStamp() -> UInt64 {
+        stampLock.lock()
+        defer { stampLock.unlock() }
+        lastStamp &+= 1
+        if lastStamp == 0 { lastStamp = 1 }
+        return lastStamp
+    }
 }
 
 struct NotchBandKey: PreferenceKey {
@@ -424,8 +441,14 @@ struct NotchBandKey: PreferenceKey {
 
     static func reduce(value: inout NotchBandItems, nextValue: () -> NotchBandItems) {
         let next = nextValue()
-        if let leading = next.leading { value.leading = leading }
-        if let trailing = next.trailing { value.trailing = trailing }
+        if let leading = next.leading {
+            value.leading = leading
+            value.leadingStamp = next.leadingStamp
+        }
+        if let trailing = next.trailing {
+            value.trailing = trailing
+            value.trailingStamp = next.trailingStamp
+        }
     }
 }
 
@@ -437,17 +460,31 @@ extension View {
     func notchBand<Leading: View, Trailing: View>(@ViewBuilder leading: () -> Leading,
                                                   @ViewBuilder trailing: () -> Trailing) -> some View {
         let leading = AnyView(leading()), trailing = AnyView(trailing())
-        return transformPreference(NotchBandKey.self) { $0.leading = leading; $0.trailing = trailing }
+        let leadingStamp = NotchBandItems.nextStamp(), trailingStamp = NotchBandItems.nextStamp()
+        return transformPreference(NotchBandKey.self) {
+            $0.leading = leading
+            $0.leadingStamp = leadingStamp
+            $0.trailing = trailing
+            $0.trailingStamp = trailingStamp
+        }
     }
 
     func notchBand<Leading: View>(@ViewBuilder leading: () -> Leading) -> some View {
         let leading = AnyView(leading())
-        return transformPreference(NotchBandKey.self) { $0.leading = leading }
+        let leadingStamp = NotchBandItems.nextStamp()
+        return transformPreference(NotchBandKey.self) {
+            $0.leading = leading
+            $0.leadingStamp = leadingStamp
+        }
     }
 
     func notchBand<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
         let trailing = AnyView(trailing())
-        return transformPreference(NotchBandKey.self) { $0.trailing = trailing }
+        let trailingStamp = NotchBandItems.nextStamp()
+        return transformPreference(NotchBandKey.self) {
+            $0.trailing = trailing
+            $0.trailingStamp = trailingStamp
+        }
     }
 }
 

@@ -20,7 +20,7 @@ struct ClipboardHistoryWriteResult {
 
 enum ClipboardHistoryWrite {
     case text(String)
-    case image(png: Data, tiff: Data?)
+    case image(png: Data, tiff: Data? = nil)
     case files([NSURL])
     case rich(NSAttributedString, plain: String)
 

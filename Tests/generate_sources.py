@@ -130,6 +130,7 @@ def main():
           + "extension RecorderSystemAudioTrustTests {\n"
           + declaration(tap, "final class RecorderAudioFlag {")
           + declaration(tap, "final class RecorderAudioHostTime {")
+          + declaration(tap, "final class RecorderAudioSampleRing:")
           + declaration(tap, "enum RecorderAudioProbe {")
           + "final class Session: Fixture {\n"
           + declaration(recorder, "    private func streamHeardSound(against").replace("private func", "func", 1)
@@ -2479,6 +2480,12 @@ def main():
           + "extension AgentUsageArchiveSettleTests {\nfinal class Host: Fixture {\n"
           + declaration("Sources/Vorssaint/Services/AgentUsage/AgentUsageService.swift",
                         "    private func settleArchive(").replace("private func", "func", 1)
+          + "}\n}\n"
+          + "extension AgentUsageStopTests {\nfinal class Host: Fixture {\n"
+          + declaration("Sources/Vorssaint/Services/AgentUsage/AgentUsageService.swift",
+                        "    func stop(")
+          + declaration("Sources/Vorssaint/Services/AgentUsage/AgentUsageService.swift",
+                        "    func flushForTesting(")
           + "}\n}\n")
 
     write("AgentUsageRead.swift", "import Foundation\n"
@@ -2502,6 +2509,12 @@ def main():
           + "extension AgentUsagePollingTests {\nfinal class Host: Fixture {\n"
           + declaration("Sources/Vorssaint/Services/AgentUsage/AgentUsageService.swift",
                         "    private func syncPolling(").replace("private func", "func", 1)
+          + "}\n}\n"
+          + "extension NotchPrivacyMuteContract {\nfinal class Host: Fixture {\n"
+          + declaration("Sources/Vorssaint/Services/Notch/CameraMicrophonePrivacyMonitor.swift",
+                        "    func toggleMicrophoneMute()")
+          + declaration("Sources/Vorssaint/Services/Notch/CameraMicrophonePrivacyMonitor.swift",
+                        "    private func reconcileMutedStateOnMain(").replace("private func", "func", 1)
           + "}\n}\n")
 
     # Same-file extensions exercise private routing and AppKit content without

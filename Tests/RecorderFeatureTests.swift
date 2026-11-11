@@ -255,6 +255,45 @@ enum RecorderFeatureTests {
                           "a restored peak past full scale is limited instead of clipping the file")
         suite.expectClose(Double(restored[2] / restored[3]), 0.05 / 0.6,
                           "both channels of a limited frame come down together")
+
+        // Real-time SPSC audio ring contract: wraparound, multi-chunk splitting,
+        // non-blocking overflow drop, and zero CMSampleBuffer allocation in ioProc.
+        let ring = RecorderSystemAudioTrustTests.RecorderAudioSampleRing(slotCount: 4, maxFramesPerSlot: 4, channels: 2)
+        for batch in 0..<6 {
+            let samples: [Float] = [Float(batch) + 0.25, Float(batch) + 0.5, Float(batch) + 0.75, Float(batch) + 1.0]
+            let pushed = samples.withUnsafeBytes { raw in
+                ring.push(samples: raw.baseAddress!, byteCount: raw.count, channels: 2,
+                          inputHostTime: UInt64(1000 + batch), hasInputHostTime: true, nowHostTime: UInt64(2000 + batch))
+            }
+            if batch < 5 {
+                suite.expect(pushed, "SPSC audio ring accepts pre-allocated slot \(batch)")
+            } else {
+                suite.expect(!pushed, "SPSC audio ring drops excess frames without blocking when full")
+            }
+            if batch == 1 {
+                var drained: [Float] = []
+                var hostTime: UInt64 = 0
+                let didDrain = ring.drainOne { ptr, count, inHost, hasHost, _ in
+                    drained = Array(UnsafeBufferPointer(start: ptr, count: count))
+                    hostTime = hasHost ? inHost : 0
+                }
+                suite.expect(didDrain && drained == [0.25, 0.5, 0.75, 1.0] && hostTime == 1000,
+                             "SPSC audio ring drains FIFO samples and host time intact before wraparound")
+            }
+        }
+        var drainedBatches = 0
+        while ring.drainOne({ _, count, _, _, _ in
+            if count == 4 { drainedBatches += 1 }
+        }) {}
+        suite.expect(drainedBatches == 4, "SPSC audio ring wraps indices cleanly across slot boundaries")
+
+        let ioProcBody = systemAudioTapSource.components(separatedBy: "AudioDeviceCreateIOProcIDWithBlock(&ioProc, aggregateID, nil) {")
+            .dropFirst().first?.components(separatedBy: "\n        }\n").first ?? ""
+        suite.expect(!ioProcBody.contains("Self.sampleBuffer(")
+                         && !ioProcBody.contains("CMSampleBuffer")
+                         && ioProcBody.contains("ring.push(")
+                         && ioProcBody.contains("source.add(data: 1)"),
+                     "HALB_IOThread ioProc pushes raw samples to the pre-allocated ring and signals DispatchSourceUserDataAdd without CMSampleBuffer allocation")
         var pauseTimeline = RecorderPauseTimeline()
         suite.expect(pauseTimeline.pause(at: 3) && !pauseTimeline.pause(at: 4),
                "a recording enters one pause only once")

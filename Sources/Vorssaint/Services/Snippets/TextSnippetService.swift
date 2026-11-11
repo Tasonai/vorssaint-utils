@@ -26,10 +26,12 @@ final class TextSnippetService {
     private var shouldStopTapThread = false
     private var pendingTapRestart = false
     private var activationObserver: NSObjectProtocol?
+    private var windowKeyObservers: [NSObjectProtocol] = []
     private let inputLock = NSLock()
     private var buffer = ""
     private var libraryVisible = false
     private var commandBarVisible = false
+    private var ownKeyWindowActive = false
     /// Registered once when the preferences change, so no expansion pays
     /// for the file read. nil means no sound plays.
     private var expansionSound: AlertSound?
@@ -57,9 +59,13 @@ final class TextSnippetService {
             let libraryIsVisible = SnippetLibraryService.shared.isVisible
             let commandBarIsVisible = AppFeature.commandBar.isAvailable
                 && CommandBarService.shared.isVisible
+            let ownKeyActive = Thread.isMainThread
+                ? MainActor.assumeIsolated { NSApp?.keyWindow != nil }
+                : false
             inputLock.withLock {
                 libraryVisible = libraryIsVisible
                 commandBarVisible = commandBarIsVisible
+                ownKeyWindowActive = ownKeyActive
             }
             start()
         } else {
@@ -168,6 +174,10 @@ final class TextSnippetService {
             NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
             self.activationObserver = nil
         }
+        for observer in windowKeyObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        windowKeyObservers.removeAll()
         resetBuffer()
     }
 
@@ -255,6 +265,18 @@ final class TextSnippetService {
                 return
             }
             self?.resetBuffer()
+        }
+        if windowKeyObservers.isEmpty {
+            let syncOwnKeyWindow: (Notification) -> Void = { [weak self] _ in
+                let activeKey = MainActor.assumeIsolated { NSApp?.keyWindow != nil }
+                self?.inputLock.withLock { self?.ownKeyWindowActive = activeKey }
+            }
+            windowKeyObservers = [
+                NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification,
+                                                       object: nil, queue: .main, using: syncOwnKeyWindow),
+                NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification,
+                                                       object: nil, queue: .main, using: syncOwnKeyWindow),
+            ]
         }
     }
 
@@ -395,30 +417,71 @@ final class TextSnippetService {
                         failureKeyCode: CGKeyCode?,
                         failureFlags: CGEventFlags = []) -> Bool {
         let didExpand = expansionSoundCue()
-        let post = { () -> Bool in
-            // Variable expansion is decided while the triggering event still
-            // belongs to this callback. Only an explicit clipboard variable
-            // pays for a synchronous read; the multiline write itself runs on
-            // the shared pasteboard lane.
-            let clipboard = TextSnippetSupport.needsClipboard(snippet.replacement)
-                ? NSPasteboard.general.string(forType: .string)
-                : nil
-            let text = TextSnippetSupport.expand(
-                snippet.replacement,
-                date: Date(),
-                clipboard: clipboard
-            )
-            return Self.postExpansion(deleteCount: deleteCount,
-                                      typedTrigger: typedTrigger,
-                                      text: text,
-                                      trailingKeyCode: trailingKeyCode,
-                                      trailingFlags: trailingFlags,
-                                      trailingText: trailingText,
-                                      failureKeyCode: failureKeyCode,
-                                      failureFlags: failureFlags,
-                                      didExpand: didExpand)
+        let replaySwallowedKey = {
+            guard let failureKeyCode else { return }
+            let source = CGEventSource(stateID: .hidSystemState)
+            source?.userData = Self.syntheticMarker
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: source, virtualKey: failureKeyCode, keyDown: down)
+                event?.flags = failureFlags
+                event?.post(tap: .cghidEventTap)
+            }
         }
-        return Thread.isMainThread ? post() : DispatchQueue.main.sync(execute: post)
+        let needsClip = TextSnippetSupport.needsClipboard(snippet.replacement)
+        let remoteType = NSPasteboard.PasteboardType("com.apple.is-remote-clipboard")
+        if !Thread.isMainThread, needsClip, (NSPasteboard.general.types ?? []).contains(remoteType) {
+            // Remote Universal Clipboard payloads can stall for seconds over
+            // Continuity; resolve on the pasteboard lane off the tap thread.
+            GeneralPasteboardAccess.shared.async({
+                NSPasteboard.general.string(forType: .string)
+            }, then: { clipboard in
+                let text = TextSnippetSupport.expand(snippet.replacement, date: Date(), clipboard: clipboard)
+                let posted = Self.postExpansion(deleteCount: deleteCount,
+                                                typedTrigger: typedTrigger,
+                                                text: text,
+                                                trailingKeyCode: trailingKeyCode,
+                                                trailingFlags: trailingFlags,
+                                                trailingText: trailingText,
+                                                failureKeyCode: failureKeyCode,
+                                                failureFlags: failureFlags,
+                                                didExpand: didExpand)
+                if !posted { replaySwallowedKey() }
+            })
+            return true
+        }
+
+        let clipboard = needsClip ? NSPasteboard.general.string(forType: .string) : nil
+        let text = TextSnippetSupport.expand(
+            snippet.replacement,
+            date: Date(),
+            clipboard: clipboard
+        )
+        if !Thread.isMainThread, TextSnippetSupport.requiresPaste(text) {
+            // TransientPaste runs on main and dispatches to the pasteboard lane;
+            // queue asynchronously so the event tap never blocks on main.sync.
+            DispatchQueue.main.async {
+                let posted = Self.postExpansion(deleteCount: deleteCount,
+                                                typedTrigger: typedTrigger,
+                                                text: text,
+                                                trailingKeyCode: trailingKeyCode,
+                                                trailingFlags: trailingFlags,
+                                                trailingText: trailingText,
+                                                failureKeyCode: failureKeyCode,
+                                                failureFlags: failureFlags,
+                                                didExpand: didExpand)
+                if !posted { replaySwallowedKey() }
+            }
+            return true
+        }
+        return Self.postExpansion(deleteCount: deleteCount,
+                                  typedTrigger: typedTrigger,
+                                  text: text,
+                                  trailingKeyCode: trailingKeyCode,
+                                  trailingFlags: trailingFlags,
+                                  trailingText: trailingText,
+                                  failureKeyCode: failureKeyCode,
+                                  failureFlags: failureFlags,
+                                  didExpand: didExpand)
     }
 
     /// Hung off the replacement going out rather than off `postExpansion`'s
@@ -447,8 +510,10 @@ final class TextSnippetService {
     /// expansion paths post their backspaces; anywhere else counts as ours,
     /// so no other app is asked.
     private static var ownWindowIsKey: Bool {
-        guard Thread.isMainThread else { return true }
-        return MainActor.assumeIsolated { NSApp.keyWindow != nil }
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated { NSApp?.keyWindow != nil }
+        }
+        return shared.inputLock.withLock { shared.ownKeyWindowActive }
     }
 
     /// Also the snippet library's insertion path (deleteCount 0): one typing
@@ -486,7 +551,7 @@ final class TextSnippetService {
             guard deleteCount > 0 else { return }
             let app = ownWindowIsKey ? nil : NSWorkspace.shared.frontmostApplication
             let selection = app.flatMap {
-                SelectedTextReader.focusedTextSelection(processID: $0.processIdentifier, timeout: 0.15)
+                SelectedTextReader.focusedTextSelection(processID: $0.processIdentifier, timeout: 0.12)
             }
             let count = TextSnippetSupport.triggerDeleteCount(
                 deleteCount, typed: typedTrigger,

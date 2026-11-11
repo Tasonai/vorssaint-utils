@@ -3,6 +3,7 @@
 
 import AppKit
 import AVFoundation
+import Combine
 import CoreAudio
 import Foundation
 
@@ -16,7 +17,7 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
     @Published private(set) var isMicrophoneActive: Bool = false
     @Published private(set) var activeCameraName: String? = nil
     @Published private(set) var activeMicrophoneName: String? = nil
-    @Published private(set) var isMicrophoneMuted: Bool = MicMuteService.shared.isMuted
+    @Published private(set) var isMicrophoneMuted: Bool = false
 
     var isAnyActive: Bool {
         isCameraActive || isMicrophoneActive
@@ -26,6 +27,9 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
     private var pollTimer: Timer?
     private var registeredDeviceIDs = Set<AudioDeviceID>()
     private var notificationObservers: [NSObjectProtocol] = []
+    private var cancellables = Set<AnyCancellable>()
+    private var pendingMuteTarget: (muted: Bool, expiresAt: TimeInterval)?
+    private var muteReconcileWork: DispatchWorkItem?
     private var isEvaluating = false
     private var pendingEvaluation = false
 
@@ -44,8 +48,18 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
             self?.evaluate()
         }
         DispatchQueue.main.async { [weak self] in
-            self?.pollTimer?.invalidate()
-            self?.pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.cancellables.removeAll()
+            self.isMicrophoneMuted = MicMuteService.shared.isMuted
+            MicMuteService.shared.$isMuted
+                .dropFirst()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] muted in
+                    self?.reconcileMutedStateOnMain(muted, fromPublisher: true)
+                }
+                .store(in: &self.cancellables)
+            self.pollTimer?.invalidate()
+            self.pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
                 self?.halQueue.async {
                     self?.evaluate()
                 }
@@ -56,6 +70,10 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
     func stop() {
         pollTimer?.invalidate()
         pollTimer = nil
+        cancellables.removeAll()
+        muteReconcileWork?.cancel()
+        muteReconcileWork = nil
+        pendingMuteTarget = nil
         for observer in notificationObservers {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -66,9 +84,46 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
     }
 
     func toggleMicrophoneMute() {
-        MicMuteService.shared.toggle()
-        DispatchQueue.main.async { [weak self] in
-            self?.isMicrophoneMuted = MicMuteService.shared.isMuted
+        let applyToggle = { [weak self] in
+            guard let self else { return }
+            let target = !(self.pendingMuteTarget?.muted ?? self.isMicrophoneMuted)
+            self.pendingMuteTarget = (muted: target, expiresAt: ProcessInfo.processInfo.systemUptime + 1.0)
+            if self.isMicrophoneMuted != target {
+                self.isMicrophoneMuted = target
+            }
+            self.muteReconcileWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.pendingMuteTarget = nil
+                let actual = MicMuteService.shared.isMuted
+                if self.isMicrophoneMuted != actual {
+                    self.isMicrophoneMuted = actual
+                }
+            }
+            self.muteReconcileWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
+            MicMuteService.shared.toggle()
+        }
+        if Thread.isMainThread {
+            applyToggle()
+        } else {
+            DispatchQueue.main.async(execute: applyToggle)
+        }
+    }
+
+    private func reconcileMutedStateOnMain(_ reportedMuted: Bool, fromPublisher: Bool) {
+        if let pending = pendingMuteTarget {
+            if reportedMuted == pending.muted || fromPublisher || ProcessInfo.processInfo.systemUptime >= pending.expiresAt {
+                pendingMuteTarget = nil
+                muteReconcileWork?.cancel()
+                muteReconcileWork = nil
+            } else {
+                // Ignore stale pre-sweep poll reads while MicMuteService.toggle() is in flight.
+                return
+            }
+        }
+        if isMicrophoneMuted != reportedMuted {
+            isMicrophoneMuted = reportedMuted
         }
     }
 
@@ -208,12 +263,15 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
         }
         isEvaluating = true
 
+        // Only thread-safe CoreAudio HAL and AVCaptureDevice discovery queries run
+        // on `halQueue`. Main-thread `@Published` state on `CameraPreviewService`
+        // and `MicMuteService` is read exclusively on the main queue below.
         let micState = checkMicrophoneInUse()
-        let camState = checkCameraInUse()
-        let micMuted = MicMuteService.shared.isMuted
+        let externalCamState = checkExternalCameraInUse()
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            let camState = Self.internalCameraInUseOnMain() ?? externalCamState
             if self.isMicrophoneActive != micState.isActive || self.activeMicrophoneName != micState.name {
                 self.isMicrophoneActive = micState.isActive
                 self.activeMicrophoneName = micState.name
@@ -222,9 +280,7 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
                 self.isCameraActive = camState.isActive
                 self.activeCameraName = camState.name
             }
-            if self.isMicrophoneMuted != micMuted {
-                self.isMicrophoneMuted = micMuted
-            }
+            self.reconcileMutedStateOnMain(MicMuteService.shared.isMuted, fromPublisher: false)
         }
 
         isEvaluating = false
@@ -236,15 +292,15 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
         }
     }
 
-    private func checkCameraInUse() -> (isActive: Bool, name: String?) {
-        // Check Vorssaint internal camera preview first
-        if let session = CameraPreviewService.shared.session, session.isRunning {
-            let selectedID = CameraPreviewService.shared.selectedDeviceID
-            let device = CameraPreviewService.shared.devices.first { $0.uniqueID == selectedID }
-            let name = device?.localizedName ?? "FaceTime HD Camera"
-            return (true, name)
-        }
+    private static func internalCameraInUseOnMain() -> (isActive: Bool, name: String?)? {
+        guard let session = CameraPreviewService.shared.session, session.isRunning else { return nil }
+        let selectedID = CameraPreviewService.shared.selectedDeviceID
+        let device = CameraPreviewService.shared.devices.first { $0.uniqueID == selectedID }
+        let name = device?.localizedName ?? "FaceTime HD Camera"
+        return (true, name)
+    }
 
+    private func checkExternalCameraInUse() -> (isActive: Bool, name: String?) {
         // Check system camera devices used by other applications
         let session = AVCaptureDevice.DiscoverySession(
             deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera],

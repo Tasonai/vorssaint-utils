@@ -393,6 +393,8 @@ enum NotchCompactTests {
             suite.expect(false, "the embedded scratchpad creates its native editor")
             return
         }
+        suite.expect(editor.textLayoutManager == nil && editor.layoutManager != nil,
+                     "PlainTextEditor explicitly constructs a TextKit 1 stack without NSTextLayoutManager")
         for preview in [true, false] {
             pad.isPreviewing = preview
             settle(host)
@@ -544,6 +546,17 @@ enum NotchCompactTests {
         // equal, so only the inputs can tell that nothing changed.
         let coordinator = MarkdownPreview.Coordinator()
         let view = TaskPreviewTextView(frame: NSRect(x: 0, y: 0, width: 240, height: 120))
+        suite.expect(view.textLayoutManager == nil && view.layoutManager != nil && view.textStorage != nil,
+                     "TaskPreviewTextView explicitly builds a TextKit 1 stack without NSTextLayoutManager")
+        let explicitContainer = NSTextContainer(containerSize: NSSize(width: 120, height: 400))
+        let explicitLayout = NSLayoutManager()
+        let explicitStorage = NSTextStorage()
+        explicitStorage.addLayoutManager(explicitLayout)
+        explicitLayout.addTextContainer(explicitContainer)
+        let explicitView = TaskPreviewTextView(frame: NSRect(x: 0, y: 0, width: 120, height: 80),
+                                               textContainer: explicitContainer)
+        suite.expect(explicitView.textLayoutManager == nil && explicitView.layoutManager === explicitLayout,
+                     "TaskPreviewTextView(frame:textContainer:) preserves an explicit TextKit 1 container")
         var renders = 0
         let observer = NotificationCenter.default.addObserver(
             forName: NSTextStorage.didProcessEditingNotification, object: view.textStorage, queue: nil) { _ in

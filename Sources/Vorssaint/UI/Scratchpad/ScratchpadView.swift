@@ -926,12 +926,40 @@ final class TaskBoxAttachment: NSTextAttachment {
 /// pointer over one becomes a hand, as over any button of the island.
 final class TaskPreviewTextView: NSTextView {
     var onToggleTask: ((Int) -> Void)?
+    private let ownedTextStorage: NSTextStorage?
     private var pointerArea: NSTrackingArea?
     /// Kept while their boxes stay, so the one VoiceOver is on lives on.
     private var boxElements: [Int: BoxElement] = [:]
     /// A link element of the text view asks the view for its children to
     /// answer its own attributes, so that inner call gets the plain list.
     private var listingChildren = false
+
+    override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+        if let container {
+            self.ownedTextStorage = nil
+            super.init(frame: frameRect, textContainer: container)
+        } else {
+            let textStorage = NSTextStorage()
+            let layoutManager = NSLayoutManager()
+            textStorage.addLayoutManager(layoutManager)
+            let textContainer = NSTextContainer(
+                containerSize: NSSize(width: frameRect.width, height: CGFloat.greatestFiniteMagnitude)
+            )
+            textContainer.widthTracksTextView = true
+            layoutManager.addTextContainer(textContainer)
+            self.ownedTextStorage = textStorage
+            super.init(frame: frameRect, textContainer: textContainer)
+        }
+    }
+
+    convenience override init(frame frameRect: NSRect) {
+        self.init(frame: frameRect, textContainer: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        self.ownedTextStorage = nil
+        super.init(coder: coder)
+    }
 
     /// A task's checkbox as VoiceOver meets it: named by its task, valued by
     /// whether it is done, and pressed as a click on it is.

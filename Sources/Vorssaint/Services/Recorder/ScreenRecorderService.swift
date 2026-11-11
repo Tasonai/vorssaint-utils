@@ -96,6 +96,7 @@ private final class RecorderSession: NSObject, RecorderCaptureEngineDelegate {
         // stream's sound is written until the tap has proven itself.
         writesTapAudio = tap != nil
             && UserDefaults.standard.bool(forKey: DefaultsKey.recorderSystemAudioTapVerified)
+        tap?.consumerQueue = writerQueue
         tap?.onSample = { [weak self] sampleBuffer in
             self?.appendTapSample(sampleBuffer)
         }
@@ -249,8 +250,11 @@ private final class RecorderSession: NSObject, RecorderCaptureEngineDelegate {
     }
 
     private func appendTapSample(_ sampleBuffer: CMSampleBuffer) {
+        // `RecorderSystemAudioTap` already drains its SPSC ring onto `writerQueue`
+        // via a coalescing `DispatchSourceUserDataAdd`, so write in place without
+        // allocating a per-buffer `writerQueue.async` closure.
         guard writesTapAudio, !tapReaderLost.value else { return }
-        append(sampleBuffer, kind: .systemAudio)
+        writer.append(sampleBuffer, kind: .systemAudio)
     }
 
     func captureEngine(_ engine: RecorderCaptureEngine, didStopWith failure: RecorderFailure) {

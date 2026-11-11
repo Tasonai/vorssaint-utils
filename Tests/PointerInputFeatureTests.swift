@@ -3862,6 +3862,8 @@ enum PointerInputFeatureTests {
                    "\(pointerTapOwner) serves its tap on the pointer thread")
             suite.expect(!code.contains("CFRunLoopGetMain()"),
                    "\(pointerTapOwner) keeps its tap off the main run loop")
+            suite.expect(!code.contains("Thread.sleep("),
+                   "\(pointerTapOwner) never sleeps synchronously on the shared pointer tap run loop")
         }
 
         let mouseTapAppDelegateSource = (try? String(

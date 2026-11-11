@@ -44,5 +44,56 @@ enum NotchPrivacyTests {
                      "Vorssaint Island Levels is recognized as own device")
         suite.expect(!MicMuteSupport.isOwnDevice(name: "MacBook Pro Microphone"),
                      "Hardware microphone is recognized as external device")
+
+        let evaluateBody = monitorSource.components(separatedBy: "    private func evaluate() {").dropFirst().first?
+            .components(separatedBy: "        DispatchQueue.main.async").first ?? ""
+        suite.expect(!evaluateBody.contains("CameraPreviewService.shared")
+                         && !evaluateBody.contains("MicMuteService.shared"),
+                     "CameraMicrophonePrivacyMonitor never reads main-thread @Published singletons on halQueue")
+
+        NotchPrivacyMuteContract.run(suite)
+    }
+}
+
+enum NotchPrivacyMuteContract {
+    final class MicMuteService {
+        static let shared = MicMuteService()
+        var isMuted = false
+        var toggles = 0
+        func toggle() { toggles += 1 }
+    }
+
+    class Fixture {
+        var isMicrophoneMuted = false
+        var pendingMuteTarget: (muted: Bool, expiresAt: TimeInterval)?
+        var muteReconcileWork: DispatchWorkItem?
+    }
+
+    static func run(_ suite: TestSuite) {
+        defer {
+            MicMuteService.shared.isMuted = false
+            MicMuteService.shared.toggles = 0
+        }
+        let host = Host()
+        host.toggleMicrophoneMute()
+        suite.expect(host.isMicrophoneMuted == true && MicMuteService.shared.toggles == 1,
+                     "toggleMicrophoneMute immediately reflects target mute state while async HAL sweep starts")
+
+        // Simulate a periodic HAL poll arriving before MicMuteService's async sweep finishes:
+        host.reconcileMutedStateOnMain(false, fromPublisher: false)
+        suite.expect(host.isMicrophoneMuted == true,
+                     "stale pre-toggle poll read does not overwrite in-flight mute toggle")
+
+        // Simulate MicMuteService.$isMuted publishing completion of the sweep:
+        MicMuteService.shared.isMuted = true
+        host.reconcileMutedStateOnMain(true, fromPublisher: true)
+        suite.expect(host.isMicrophoneMuted == true && host.pendingMuteTarget == nil,
+                     "publisher emission clears pending target and keeps settled mute state")
+
+        // Toggling again unmutes cleanly without inversion:
+        host.toggleMicrophoneMute()
+        suite.expect(host.isMicrophoneMuted == false && MicMuteService.shared.toggles == 2,
+                     "second toggleMicrophoneMute transitions cleanly back to unmuted")
+        host.muteReconcileWork?.cancel()
     }
 }

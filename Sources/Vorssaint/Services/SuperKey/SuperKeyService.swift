@@ -469,7 +469,12 @@ final class SuperKeyService: ObservableObject {
             }
         }
         if synchronously {
-            mappingQueue.sync(execute: work)
+            let done = DispatchSemaphore(value: 0)
+            mappingQueue.async {
+                work()
+                done.signal()
+            }
+            _ = done.wait(timeout: .now() + 0.5)
         } else {
             mappingQueue.async(execute: work)
         }
@@ -857,13 +862,13 @@ final class SuperKeyService: ObservableObject {
             else { return }
             _ = TISSelectInputSource(next)
         }
-        // TIS talks to the text-input server from the main thread. sync (not
-        // async) keeps the switch ahead of the next keystroke this tap is
-        // about to let through.
+        // TIS talks to the text-input server from the main thread. Dispatch
+        // asynchronously when called from the event tap thread so a busy main
+        // thread (or concurrent suspend()) can never deadlock keyboard/mouse input.
         if Thread.isMainThread {
             apply()
         } else {
-            DispatchQueue.main.sync(execute: apply)
+            DispatchQueue.main.async(execute: apply)
         }
     }
 

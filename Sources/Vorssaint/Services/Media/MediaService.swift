@@ -347,7 +347,11 @@ final class MediaService: ObservableObject {
         let logLock = NSLock()
         pipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
-            guard !data.isEmpty, let chunk = String(data: data, encoding: .utf8) else { return }
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+                return
+            }
+            guard let chunk = String(data: data, encoding: .utf8) else { return }
             logLock.lock()
             log.append(chunk)
             if log.count > 8_000 { log.removeFirst(log.count - 8_000) }

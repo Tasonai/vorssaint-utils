@@ -200,13 +200,14 @@ final class FinderRenameService {
 
     private func focusedRole(for pid: pid_t) -> String? {
         let app = AXUIElementCreateApplication(pid)
-        AXUIElementSetMessagingTimeout(app, 0.15)
+        AXUIElementSetMessagingTimeout(app, 0.12)
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString,
                                             &focused) == .success,
               let focused, CFGetTypeID(focused) == AXUIElementGetTypeID()
         else { return nil }
         let element = focused as! AXUIElement
+        AXUIElementSetMessagingTimeout(element, 0.12)
         var role: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString,
                                             &role) == .success,

@@ -726,6 +726,7 @@ final class HomebrewManager: ObservableObject {
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let chunk = handle.availableData
                 guard !chunk.isEmpty else {
+                    handle.readabilityHandler = nil
                     drained.signal()
                     return
                 }
@@ -770,6 +771,7 @@ final class HomebrewManager: ObservableObject {
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
                 guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
                     drained.signal()
                     return
                 }

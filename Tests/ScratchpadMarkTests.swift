@@ -161,6 +161,22 @@ enum ScratchpadMarkTests {
         let blankKept = applying(.bullet, to: "one\n\ntwo", NSRange(location: 0, length: 8))
         expect(blankKept.text == "- one\n\n- two", "blank lines stay blank, got \(blankKept.text)")
 
+        // CRLF (\r\n) is a single Swift Character grapheme cluster; line-prefix
+        // edits must still detect and preserve \r\n without marking blank lines
+        // or leaving stray \r characters on edited lines.
+        let crlfSingle = applying(.heading, to: "Title\r\nNext", NSRange(location: 2, length: 0))
+        expect(crlfSingle.text == "# Title\r\nNext" && crlfSingle.selection == NSRange(location: 4, length: 0),
+               "heading preserves CRLF on a single line, got \(crlfSingle.text.debugDescription)")
+        let crlfBlank = clicking(.heading, 4, from: "\r\n", NSRange(location: 0, length: 0))
+        expect(crlfBlank == "\r\n",
+               "heading cycles cleanly on an empty CRLF line, got \(crlfBlank.debugDescription)")
+        let crlfMulti = applying(.bullet, to: "one\r\n\r\ntwo\r\n", NSRange(location: 0, length: 12))
+        expect(crlfMulti.text == "- one\r\n\r\n- two\r\n",
+               "bullets preserve CRLF and skip blank CRLF lines, got \(crlfMulti.text.debugDescription)")
+        let crlfUnbulleted = applying(.bullet, to: crlfMulti.text, crlfMulti.selection)
+        expect(crlfUnbulleted.text == "one\r\n\r\ntwo\r\n",
+               "toggling bullets off on CRLF text restores the original CRLF lines, got \(crlfUnbulleted.text.debugDescription)")
+
         // Selections arrive in UTF-16 units from the text view. Reading them as
         // Characters would put the markers inside the emoji.
         let afterEmoji = applying(.bold, to: "🙂ab", NSRange(location: 2, length: 2))

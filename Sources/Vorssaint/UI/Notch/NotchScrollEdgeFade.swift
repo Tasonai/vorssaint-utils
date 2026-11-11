@@ -22,8 +22,11 @@ struct NotchScrollEdgeFade: ViewModifier {
                     let total = axis == .vertical ? geometry.contentSize.height : geometry.contentSize.width
                     return Edges(start: offset > 1, end: offset + visible < total - 1)
                 } action: { _, edges in
-                    beyondStart = edges.start
-                    beyondEnd = edges.end
+                    guard beyondStart != edges.start || beyondEnd != edges.end else { return }
+                    DispatchQueue.main.async {
+                        if beyondStart != edges.start { beyondStart = edges.start }
+                        if beyondEnd != edges.end { beyondEnd = edges.end }
+                    }
                 }
                 .mask { fadeMask }
         } else {

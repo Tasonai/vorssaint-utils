@@ -1410,6 +1410,27 @@ enum MixerFeatureTests {
         suite.expect(fallbackLimited.allSatisfy { abs($0) <= BoostLimiter.ceiling + 0.0001 },
                "an unreadable sample rate still limits at the common device rate")
 
+        // Non-finite samples (NaN / ±Infinity) from a misbehaving audio app must
+        // be silenced without poisoning the limiter's envelope or gain state.
+        var poisonedLimiter = BoostLimiter()
+        let poisonedOut = limited([0.25, .nan, .infinity, -.infinity, 0.25], with: &poisonedLimiter)
+        let recoveredTone = limited(sine(amplitude: 0.5, frames: 480), with: &poisonedLimiter)
+        suite.expect(poisonedOut.allSatisfy(\.isFinite)
+                && poisonedOut[1] == 0 && poisonedOut[2] == 0 && poisonedOut[3] == 0
+                && abs(poisonedOut[4] - 0.25) < 0.0001
+                && recoveredTone == sine(amplitude: 0.5, frames: 480),
+               "BoostLimiter sanitizes NaN and ±Infinity inputs without poisoning subsequent audio")
+
+        let poisonedLookahead = BoostLookaheadLimiter(channels: 1)
+        var lookaheadPoison: [Float] = [.nan, .infinity, -.infinity] + sine(amplitude: 0.5, frames: 600)
+        _ = lookaheadPoison.withUnsafeMutableBufferPointer { buffer in
+            poisonedLookahead.process(buffer.baseAddress!, frames: buffer.count, channels: 1,
+                                      release: BoostLimiter.release(sampleRate: 48_000))
+        }
+        suite.expect(lookaheadPoison.allSatisfy(\.isFinite)
+                && lookaheadPoison.suffix(200).max()! > 0.49,
+               "BoostLookaheadLimiter sanitizes NaN and ±Infinity inputs and recovers clean audio")
+
         // A headset that takes the microphone for a call changes the rate the
         // device runs at while the audio path stays up. The recovery has to
         // stay the same length of time, not the same number of samples.

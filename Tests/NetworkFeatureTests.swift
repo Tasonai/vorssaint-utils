@@ -197,6 +197,21 @@ enum NetworkFeatureTests {
         suite.expect(timedOutProcess.timedOut && timedOutProcess.status == -1
                 && Date().timeIntervalSince(timeoutStarted) < 1.5,
                "a stalled subprocess is terminated inside its deadline")
+        var rusageBefore = rusage()
+        getrusage(RUSAGE_SELF, &rusageBefore)
+        let earlyEOF = BoundedProcessRunner.run(
+            "/bin/sh", ["-c", "/usr/bin/printf closed-early; exec >&- 2>&-; /bin/sleep 0.15"],
+            timeout: 2, maxOutputBytes: 1_024)
+        var rusageAfter = rusage()
+        getrusage(RUSAGE_SELF, &rusageAfter)
+        let cpuSeconds = Double(rusageAfter.ru_utime.tv_sec - rusageBefore.ru_utime.tv_sec)
+            + Double(rusageAfter.ru_utime.tv_usec - rusageBefore.ru_utime.tv_usec) / 1_000_000
+            + Double(rusageAfter.ru_stime.tv_sec - rusageBefore.ru_stime.tv_sec)
+            + Double(rusageAfter.ru_stime.tv_usec - rusageBefore.ru_stime.tv_usec) / 1_000_000
+        suite.expect(earlyEOF.status == 0
+                && String(decoding: earlyEOF.output, as: UTF8.self) == "closed-early"
+                && cpuSeconds < 0.08,
+               "closing stdout before exit clears readabilityHandler on EOF instead of busy-spinning")
 
         // The new-session path gives a child what it has under an app launched
         // from Finder whether or not these tests run in a terminal: no

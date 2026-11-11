@@ -880,11 +880,29 @@ extension ScratchpadSupport {
         }
         let lineRange = ns.lineRange(for: selection)
         let block = ns.substring(with: lineRange)
-        // lineRange keeps the line terminator. Splitting with it still attached
-        // invents a trailing empty line that would collect a prefix of its own.
-        let terminator = block.hasSuffix("\n") ? "\n" : ""
-        let body = terminator.isEmpty ? block : String(block.dropLast())
-        let lines = body.components(separatedBy: "\n")
+        let nsBlock = block as NSString
+        // lineRange keeps each line's own terminator (\n, \r\n, or \r). Splitting
+        // via NSString line boundaries preserves CRLF endings instead of leaving
+        // stray \r characters on lines or inventing a trailing empty line.
+        var lines: [String] = []
+        var endings: [String] = []
+        if nsBlock.length == 0 {
+            lines = [""]
+            endings = [""]
+        } else {
+            var cursor = 0
+            while cursor < nsBlock.length {
+                var lineStart = 0
+                var lineEnd = 0
+                var contentsEnd = 0
+                nsBlock.getLineStart(&lineStart, end: &lineEnd, contentsEnd: &contentsEnd,
+                                     for: NSRange(location: cursor, length: 0))
+                guard lineEnd > cursor else { break }
+                lines.append(nsBlock.substring(with: NSRange(location: lineStart, length: contentsEnd - lineStart)))
+                endings.append(nsBlock.substring(with: NSRange(location: contentsEnd, length: lineEnd - contentsEnd)))
+                cursor = lineEnd
+            }
+        }
 
         // Indentation is what nests a list, so the mark goes after it and the
         // line keeps its depth rather than growing "-   - text".
@@ -916,7 +934,7 @@ extension ScratchpadSupport {
             return lead + "\(ordinal). " + body
         }
 
-        let replacement = updated.joined(separator: "\n") + terminator
+        let replacement = zip(updated, endings).map { $0 + $1 }.joined()
         let firstDelta = (updated[0] as NSString).length - (lines[0] as NSString).length
         let totalDelta = (replacement as NSString).length - (block as NSString).length
         // Both ends move with the prefixes before them. The start is held at

@@ -91,14 +91,30 @@ struct PlainTextEditor: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSTextView.scrollableTextView()
+        let scroll = NSScrollView()
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
-        guard let textView = scroll.documentView as? NSTextView else { return scroll }
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        let textContainer = NSTextContainer(
+            containerSize: NSSize(width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+        )
+        textContainer.widthTracksTextView = true
+        textContainer.lineFragmentPadding = Self.lineFragmentPadding
+        layoutManager.addTextContainer(textContainer)
+        context.coordinator.ownedTextStorage = textStorage
+        let textView = NSTextView(frame: NSRect(origin: .zero, size: scroll.contentSize),
+                                  textContainer: textContainer)
+        textView.minSize = NSSize(width: 0, height: scroll.contentSize.height)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        scroll.documentView = textView
         textView.drawsBackground = false
         textView.font = .systemFont(ofSize: fontSize)
-        textView.textContainer?.lineFragmentPadding = Self.lineFragmentPadding
         textView.allowsUndo = true
         textView.isRichText = false
         textView.importsGraphics = false
@@ -141,9 +157,22 @@ struct PlainTextEditor: NSViewRepresentable {
         guard let textView = nsView.documentView as? NSTextView else { return }
         context.coordinator.continuesLists = continuesLists
         context.coordinator.onCommandReturn = onCommandReturn
+        context.coordinator.isActive = isActive
         // Hidden, not disabled: it keeps its text and undo history, and can
         // still be cleared through, but a hidden view has no cursor rects.
-        if nsView.isHidden == isActive { nsView.isHidden = !isActive }
+        if nsView.isHidden == isActive {
+            if !isActive,
+               let responder = nsView.window?.firstResponder as? NSView,
+               responder.isDescendant(of: nsView) {
+                let coordinator = context.coordinator
+                DispatchQueue.main.async { [weak nsView] in
+                    guard let nsView, !coordinator.isActive else { return }
+                    nsView.isHidden = true
+                }
+            } else {
+                nsView.isHidden = !isActive
+            }
+        }
         // Size is a preference and can change under a view that is already up,
         // so it is applied before the text guard below rather than after it.
         if textView.font?.pointSize != fontSize {
@@ -168,6 +197,8 @@ struct PlainTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         private let text: Binding<String>
         private let selectedRange: Binding<Range<Int>?>?
+        var ownedTextStorage: NSTextStorage?
+        var isActive = true
         var isApplyingExternalText = false
         var completesTaskBoxes = false
         var continuesLists = false

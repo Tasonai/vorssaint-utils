@@ -312,7 +312,10 @@ public func vorssaintNowPlayingWatch() {
     var commandFramer = NotchPlaybackCommandFramer()
     FileHandle.standardInput.readabilityHandler = { input in
         let data = input.availableData
-        if data.isEmpty { exit(0) }
+        if data.isEmpty {
+            input.readabilityHandler = nil
+            exit(0)
+        }
         DispatchQueue.main.async {
             for command in commandFramer.append(data) {
                 guard let command else { emit(["sent": false]); continue }

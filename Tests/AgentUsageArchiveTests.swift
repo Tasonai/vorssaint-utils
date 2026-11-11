@@ -421,6 +421,114 @@ enum AgentUsageArchiveSettleTests {
     }
 }
 
+/// Non-blocking `AgentUsageService.stop` contract: cancelling an in-flight scan
+/// from the main thread returns in O(1) without waiting on `queue.sync`, while
+/// still flushing/removing the archive and resetting reader state in FIFO order.
+enum AgentUsageStopTests {
+    enum AgentUsageArchive {
+        static var removed = 0
+        static func remove() { removed += 1 }
+    }
+
+    enum NotchAgentSupport {
+        static var enabled = true
+        static func isEnabled() -> Bool { enabled }
+    }
+
+    final class Cancellation {
+        private let lock = NSLock()
+        private var cancelled = false
+        var isCancelled: Bool { lock.withLock { cancelled } }
+        func cancel() { lock.withLock { cancelled = true } }
+    }
+
+    final class DummyStoppable {
+        var stopped = false
+        func cancel() { stopped = true }
+        func stop() { stopped = true }
+    }
+
+    class Fixture {
+        let queue = DispatchQueue(label: "com.vorssaint.agent-usage.stop-test")
+        let lifecycleLock = NSLock()
+        var running = true
+        var paused = false
+        var session = 3
+        var cancellation = Cancellation()
+        var timer: Timer? = Timer(timeInterval: 30, repeats: true) { _ in }
+        var pageVisible = true
+        var claudeAccountAttempted = Date()
+        var claudeAccountFailure: AgentClaudeServer.Failure? = .unreachable
+        var claudeAccountUnreachable = 2
+        var online = false
+        var providers: [AgentProvider] = [.claude, .codex]
+        var pricesInFlight = true
+        var pricesSaved: Date? = Date()
+        var snapshot = AgentUsageSnapshot()
+        var claudeAppChecked: Date? = Date()
+        var claudeAccountIdentity: ClaudeAccountProfile.Identity?
+        var readerSession = 3
+        var readerCancellation: Cancellation?
+        var poller: DummyStoppable? = DummyStoppable()
+        var watcher: DummyStoppable? = DummyStoppable()
+        var watchedRoots: [String] = ["/tmp"]
+        var network: DummyStoppable? = DummyStoppable()
+        var offlineSince: (date: Date, uptime: TimeInterval)? = (Date(), 1)
+        var store = AgentUsageStore()
+        var cursors: [String: AgentLogCursor] = [:]
+        var published = AgentUsageSnapshot()
+        var previousLimits: [AgentProvider: AgentLimits] = [:]
+        var warned: [String: (provider: AgentProvider, window: AgentLimitWindow)] = [:]
+        var budgetDay: Date? = Date()
+        var claudePlan: AgentPlan?
+        var claudeOrganization: String? = "org"
+        var claudeIdentity: ClaudeAccountProfile.Identity?
+        var claudeProfileModified: Date? = Date()
+        var claudeAppModified: Date? = Date()
+        var claudeAppSamples: [AgentClaudeAppUsage.Sample] = []
+        var claudeAccountLimits: AgentLimits?
+        var savedMark: Int? = 42
+        var lastSave = Date()
+        var saved = 0
+        var cancelledClaudeLimits = 0
+        func cancelClaudeLimits() { cancelledClaudeLimits += 1 }
+        func saveProgress() { saved += 1 }
+    }
+
+    static func run(_ suite: TestSuite) {
+        defer {
+            AgentUsageArchive.removed = 0
+            NotchAgentSupport.enabled = true
+        }
+        let host = Host()
+        let oldCancellation = host.cancellation
+        let oldPoller = host.poller
+        let oldWatcher = host.watcher
+        let started = DispatchSemaphore(value: 0)
+        let unblock = DispatchSemaphore(value: 0)
+        host.queue.async {
+            started.signal()
+            _ = unblock.wait(timeout: .now() + 2.0)
+        }
+        started.wait()
+
+        let t0 = ProcessInfo.processInfo.systemUptime
+        host.stop(keepingProgress: false, pausingAccounts: false)
+        let elapsed = ProcessInfo.processInfo.systemUptime - t0
+
+        suite.expect(elapsed < 0.08,
+                     "AgentUsageService.stop returns immediately in O(1) without blocking on an occupied serial queue (\(elapsed)s)")
+        suite.expect(oldCancellation.isCancelled && !host.running && host.session == 4 && host.timer == nil,
+                     "AgentUsageService.stop immediately cancels the active scan, flips running off, advances session, and invalidates timer")
+
+        unblock.signal()
+        host.flushForTesting()
+        suite.expect(AgentUsageArchive.removed == 1 && host.saved == 0 && host.readerSession == -1
+                         && oldPoller?.stopped == true && oldWatcher?.stopped == true,
+                     "AgentUsageService.stop asynchronously settles the archive and tears down reader state on queue in FIFO order")
+    }
+}
+
 typealias AgentUsageProductionArchive = AgentUsageArchive
 
 /// The production save method against a recording archive.

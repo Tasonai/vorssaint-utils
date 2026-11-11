@@ -564,7 +564,7 @@ final class MiddleClickService: ObservableObject {
                 fingerCount: count,
                 frameAge: age,
                 settledFor: settledFor,
-                sinceLastTransformEnd: sinceLastTransformEnd.map { now - $0 },
+                sinceLastTransformEnd: sinceLastTransformEnd.map { max(0, now - $0) },
                 systemDragGestureEnabled: dragGestureEnabled(now: now)
             )
             switch action {
@@ -623,6 +623,7 @@ final class MiddleClickService: ObservableObject {
         middleButtonHeld = false
         let targetPID = middleButtonTargetPID
         middleButtonTargetPID = nil
+        lastTransformEnd = ProcessInfo.processInfo.systemUptime
         tapStateLock.unlock()
         let position = CGEvent(source: nil)?.location ?? .zero
         let event = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState),
@@ -634,10 +635,17 @@ final class MiddleClickService: ObservableObject {
         } else {
             event?.post(tap: .cghidEventTap)
         }
-        // CGEvent posting is asynchronous. During app termination, keep this
-        // process alive just long enough for WindowServer to deliver the up.
-        Thread.sleep(forTimeInterval: 0.02)
-        tapStateLock.withLock { lastTransformEnd = ProcessInfo.processInfo.systemUptime }
+        // CGEvent posting is asynchronous. Retain the synthesized release across
+        // WindowServer's delivery window without stalling the pointer tap thread.
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.02) { [weak self] in
+            _ = event
+            guard let self else { return }
+            self.tapStateLock.withLock {
+                if self.tap != nil {
+                    self.lastTransformEnd = ProcessInfo.processInfo.systemUptime
+                }
+            }
+        }
     }
 
     /// Rewrites the event in place: same position, timestamp and modifiers,

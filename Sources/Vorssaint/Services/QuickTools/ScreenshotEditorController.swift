@@ -60,6 +60,8 @@ final class ScreenshotEditorModel: ObservableObject, BackdropEditing {
     private var textSelectionAnchor: CGPoint?
     /// A QR code found in the capture, offered as a copy or open action.
     @Published private(set) var qrReading: BarcodeDetector.Reading?
+    private let recognitionLock = NSLock()
+    private var activeRecognitionImageID: ObjectIdentifier?
     @Published var color: ScreenshotSupport.ColorID {
         didSet {
             UserDefaults.standard.set(color.rawValue, forKey: DefaultsKey.screenshotLastColor)
@@ -442,6 +444,8 @@ final class ScreenshotEditorModel: ObservableObject, BackdropEditing {
     /// boxes land in image pixels with their line index.
     func recognizeText() {
         let image = baseImage
+        let imageID = ObjectIdentifier(image)
+        recognitionLock.withLock { activeRecognitionImageID = imageID }
         let width = CGFloat(image.width)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let tiles = ScreenshotSupport.recognitionTiles(width: image.width, height: image.height)
@@ -451,7 +455,9 @@ final class ScreenshotEditorModel: ObservableObject, BackdropEditing {
             var reads: [[ScreenshotSupport.BandWord]?] = []
             var lineOffset = 0
             for band in tiles {
-                guard let current = self, image === current.baseImage else { return }
+                guard let current = self,
+                      current.recognitionLock.withLock({ current.activeRecognitionImageID == imageID })
+                else { return }
                 let tileY = band.rect.minY
                 let currentHeight = band.rect.height
                 guard let tile = image.cropping(to: band.rect) else { break }
@@ -515,8 +521,12 @@ final class ScreenshotEditorModel: ObservableObject, BackdropEditing {
     /// changes (crop, undo) so a cropped out code stops being offered.
     func recognizeQRCodes() {
         let image = baseImage
+        let imageID = ObjectIdentifier(image)
+        recognitionLock.withLock { activeRecognitionImageID = imageID }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let current = self, image === current.baseImage else { return }
+            guard let current = self,
+                  current.recognitionLock.withLock({ current.activeRecognitionImageID == imageID })
+            else { return }
             let reading = BarcodeDetector.read(image)
             DispatchQueue.main.async { [weak self] in
                 guard let self, image === self.baseImage else { return }

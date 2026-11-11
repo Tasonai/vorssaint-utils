@@ -100,9 +100,12 @@ struct NotchScratchpadView: View {
         .onChange(of: pad.isPreviewing) { _, previewing in
             guard let view = editor.view else { return }
             if previewing {
-                pad.hideFindBar(in: view)
-                if view.window?.firstResponder === view || PlainTextEditor.findBarHasKeyboard(in: view.window) {
-                    view.window?.makeFirstResponder(nil)
+                DispatchQueue.main.async {
+                    guard pad.isPreviewing else { return }
+                    pad.hideFindBar(in: view)
+                    if view.window?.firstResponder === view || PlainTextEditor.findBarHasKeyboard(in: view.window) {
+                        view.window?.makeFirstResponder(nil)
+                    }
                 }
             } else {
                 DispatchQueue.main.async {

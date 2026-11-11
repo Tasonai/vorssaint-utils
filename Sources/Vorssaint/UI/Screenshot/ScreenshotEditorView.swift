@@ -59,13 +59,23 @@ struct ScreenshotEditorView: View {
                     }
                     .scrollIndicators(.never)
                     .fixedSize(horizontal: true, vertical: false)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { railColumnHeight = $0 }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                        guard height.isFinite, abs(height - railColumnHeight) > 0.5 else { return }
+                        DispatchQueue.main.async {
+                            if abs(height - railColumnHeight) > 0.5 { railColumnHeight = height }
+                        }
+                    }
                     .padding(.leading, 10)
                     canvasArea
                 }
                 .padding(.top, 6)
                 bottomRow
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                        guard height.isFinite, abs(height - footerHeight) > 0.5 else { return }
+                        DispatchQueue.main.async {
+                            if abs(height - footerHeight) > 0.5 { footerHeight = height }
+                        }
+                    }
                     .padding(.horizontal, 12)
                     .padding(.top, 6)
                     .padding(.bottom, 10)

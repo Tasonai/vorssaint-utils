@@ -57,7 +57,9 @@ final class AgentUsageService: ObservableObject {
         func cancel() { lock.withLock { cancelled = true } }
     }
 
-    // Main thread.
+    // Lifecycle state guarded by `lifecycleLock` so `stop()` can cancel work
+    // and invalidate the active generation in O(1) without stalling on `queue`.
+    private let lifecycleLock = NSLock()
     private var running = false
     /// Reading waits while the island is away; what was read stays.
     private var paused = false
@@ -131,17 +133,22 @@ final class AgentUsageService: ObservableObject {
         // read from its start: both take a fresh reading, which would not
         // resume progress saved for the old set, so it goes at once. Codex
         // accounts keep their checks: they read no log.
-        if running, wanted != providers || profile != claudeProfile {
+        if lifecycleLock.withLock({ running }), wanted != providers || profile != claudeProfile {
             stop(keepingProgress: false, pausingAccounts: false)
         }
         if claudeProfile != profile { claudeProfile = profile }
         pageVisible = showingPage
-        if !running {
+        let started: (session: Int, cancellation: Cancellation)? = lifecycleLock.withLock {
+            guard !running else { return nil }
             running = true
             session += 1
-            cancellation = Cancellation()
+            let fresh = Cancellation()
+            cancellation = fresh
+            return (session, fresh)
+        }
+        if let started {
             providers = wanted
-            start(session: session, providers: Set(wanted), cancellation: cancellation, claudeProfile: profile)
+            start(session: started.session, providers: Set(wanted), cancellation: started.cancellation, claudeProfile: profile)
         } else if paused {
             resume()
         }
@@ -157,11 +164,13 @@ final class AgentUsageService: ObservableObject {
         // A page torn down with the island never reports leaving, so the
         // minute cadence would outlive it.
         pageVisible = false
-        guard running, !paused else { return }
+        guard lifecycleLock.withLock({ running }), !paused else { return }
         paused = true
         cancelClaudeLimits()
-        timer?.invalidate()
-        timer = nil
+        lifecycleLock.withLock {
+            timer?.invalidate()
+            timer = nil
+        }
         queue.async { [self] in
             poller?.cancel()
             poller = nil
@@ -187,21 +196,31 @@ final class AgentUsageService: ObservableObject {
     func stop(keepingProgress keeps: Bool = true, pausingAccounts: Bool = true) {
         if pausingAccounts { CodexProfileLimitsService.shared.pause() }
         pageVisible = false
-        // A first read still going stops at its next chunk, so the wait
-        // below is short.
-        if running { cancellation.cancel() }
-        settleArchive(keeping: keeps && NotchAgentSupport.isEnabled())
-        guard running else { return }
-        running = false
+        let shouldKeep = keeps && NotchAgentSupport.isEnabled()
+        // Cancel any in-flight scan, invalidate the active generation, and tear
+        // down the timer immediately in O(1) without blocking the main thread
+        // on `queue.sync` while archive settlement and reader cleanup queue FIFO.
+        let wasRunning = lifecycleLock.withLock { () -> Bool in
+            guard running else { return false }
+            cancellation.cancel()
+            running = false
+            session += 1
+            timer?.invalidate()
+            timer = nil
+            return true
+        }
+        guard wasRunning else {
+            queue.async { [self] in
+                if shouldKeep { saveProgress() } else { AgentUsageArchive.remove() }
+            }
+            return
+        }
         cancelClaudeLimits()
         claudeAccountAttempted = .distantPast
         claudeAccountFailure = nil
         claudeAccountUnreachable = 0
         online = true
         paused = false
-        session += 1
-        timer?.invalidate()
-        timer = nil
         providers = []
         pricesInFlight = false
         pricesSaved = nil
@@ -209,6 +228,7 @@ final class AgentUsageService: ObservableObject {
         claudeAppChecked = nil
         claudeAccountIdentity = nil
         queue.async { [self] in
+            if shouldKeep { saveProgress() } else { AgentUsageArchive.remove() }
             readerSession = -1
             readerCancellation = nil
             poller?.cancel()
@@ -235,6 +255,11 @@ final class AgentUsageService: ObservableObject {
             savedMark = nil
             lastSave = .distantPast
         }
+    }
+
+    /// Waits for queued archive flush or cleanup work in deterministic tests.
+    func flushForTesting() {
+        queue.sync {}
     }
 
     /// Limits an agent read from the account on request, newer than its
@@ -281,7 +306,10 @@ final class AgentUsageService: ObservableObject {
         let timer = Timer(timeInterval: Self.tick, repeats: true) { [weak self] _ in self?.tickTimer() }
         timer.tolerance = 10
         RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        lifecycleLock.withLock {
+            self.timer?.invalidate()
+            self.timer = timer
+        }
     }
 
     private func start(session: Int, providers: Set<AgentProvider>, cancellation: Cancellation,

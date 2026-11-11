@@ -1872,6 +1872,8 @@ enum ScreenshotFeatureTests {
         suite.expect(!screenshotEditorSource.contains("annotations.append(annotation)\n            selectedID = annotation.id\n            draftID = annotation.id")
                 && screenshotEditorSource.contains("} else if let draftID {\n                selectedID = draftID"),
                "a shape is selected only after its drag ends")
+        suite.expect(!screenshotEditorSource.contains("current.baseImage"),
+               "background OCR and QR queues never read @Published baseImage off the main thread")
         suite.expect(screenshotSupportSource.contains("let color: ColorID?")
                 && screenshotSupportSource.contains("let stroke: StrokeID?")
                 && screenshotSupportSource.contains("let arrowStyle: ArrowStyleID?"),

@@ -180,22 +180,20 @@ final class DockClickService {
         // coordinate lines up with an icon would minimize or restore apps out
         // of thin air. Only clicks inside the Dock strip that is actually on
         // screen and reachable by the pointer can mean an icon.
+        let onScreenWindows = WindowServerSupport.onScreenWindows()
         guard let dockPID = dockProcessID(),
               DockClickSupport.dockOwnsPoint(
                 point,
-                windows: WindowServerSupport.onScreenWindows(),
+                windows: onScreenWindows,
                 dockProcessID: dockPID,
                 dockLayer: Int(CGWindowLevelForKey(.dockWindow)),
                 ownProcessID: getpid(),
                 accessibilityHitProcessID: {
-                    var element: AXUIElement?
-                    guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),
-                                                           Float(point.x), Float(point.y),
-                                                           &element) == .success,
-                          let element else { return nil }
-                    var pid: pid_t = 0
-                    guard AXUIElementGetPid(element, &pid) == .success else { return nil }
-                    return pid
+                    Self.hitProcessID(at: point,
+                                      windows: onScreenWindows,
+                                      dockPID: dockPID,
+                                      dockLayer: Int(CGWindowLevelForKey(.dockWindow)),
+                                      ownPID: getpid())
                 }) else {
             return Unmanaged.passUnretained(event)
         }
@@ -246,9 +244,9 @@ final class DockClickService {
                 // while their windows remain plainly visible (#200).
                 windowServerSeesWindows = Self.windowServerHasStandardWindows(pid: pid)
                 if windowServerSeesWindows {
-                    // One slower retry: a busy JVM often just missed the 0.35 s
-                    // leash. Rare path, so the extra wait never taxes normal apps.
-                    windows = Self.standardWindows(pid: pid, timeout: 0.7)
+                    // One short retry for a busy JVM without exceeding the
+                    // event tap's responsiveness budget.
+                    windows = Self.standardWindows(pid: pid, timeout: 0.15)
                 }
             }
             // Counted on the Space the user is looking at, the only windows
@@ -818,14 +816,58 @@ final class DockClickService {
     /// The tile's place in that list is carried into the resolution: several
     /// tiles can name one bundle, one per process of an app that runs as
     /// several.
+    /// Per-application AX hit-test across windows covering the Dock strip,
+    /// capped to 0.12 s per element and 0.15 s total instead of calling
+    /// `AXUIElementCopyElementAtPosition` on the uncapped system-wide element.
+    private static func hitProcessID(at point: CGPoint,
+                                     windows: [MouseAppExceptionSupport.Window],
+                                     dockPID: pid_t,
+                                     dockLayer: Int,
+                                     ownPID: pid_t) -> pid_t? {
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.15
+        var seen = Set<pid_t>()
+        for window in windows where window.alpha > 0 {
+            if window.processID == dockPID && window.layer == dockLayer { break }
+            guard window.processID != ownPID,
+                  window.frame.contains(point),
+                  seen.insert(window.processID).inserted else { continue }
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            guard remaining > 0.01 else { return nil }
+            let app = AXUIElementCreateApplication(window.processID)
+            AXUIElementSetMessagingTimeout(app, Float(min(0.12, remaining)))
+            let started = ProcessInfo.processInfo.systemUptime
+            var element: AXUIElement?
+            let status = AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element)
+            if status == .success, let element {
+                var pid: pid_t = 0
+                return AXUIElementGetPid(element, &pid) == .success ? pid : window.processID
+            }
+            // A beachballing covering app that exhausted its timeout must not
+            // fall through to claiming the Dock owns the click underneath it.
+            if ProcessInfo.processInfo.systemUptime - started >= 0.10 {
+                return nil
+            }
+        }
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        guard remaining > 0.01 else { return nil }
+        let dockElement = AXUIElementCreateApplication(dockPID)
+        AXUIElementSetMessagingTimeout(dockElement, Float(min(0.12, remaining)))
+        var element: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(dockElement, Float(point.x), Float(point.y), &element) == .success,
+              let element else { return nil }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(element, &pid) == .success else { return nil }
+        return pid
+    }
+
     private func dockApplication(at point: CGPoint) -> NSRunningApplication? {
         guard let dockPID = dockProcessID() else { return nil }
         let dockElement = AXUIElementCreateApplication(dockPID)
-        AXUIElementSetMessagingTimeout(dockElement, 0.35)
-        guard let children = Self.elementArray(dockElement, kAXChildrenAttribute as String) else { return nil }
+        AXUIElementSetMessagingTimeout(dockElement, 0.12)
+        guard let children = Self.elementArray(dockElement, kAXChildrenAttribute as String, timeout: 0.12) else { return nil }
 
         for child in children where Self.roleString(child) == "AXList" {
-            guard let items = Self.elementArray(child, kAXChildrenAttribute as String),
+            guard let items = Self.elementArray(child, kAXChildrenAttribute as String, timeout: 0.12),
                   let listFrame = Self.axFrame(child)
             else { continue }
             let horizontal = listFrame.width >= listFrame.height
@@ -847,21 +889,28 @@ final class DockClickService {
         return nil
     }
 
-    private static func elementArray(_ element: AXUIElement, _ attribute: String) -> [AXUIElement]? {
+    private static func elementArray(_ element: AXUIElement, _ attribute: String,
+                                     timeout: Float = 0.15) -> [AXUIElement]? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
               let array = value as? [AXUIElement]
         else { return nil }
+        for child in array {
+            AXUIElementSetMessagingTimeout(child, timeout)
+        }
         return array
     }
 
-    private static func elementAttribute(_ element: AXUIElement, _ attribute: String) -> AXUIElement? {
+    private static func elementAttribute(_ element: AXUIElement, _ attribute: String,
+                                         timeout: Float = 0.15) -> AXUIElement? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
               let value,
               CFGetTypeID(value) == AXUIElementGetTypeID()
         else { return nil }
-        return (value as! AXUIElement)
+        let child = value as! AXUIElement
+        AXUIElementSetMessagingTimeout(child, timeout)
+        return child
     }
 
     private static func roleString(_ element: AXUIElement) -> String? {
@@ -960,7 +1009,7 @@ final class DockClickService {
 
     /// The app's standard windows split by minimized state, plus whether any
     /// window is fullscreen (those can't minimize and must veto the action).
-    private static func standardWindows(pid: pid_t, timeout: Float = 0.35)
+    private static func standardWindows(pid: pid_t, timeout: Float = 0.12)
         -> (unminimized: [AXUIElement], minimized: [AXUIElement], hasFullscreen: Bool) {
         let appElement = AXUIElementCreateApplication(pid)
         // This runs inside the tap callback against the app the user just

@@ -180,13 +180,14 @@ final class ClipboardHistoryService: ObservableObject {
     /// admission stays occupied until the underlying operation actually ends.
     private func writeToPasteboard(_ list: [ClipboardHistoryEntry],
                                    completion: @escaping (Bool) -> Void) {
-        guard !copyInFlight, let write = Self.plannedWrite(for: list) else {
+        guard !copyInFlight, !list.isEmpty else {
             completion(false)
             return
         }
         copyInFlight = true
-        GeneralPasteboardAccess.shared.async(timeout: Self.pasteboardTimeout, { isExpired in
-            write.write(to: NSPasteboard.general, isExpired: isExpired)
+        GeneralPasteboardAccess.shared.async(timeout: Self.pasteboardTimeout, { isExpired -> ClipboardHistoryWriteResult? in
+            guard !isExpired(), let write = Self.plannedWrite(for: list) else { return nil }
+            return write.write(to: NSPasteboard.general, isExpired: isExpired)
         }, then: { result in
             completion(result?.succeeded == true)
         }, didFinish: { [weak self] result in
@@ -203,9 +204,7 @@ final class ClipboardHistoryService: ObservableObject {
     /// What to put on the pasteboard once it is cleared, or nil when the
     /// content is gone (image purged from the store, files deleted or on an
     /// ejected volume) and the copy must abort with the user's clipboard
-    /// intact. Resolving on the caller's thread also keeps the AppKit work a
-    /// write may need — RTFD attachments, TIFF rendering — on the main thread
-    /// it has always run on; only the pasteboard calls move to the lane.
+    /// intact. Runs on the pasteboard lane so disk reads stay off the main thread.
     private static func plannedWrite(for list: [ClipboardHistoryEntry])
         -> ClipboardHistoryWrite? {
         if list.count == 1, let entry = list.first {
@@ -215,9 +214,7 @@ final class ClipboardHistoryService: ObservableObject {
             case .image:
                 guard let name = entry.imageFile,
                       let data = ClipboardImageStore.imageData(named: name) else { return nil }
-                // TIFF alongside PNG: some paste targets only take TIFF.
-                let tiff = NSBitmapImageRep(data: data)?.tiffRepresentation
-                return .image(png: data, tiff: tiff)
+                return .image(png: data, tiff: nil)
             case .files:
                 let urls = entry.filePaths
                     .map { URL(fileURLWithPath: $0) }

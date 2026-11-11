@@ -171,6 +171,7 @@ enum BoundedProcessRunner {
         reader.readabilityHandler = { handle in
             let chunk = handle.availableData
             if chunk.isEmpty {
+                handle.readabilityHandler = nil
                 drained.signal()
             } else {
                 // Keep draining after the retained prefix is full so the child

@@ -2524,8 +2524,10 @@ private struct OverlayScrollView<Content: View>: NSViewRepresentable {
         host.rootView = content
         installReporter(on: host)               // re-bind to the latest measuredHeight
         let h = host.fittingSize.height          // catch content changes with no new layout pass
-        if h > 1, abs(h - measuredHeight) > 0.5 {
-            DispatchQueue.main.async { measuredHeight = h }
+        if h.isFinite, h > 1, abs(h - measuredHeight) > 0.5 {
+            DispatchQueue.main.async {
+                if abs(h - measuredHeight) > 0.5 { measuredHeight = h }
+            }
         }
     }
 
@@ -2539,8 +2541,10 @@ private struct OverlayScrollView<Content: View>: NSViewRepresentable {
         host.onLayout = { [weak host] in
             guard let host else { return }
             let h = host.fittingSize.height
-            guard h > 1, abs(h - binding.wrappedValue) > 0.5 else { return }
-            DispatchQueue.main.async { binding.wrappedValue = h }
+            guard h.isFinite, h > 1, abs(h - binding.wrappedValue) > 0.5 else { return }
+            DispatchQueue.main.async {
+                if abs(h - binding.wrappedValue) > 0.5 { binding.wrappedValue = h }
+            }
         }
     }
 
@@ -2587,9 +2591,11 @@ private extension View {
             }
         )
         .onPreferenceChange(MenuPanelHeightPreferenceKey.self) { value in
-            guard abs(value - height.wrappedValue) > 0.5 else { return }
+            guard value.isFinite, abs(value - height.wrappedValue) > 0.5 else { return }
             DispatchQueue.main.async {
-                height.wrappedValue = value
+                if abs(value - height.wrappedValue) > 0.5 {
+                    height.wrappedValue = value
+                }
             }
         }
     }

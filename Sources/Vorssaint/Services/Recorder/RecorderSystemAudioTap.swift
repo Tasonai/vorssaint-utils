@@ -33,6 +33,107 @@ final class RecorderAudioHostTime {
     }
 }
 
+/// Pre-allocated lock-free SPSC ring buffer transferring raw float audio frames
+/// and host timestamps from CoreAudio's real-time `HALB_IOThread` to the serial
+/// consumer/writer queue with zero heap allocation or lock contention.
+final class RecorderAudioSampleRing: @unchecked Sendable {
+    struct SlotMeta {
+        var sampleCount: Int32 = 0
+        var inputHostTime: UInt64 = 0
+        var nowHostTime: UInt64 = 0
+        var hasInputHostTime: Bool = false
+    }
+
+    let slotCount: Int
+    let maxSamplesPerSlot: Int
+    private let slotMask: Int64
+    private let sampleStorage: UnsafeMutablePointer<Float>
+    private let metaStorage: UnsafeMutablePointer<SlotMeta>
+    private var writeIndex: Int64 = 0
+    private var readIndex: Int64 = 0
+
+    init(slotCount: Int = 64, maxFramesPerSlot: Int = 8192, channels: Int) {
+        var power = 2
+        while power < max(2, slotCount) { power <<= 1 }
+        self.slotCount = power
+        self.slotMask = Int64(power - 1)
+        self.maxSamplesPerSlot = max(1, maxFramesPerSlot * max(1, channels))
+        self.sampleStorage = UnsafeMutablePointer<Float>.allocate(capacity: power * self.maxSamplesPerSlot)
+        self.sampleStorage.initialize(repeating: 0, count: power * self.maxSamplesPerSlot)
+        self.metaStorage = UnsafeMutablePointer<SlotMeta>.allocate(capacity: power)
+        self.metaStorage.initialize(repeating: SlotMeta(), count: power)
+    }
+
+    deinit {
+        metaStorage.deinitialize(count: slotCount)
+        metaStorage.deallocate()
+        sampleStorage.deinitialize(count: slotCount * maxSamplesPerSlot)
+        sampleStorage.deallocate()
+    }
+
+    /// Producer (`HALB_IOThread` only): copies float samples into fixed pre-allocated
+    /// ring slots without allocating or blocking. Drops excess if consumer falls behind.
+    @discardableResult
+    func push(samples: UnsafeRawPointer,
+              byteCount: Int,
+              channels: Int,
+              inputHostTime: UInt64,
+              hasInputHostTime: Bool,
+              nowHostTime: UInt64,
+              hostTicksPerFrame: Double = 0) -> Bool {
+        let safeChannels = max(1, channels)
+        let totalFrames = byteCount / (safeChannels * MemoryLayout<Float>.size)
+        guard totalFrames > 0 else { return false }
+        let maxFrames = maxSamplesPerSlot / safeChannels
+        guard maxFrames > 0 else { return false }
+
+        var frameOffset = 0
+        var pushedAny = false
+        while frameOffset < totalFrames {
+            let w = OSAtomicAdd64Barrier(0, &writeIndex)
+            let r = OSAtomicAdd64Barrier(0, &readIndex)
+            if w - r >= Int64(slotCount) { break }
+
+            let chunkFrames = min(maxFrames, totalFrames - frameOffset)
+            let chunkSamples = chunkFrames * safeChannels
+            let slot = Int(w & slotMask)
+            let dst = sampleStorage.advanced(by: slot * maxSamplesPerSlot)
+            let src = samples.advanced(by: frameOffset * safeChannels * MemoryLayout<Float>.size)
+            memcpy(dst, src, chunkSamples * MemoryLayout<Float>.size)
+
+            let adjustedInputHostTime: UInt64
+            if hasInputHostTime, frameOffset > 0, hostTicksPerFrame > 0 {
+                adjustedInputHostTime = inputHostTime &+ UInt64((Double(frameOffset) * hostTicksPerFrame).rounded())
+            } else {
+                adjustedInputHostTime = inputHostTime
+            }
+            metaStorage[slot] = SlotMeta(
+                sampleCount: Int32(chunkSamples),
+                inputHostTime: adjustedInputHostTime,
+                nowHostTime: nowHostTime,
+                hasInputHostTime: hasInputHostTime
+            )
+            OSAtomicAdd64Barrier(1, &writeIndex)
+            pushedAny = true
+            frameOffset += chunkFrames
+        }
+        return pushedAny
+    }
+
+    /// Consumer (serial consumer/writer queue only): reads the next queued slot in place.
+    func drainOne(_ body: (UnsafeMutablePointer<Float>, Int, UInt64, Bool, UInt64) -> Void) -> Bool {
+        let r = OSAtomicAdd64Barrier(0, &readIndex)
+        let w = OSAtomicAdd64Barrier(0, &writeIndex)
+        guard r < w else { return false }
+        let slot = Int(r & slotMask)
+        let meta = metaStorage[slot]
+        let ptr = sampleStorage.advanced(by: slot * maxSamplesPerSlot)
+        body(ptr, Int(meta.sampleCount), meta.inputHostTime, meta.hasInputHostTime, meta.nowHostTime)
+        OSAtomicAdd64Barrier(1, &readIndex)
+        return true
+    }
+}
+
 /// Whether linear float audio holds anything but silence.
 enum RecorderAudioProbe {
     static func containsSound(_ sampleBuffer: CMSampleBuffer) -> Bool {
@@ -85,9 +186,13 @@ enum RecorderAudioProbe {
 /// `onSample`, which the caller sets once before `start`. That confinement
 /// is what makes the reference safe to hand across threads.
 final class RecorderSystemAudioTap: @unchecked Sendable {
-    /// Called on the audio system's own thread, with the sound retimed onto
-    /// the recording's clock. Set before `start`.
+    /// Called on `consumerQueue` (off the real-time audio thread), with the
+    /// sound retimed onto the recording's clock. Set before `start`.
     var onSample: ((CMSampleBuffer) -> Void)?
+
+    /// Serial queue that drains the real-time ring buffer, builds `CMSampleBuffer`s,
+    /// and invokes `onSample`. Set before `start` (defaults to an internal serial queue).
+    var consumerQueue: DispatchQueue?
 
     /// Called on this tap's own queue when a device or process change left it
     /// without a reader, so the recording can go back to the stream's sound
@@ -127,6 +232,9 @@ final class RecorderSystemAudioTap: @unchecked Sendable {
     private var clock: CMClock?
     private var aggregateID = AudioObjectID(0)
     private var ioProc: AudioDeviceIOProcID?
+    private var sampleSource: DispatchSourceUserDataAdd?
+    private var sampleDrain: (() -> Void)?
+    private var activeConsumerQueue: DispatchQueue?
     private var hostDeviceUID: String?
     private var sampleRate: Double = 0
     /// Name the default output, sample rate and process list listeners. See
@@ -213,6 +321,7 @@ final class RecorderSystemAudioTap: @unchecked Sendable {
         let tapID = stopped ? 0 : self.tapID
         let aggregateID = self.aggregateID
         let ioProc = self.ioProc
+        sampleSource?.cancel()
         levelWatch?.stop()
         Self.removeListener(deviceListenerClient, from: AudioObjectID(kAudioObjectSystemObject),
                             kAudioHardwarePropertyDefaultOutputDevice)
@@ -301,8 +410,9 @@ final class RecorderSystemAudioTap: @unchecked Sendable {
             return
         }
 
-        // The audio thread touches only these captured values, never the
-        // engine object, matching the mixer's realtime discipline.
+        // Pre-allocate the SPSC ring buffer and coalescing dispatch source before
+        // `AudioDeviceStart` so `HALB_IOThread` never allocates heap memory,
+        // constructs `CMSampleBuffer`s, or dispatches async closures per cycle.
         let channels = tapChannels
         let heard = self.heard
         let onSample = self.onSample
@@ -311,6 +421,47 @@ final class RecorderSystemAudioTap: @unchecked Sendable {
         let limiter = LimiterState(release: BoostLimiter.release(sampleRate: sampleRate))
         let timescale = CMTimeScale(sampleRate.rounded())
         let hostClock = CMClockGetHostTimeClock()
+        var timebase = mach_timebase_info_data_t()
+        mach_timebase_info(&timebase)
+        let hostFrequency = timebase.numer > 0 ? 1_000_000_000.0 * Double(timebase.denom) / Double(timebase.numer) : 0
+        let hostTicksPerFrame = sampleRate > 0 ? hostFrequency / sampleRate : 0
+        let ring = RecorderAudioSampleRing(slotCount: 64, maxFramesPerSlot: 8192, channels: channels)
+        let targetQueue = consumerQueue
+            ?? DispatchQueue(label: "com.vorssaint.recorder.systemaudio.consumer", qos: .userInitiated)
+        let source = DispatchSource.makeUserDataAddSource(queue: targetQueue)
+        let drainSamples: () -> Void = {
+            guard let onSample else {
+                while ring.drainOne({ _, _, _, _, _ in }) {}
+                return
+            }
+            while ring.drainOne({ samples, sampleCount, inputHostTime, hasInputHostTime, nowHostTime in
+                let gain = ramp.next(toward: compensation.value, hostTime: nowHostTime)
+                if gain > 1 {
+                    RecorderSupport.restoreTapLevel(samples, count: sampleCount, channels: channels,
+                                                    gain: gain, limiter: &limiter.limiter,
+                                                    release: limiter.release)
+                } else {
+                    limiter.limiter = BoostLimiter()
+                }
+                let hostTime = hasInputHostTime
+                    ? CMClockMakeHostTimeFromSystemUnits(inputHostTime)
+                    : CMClockMakeHostTimeFromSystemUnits(nowHostTime)
+                let time = CMSyncConvertTime(hostTime, from: hostClock, to: clock)
+                guard time.isValid else { return }
+                let buffer = AudioBuffer(
+                    mNumberChannels: UInt32(channels),
+                    mDataByteSize: UInt32(sampleCount * MemoryLayout<Float>.size),
+                    mData: UnsafeMutableRawPointer(samples)
+                )
+                guard let sample = Self.sampleBuffer(from: buffer, format: format,
+                                                     timescale: timescale, time: time)
+                else { return }
+                onSample(sample)
+            }) {}
+        }
+        source.setEventHandler(handler: drainSamples)
+        source.resume()
+
         var ioProc: AudioDeviceIOProcID?
         let created = AudioDeviceCreateIOProcIDWithBlock(&ioProc, aggregateID, nil) {
             now, input, inputTime, output, _ in
@@ -322,37 +473,28 @@ final class RecorderSystemAudioTap: @unchecked Sendable {
             else { return }
             let buffer = inputBuffers[index]
             if !heard.value, RecorderAudioProbe.containsSound(buffer) { heard.raise() }
-            guard let onSample else { return }
-            let hostTime = inputTime.pointee.mFlags.contains(.hostTimeValid)
-                ? CMClockMakeHostTimeFromSystemUnits(inputTime.pointee.mHostTime)
-                : CMClockGetTime(hostClock)
-            let time = CMSyncConvertTime(hostTime, from: hostClock, to: clock)
-            guard time.isValid,
-                  let sample = Self.sampleBuffer(from: buffer, format: format,
-                                                 timescale: timescale, time: time)
-            else { return }
-            // Eased as in the mixer, so a change never steps the level.
-            let gain = ramp.next(toward: compensation.value, hostTime: now.pointee.mHostTime)
-            if gain > 1 {
-                Self.withSamples(of: sample) { samples, count in
-                    RecorderSupport.restoreTapLevel(samples, count: count, channels: channels,
-                                                    gain: gain, limiter: &limiter.limiter,
-                                                    release: limiter.release)
-                }
-            } else {
-                // Peaks held from an earlier stretch must not turn down the
-                // next one, which starts from the sound it brings.
-                limiter.limiter = BoostLimiter()
+            guard onSample != nil, let rawData = buffer.mData, buffer.mDataByteSize > 0 else { return }
+            if ring.push(samples: rawData,
+                         byteCount: Int(buffer.mDataByteSize),
+                         channels: channels,
+                         inputHostTime: inputTime.pointee.mHostTime,
+                         hasInputHostTime: inputTime.pointee.mFlags.contains(.hostTimeValid),
+                         nowHostTime: now.pointee.mHostTime,
+                         hostTicksPerFrame: hostTicksPerFrame) {
+                source.add(data: 1)
             }
-            onSample(sample)
         }
         guard created == noErr, let ioProc,
               AudioDeviceStart(aggregateID, ioProc) == noErr else {
+            source.cancel()
             Self.destroy(aggregateID: aggregateID, ioProc: ioProc, tapID: 0)
             return
         }
         self.aggregateID = aggregateID
         self.ioProc = ioProc
+        self.sampleSource = source
+        self.sampleDrain = drainSamples
+        self.activeConsumerQueue = targetQueue
         hostDeviceUID = hostUID
         self.sampleRate = sampleRate
         pipelineStarted.value = mach_absolute_time()
@@ -364,14 +506,31 @@ final class RecorderSystemAudioTap: @unchecked Sendable {
         let aggregateID = self.aggregateID
         let ioProc = self.ioProc
         let rateListenerClient = self.rateListenerClient
+        let sampleSource = self.sampleSource
+        let sampleDrain = self.sampleDrain
+        let activeConsumerQueue = self.activeConsumerQueue
         self.aggregateID = 0
         self.ioProc = nil
         self.rateListenerClient = nil
+        self.sampleSource = nil
+        self.sampleDrain = nil
+        self.activeConsumerQueue = nil
         hostDeviceUID = nil
         pipelineStarted.value = 0
-        guard aggregateID != 0 else { return }
+        guard aggregateID != 0 else {
+            sampleSource?.cancel()
+            return
+        }
         if let ioProc {
             AudioDeviceStop(aggregateID, ioProc)
+        }
+        if let activeConsumerQueue {
+            activeConsumerQueue.async {
+                sampleDrain?()
+                sampleSource?.cancel()
+            }
+        } else {
+            sampleSource?.cancel()
         }
         Self.removeListener(rateListenerClient, from: aggregateID, kAudioDevicePropertyNominalSampleRate)
         Self.destroy(aggregateID: aggregateID, ioProc: ioProc, tapID: 0)
