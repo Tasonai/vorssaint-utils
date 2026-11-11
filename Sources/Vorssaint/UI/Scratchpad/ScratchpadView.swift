@@ -868,12 +868,29 @@ struct MarkdownPreview: NSViewRepresentable {
         func textView(_ textView: NSTextView,
                       clickedOnLink link: Any,
                       at charIndex: Int) -> Bool {
-            guard let url = link as? URL else { return false }
-            if url.scheme == ScratchpadSupport.taskScheme {
+            let resolved: URL?
+            if let url = link as? URL {
+                resolved = url
+            } else if let text = link as? String {
+                resolved = URL(string: text)
+            } else {
+                return true
+            }
+            guard let url = resolved, let scheme = url.scheme?.lowercased() else { return true }
+            if scheme == ScratchpadSupport.taskScheme {
                 if let box = url.host.flatMap(Int.init) { onToggleTask?(box) }
                 return true
             }
-            return NSWorkspace.shared.open(url)
+            guard scheme == "http" || scheme == "https" || scheme == "mailto" else {
+                NSSound.beep()
+                return true
+            }
+            if (scheme == "http" || scheme == "https"), (url.host ?? "").isEmpty {
+                NSSound.beep()
+                return true
+            }
+            _ = NSWorkspace.shared.open(url)
+            return true
         }
     }
 }

@@ -114,7 +114,8 @@ enum AgentClaudeServer {
         // Its tokens, provider routing and config overrides must not replace
         // the chosen profile's own sign-in. Network settings still apply.
         var environment = base.filter {
-            optOuts.contains($0.key) || (!$0.key.hasPrefix("CLAUDE_") && !$0.key.hasPrefix("ANTHROPIC_"))
+            !AgentCodexServer.isUnsafeEnvironmentKey($0.key)
+                && (optOuts.contains($0.key) || (!$0.key.hasPrefix("CLAUDE_") && !$0.key.hasPrefix("ANTHROPIC_")))
         }
         environment.removeValue(forKey: "CLAUDECODE")
         if !profile.isDefault { environment["CLAUDE_CONFIG_DIR"] = profile.directory }

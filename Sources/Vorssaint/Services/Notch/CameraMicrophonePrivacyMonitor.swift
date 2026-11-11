@@ -335,12 +335,12 @@ final class CameraMicrophonePrivacyMonitor: ObservableObject {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var nameCF: CFString?
-        var nameSize = UInt32(MemoryLayout<CFString?>.size)
+        var nameCF: Unmanaged<CFString>? = nil
+        var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         let status = withUnsafeMutablePointer(to: &nameCF) { ptr in
-            AudioObjectGetPropertyData(devID, &nameAddress, 0, nil, &nameSize, ptr)
+            AudioObjectGetPropertyData(devID, &nameAddress, 0, nil, &nameSize, UnsafeMutableRawPointer(ptr))
         }
-        guard status == noErr, let name = nameCF as String? else { return nil }
-        return name
+        guard status == noErr else { return nil }
+        return nameCF?.takeRetainedValue() as String?
     }
 }

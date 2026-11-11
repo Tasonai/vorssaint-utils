@@ -391,8 +391,9 @@ struct GlobalShortcut: Equatable, Hashable {
         event.keyboardGetUnicodeString(maxStringLength: chars.count,
                                        actualStringLength: &length,
                                        unicodeString: &chars)
-        guard length > 0 else { return false }
-        let typed = String(utf16CodeUnits: chars, count: length)
+        let count = min(max(0, length), chars.count)
+        guard count > 0 else { return false }
+        let typed = String(utf16CodeUnits: chars, count: count)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return !typed.isEmpty && typed.uppercased() == label.uppercased()
     }

@@ -196,9 +196,7 @@ final class AudioInputDeviceManager: ObservableObject {
             MicMuteService.shared.withUnmutedInput(lifetime: muteLifetime) {
                 guard self.volumeWriteLock.withLock({ self.volumeWriteLifetime == lifetime }),
                       Self.defaultInputDeviceUID() == uid else { return }
-                var deviceUID: CFString = "" as CFString
-                guard Self.read(device.audioObjectID, kAudioDevicePropertyDeviceUID, &deviceUID),
-                      deviceUID as String == uid,
+                guard Self.readCFString(device.audioObjectID, kAudioDevicePropertyDeviceUID) == uid,
                       self.volumeWriteLock.withLock({ self.volumeWriteLifetime == lifetime }) else { return }
                 _ = Self.setInputVolume(Float32(clamped), for: device.audioObjectID)
             }
@@ -694,15 +692,10 @@ final class AudioInputDeviceManager: ObservableObject {
                 continue
             }
 
-            var uidRef: CFString = "" as CFString
-            guard read(deviceID, kAudioDevicePropertyDeviceUID, &uidRef) else { continue }
-            let uid = uidRef as String
-            guard !uid.isEmpty else { continue }
+            guard let uid = readCFString(deviceID, kAudioDevicePropertyDeviceUID),
+                  !uid.isEmpty else { continue }
 
-            var nameRef: CFString = "" as CFString
-            let name = read(deviceID, kAudioObjectPropertyName, &nameRef)
-                ? nameRef as String
-                : uid
+            let name = readCFString(deviceID, kAudioObjectPropertyName) ?? uid
             guard !MicMuteSupport.isOwnDevice(name: name) else { continue }
             var transportType: UInt32 = 0
             _ = read(deviceID, kAudioDevicePropertyTransportType, &transportType)
@@ -737,9 +730,7 @@ final class AudioInputDeviceManager: ObservableObject {
         guard read(AudioObjectID(kAudioObjectSystemObject),
                    kAudioHardwarePropertyDefaultInputDevice, &defaultDevice),
               defaultDevice != 0 else { return nil }
-        var uidRef: CFString = "" as CFString
-        guard read(defaultDevice, kAudioDevicePropertyDeviceUID, &uidRef) else { return nil }
-        return uidRef as String
+        return readCFString(defaultDevice, kAudioDevicePropertyDeviceUID)
     }
 
     @discardableResult
@@ -755,5 +746,21 @@ final class AudioInputDeviceManager: ObservableObject {
             AudioObjectGetPropertyData(object, &address, 0, nil, &size,
                                        UnsafeMutableRawPointer(pointer)) == noErr
         }
+    }
+
+    private static func readCFString(_ object: AudioObjectID,
+                                     _ selector: AudioObjectPropertySelector,
+                                     scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> String? {
+        var address = AudioObjectPropertyAddress(mSelector: selector,
+                                                 mScope: scope,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var unmanagedRef: Unmanaged<CFString>? = nil
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let status = withUnsafeMutablePointer(to: &unmanagedRef) { pointer in
+            AudioObjectGetPropertyData(object, &address, 0, nil, &size,
+                                       UnsafeMutableRawPointer(pointer))
+        }
+        guard status == noErr else { return nil }
+        return unmanagedRef?.takeRetainedValue() as String?
     }
 }

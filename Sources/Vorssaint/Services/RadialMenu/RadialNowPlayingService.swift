@@ -342,9 +342,19 @@ private final class MediaRemoteNowPlayingBridge {
             return
         }
         queue.async {
+            var perlEnvironment: [String: String] = [
+                "PATH": "/usr/bin:/bin",
+                "LANG": "en_US.UTF-8",
+                "LC_ALL": "en_US.UTF-8",
+            ]
+            let inherited = ProcessInfo.processInfo.environment
+            for key in ["HOME", "USER", "LOGNAME", "TMPDIR", "__CF_USER_TEXT_ENCODING"] {
+                if let value = inherited[key] { perlEnvironment[key] = value }
+            }
             let result = BoundedProcessRunner.run("/usr/bin/perl", [script.path, library.path],
                                                   timeout: Self.replyTimeout,
-                                                  maxOutputBytes: RadialNowPlayingSupport.maximumAdapterReplyBytes)
+                                                  maxOutputBytes: RadialNowPlayingSupport.maximumAdapterReplyBytes,
+                                                  environment: perlEnvironment)
             guard result.status == 0, !result.timedOut,
                   let reply = RadialNowPlayingSupport.adapterReply(from: result.output) else {
                 completion(nil)

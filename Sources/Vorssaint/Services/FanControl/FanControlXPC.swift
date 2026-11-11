@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Vorssaint
 
 import Foundation
-#if VORSSAINT_DEVELOPMENT
+#if VORSSAINT_DEVELOPMENT || VORSSAINT_SELF_SIGNED
 import Security
 import CryptoKit
 #endif
@@ -20,7 +20,7 @@ enum FanControlIdentifiers {
     static let plistName = "\(helperID).plist"
 
     static var appCodeRequirement: String {
-        #if VORSSAINT_DEVELOPMENT
+        #if VORSSAINT_DEVELOPMENT || VORSSAINT_SELF_SIGNED
         guard let hash = self.currentLeafCertificateSHA1() else {
             return "identifier \"\(appBundleID)\" and certificate leaf = H\"0000000000000000000000000000000000000000\""
         }
@@ -31,7 +31,7 @@ enum FanControlIdentifiers {
     }
 
     static var helperCodeRequirement: String {
-        #if VORSSAINT_DEVELOPMENT
+        #if VORSSAINT_DEVELOPMENT || VORSSAINT_SELF_SIGNED
         guard let hash = self.currentLeafCertificateSHA1() else {
             return "identifier \"\(helperID)\" and certificate leaf = H\"0000000000000000000000000000000000000000\""
         }
@@ -41,7 +41,7 @@ enum FanControlIdentifiers {
         #endif
     }
 
-    #if VORSSAINT_DEVELOPMENT
+    #if VORSSAINT_DEVELOPMENT || VORSSAINT_SELF_SIGNED
     private static func currentLeafCertificateSHA1() -> String? {
         var dynamicCode: SecCode?
         guard SecCodeCopySelf([], &dynamicCode) == errSecSuccess,

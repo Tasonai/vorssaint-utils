@@ -134,12 +134,30 @@ enum AgentCodexResetTests {
                      "the desktop app's own copy wins over an installed one")
 
         let environment = AgentCodexServer.environment(for: URL(fileURLWithPath: "/tool/bin/codex"), searchPath: nil,
-                                                       base: ["PATH": "/usr/bin:/bin", "HOME": "/Users/someone"])
+                                                       base: ["PATH": "/usr/bin:/bin", "HOME": "/Users/someone",
+                                                              "DYLD_INSERT_LIBRARIES": "/tmp/evil.dylib",
+                                                              "LD_PRELOAD": "/tmp/evil.so",
+                                                              "PERL5OPT": "-Mevil",
+                                                              "NODE_OPTIONS": "--require /tmp/evil.js",
+                                                              "NODE_EXTRA_CA_CERTS": "/tmp/evil.pem",
+                                                              "SSL_CERT_FILE": "/tmp/evil.pem",
+                                                              "PYTHONPATH": "/tmp/evil",
+                                                              "BASH_ENV": "/tmp/evil.sh",
+                                                              "ENV": "/tmp/evil.sh"])
         let shell = AgentCodexServer.environment(for: URL(fileURLWithPath: "/tool/bin/codex"), searchPath: "/a:/b",
                                                  base: ["PATH": "/usr/bin:/bin"])
         suite.expect(environment["PATH"] == "/tool/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-                        && environment["HOME"] == "/Users/someone" && shell["PATH"] == "/tool/bin:/a:/b:/usr/bin:/bin",
-                     "the tool runs with its own folder and the usual ones on its PATH, which finds node for npm's copy")
+                        && environment["HOME"] == "/Users/someone" && shell["PATH"] == "/tool/bin:/a:/b:/usr/bin:/bin"
+                        && environment["DYLD_INSERT_LIBRARIES"] == nil
+                        && environment["LD_PRELOAD"] == nil
+                        && environment["PERL5OPT"] == nil
+                        && environment["NODE_OPTIONS"] == nil
+                        && environment["NODE_EXTRA_CA_CERTS"] == nil
+                        && environment["SSL_CERT_FILE"] == nil
+                        && environment["PYTHONPATH"] == nil
+                        && environment["BASH_ENV"] == nil
+                        && environment["ENV"] == nil,
+                     "the tool runs with its own folder and the usual ones on its PATH, stripping injection variables")
     }
 
     // MARK: Conversations

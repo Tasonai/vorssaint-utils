@@ -739,15 +739,39 @@ enum RadialMenuSupport {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
         if hasExplicitScheme(trimmed) {
-            guard let url = URL(string: trimmed) else { return nil }
-            if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
-                return url.host != nil ? trimmed : nil
+            guard let url = URL(string: trimmed),
+                  let scheme = url.scheme?.lowercased() else { return nil }
+            switch scheme {
+            case "file", "javascript", "data", "vbscript":
+                return nil
+            case "http", "https":
+                return (url.host?.isEmpty == false) ? trimmed : nil
+            default:
+                return trimmed
             }
-            return trimmed
         }
         let candidate = "https://" + trimmed
         guard let url = URL(string: candidate), url.host != nil else { return nil }
         return candidate
+    }
+
+    /// URLs safe to open without an explicit confirmation: web and mail links only.
+    /// Local files and applications have dedicated `.file` and `.app` slice kinds.
+    static func autoOpenURL(_ raw: String) -> URL? {
+        guard let normalized = normalizedURL(raw),
+              let url = URL(string: normalized),
+              let scheme = url.scheme?.lowercased()
+        else { return nil }
+        switch scheme {
+        case "http", "https":
+            return (url.host?.isEmpty == false) ? url : nil
+        case "mailto":
+            let recipient = String(normalized.dropFirst("mailto:".count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return recipient.isEmpty ? nil : url
+        default:
+            return nil
+        }
     }
 
     /// A leading URL scheme, minding that "example.com:8080" is a host and
@@ -909,6 +933,13 @@ enum RadialMenuSupport {
     static func profile(using shortcut: GlobalShortcut, in profiles: [RadialMenuProfile],
                         excluding profileID: UUID) -> RadialMenuProfile? {
         profiles.first { $0.id != profileID && GlobalShortcut(storageValue: $0.shortcut) == shortcut }
+    }
+
+    static func decodeStoredProfiles(_ data: Data) -> [RadialMenuProfile]? {
+        guard let decoded = try? JSONDecoder().decode([FailableRadialMenuProfile].self, from: data) else {
+            return nil
+        }
+        return decoded.compactMap(\.value)
     }
 
     static func encodeProfiles(_ profiles: [RadialMenuProfile]) -> Data? {

@@ -31,15 +31,7 @@ enum SettingsBackup {
         let payload = SettingsBackupSupport.payload(appVersion: AppInfo.version) {
             defaults.object(forKey: $0)
         }
-        do {
-            let data = try PropertyListSerialization.data(fromPropertyList: payload,
-                                                          format: .xml,
-                                                          options: 0)
-            try data.write(to: url, options: .atomic)
-            return true
-        } catch {
-            return false
-        }
+        return SettingsBackupSupport.writePayload(payload, to: url)
     }
 
     /// Shows the open panel; nil = user cancelled.
@@ -89,6 +81,10 @@ enum SettingsBackup {
         let localRecorderPresets = defaults.data(forKey: DefaultsKey.recorderEditorPresets)
         let localWatermark = defaults.string(forKey: DefaultsKey.screenshotWatermarkStyle)
         let localWatermarkPresets = defaults.string(forKey: DefaultsKey.screenshotWatermarkPresets)
+        let localCommandBarLinks = defaults.data(forKey: DefaultsKey.commandBarLinks)
+        let localCommandBarShortcuts = defaults.string(forKey: DefaultsKey.commandBarRowShortcuts)
+        let localRadialItems = defaults.data(forKey: DefaultsKey.radialMenuItems)
+        let localRadialProfiles = defaults.data(forKey: DefaultsKey.radialMenuProfiles)
         // A backup carries only the portable half of an exception list: the
         // path of a program that is not an app is authority on one Mac and is
         // filtered out on export (issue #1009). The clear below covers every
@@ -131,6 +127,27 @@ enum SettingsBackup {
             defaults.set(SettingsBackupSupport.restoredExceptionList(
                 restored: defaults.stringArray(forKey: DefaultsKey.windowLayoutIgnoredApps) ?? [],
                 carried: windowLayoutPaths), forKey: DefaultsKey.windowLayoutIgnoredApps)
+        }
+        if let mergedLinks = SettingsBackupSupport.preservingLocalCommandBarLinks(
+            restored: settings[DefaultsKey.commandBarLinks] as? Data,
+            local: localCommandBarLinks) {
+            defaults.set(mergedLinks, forKey: DefaultsKey.commandBarLinks)
+        }
+        if let mergedShortcuts = SettingsBackupSupport.preservingLocalCommandBarRowShortcuts(
+            restored: settings[DefaultsKey.commandBarRowShortcuts] as? String,
+            local: localCommandBarShortcuts,
+            localLinks: localCommandBarLinks) {
+            defaults.set(mergedShortcuts, forKey: DefaultsKey.commandBarRowShortcuts)
+        }
+        if let mergedRadialItems = SettingsBackupSupport.preservingLocalRadialMenuItems(
+            restored: settings[DefaultsKey.radialMenuItems] as? Data,
+            local: localRadialItems) {
+            defaults.set(mergedRadialItems, forKey: DefaultsKey.radialMenuItems)
+        }
+        if let mergedRadialProfiles = SettingsBackupSupport.preservingLocalRadialMenuProfiles(
+            restored: settings[DefaultsKey.radialMenuProfiles] as? Data,
+            local: localRadialProfiles) {
+            defaults.set(mergedRadialProfiles, forKey: DefaultsKey.radialMenuProfiles)
         }
     }
 

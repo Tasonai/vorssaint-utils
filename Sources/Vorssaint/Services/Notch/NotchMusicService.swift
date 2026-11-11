@@ -124,6 +124,16 @@ final class NotchMusicService: ObservableObject {
         generation = requested
         process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
         process.arguments = arguments + [includeOtherPlayers ? "watch_all" : "watch"]
+        var perlEnvironment: [String: String] = [
+            "PATH": "/usr/bin:/bin",
+            "LANG": "en_US.UTF-8",
+            "LC_ALL": "en_US.UTF-8",
+        ]
+        let inherited = ProcessInfo.processInfo.environment
+        for key in ["HOME", "USER", "LOGNAME", "TMPDIR", "__CF_USER_TEXT_ENCODING"] {
+            if let value = inherited[key] { perlEnvironment[key] = value }
+        }
+        process.environment = perlEnvironment
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         process.standardInput = input

@@ -23,7 +23,35 @@ set -euo pipefail
 
 IDENTITY="Vorssaint Utils Signing"
 KC="$HOME/Library/Keychains/vorssaint-signing.keychain-db"
-KCPASS="vorssaint-signing"
+FALLBACK_KCPASS="vorssaint-signing"
+SECRET_DIR="$HOME/Library/Application Support/Vorssaint"
+SECRET_FILE="$SECRET_DIR/signing-keychain.secret"
+KCPASS=""
+
+unlock_signing_keychain() {
+    [[ -f "$KC" ]] || return 0
+    if [[ -n "$KCPASS" ]] && security unlock-keychain -p "$KCPASS" "$KC" 2>/dev/null; then
+        return 0
+    fi
+    if [[ -f "$SECRET_FILE" ]]; then
+        local secret
+        secret="$(<"$SECRET_FILE")"
+        if [[ -n "$secret" ]] && security unlock-keychain -p "$secret" "$KC" 2>/dev/null; then
+            KCPASS="$secret"
+            return 0
+        fi
+    fi
+    if security unlock-keychain -p "$FALLBACK_KCPASS" "$KC" 2>/dev/null; then
+        KCPASS="$FALLBACK_KCPASS"
+        return 0
+    fi
+    return 0
+}
+
+lock_signing_keychain() {
+    [[ -f "$KC" ]] && security lock-keychain "$KC" 2>/dev/null || true
+    return 0
+}
 
 # A find-identity listing also names certificates codesign then rejects, and -v
 # excludes every self-signed one; ask codesign itself with a throwaway copy.
@@ -31,7 +59,7 @@ identity_can_sign() {
     local probe signed=1
     # Locked after every reboot; a locked keychain cannot sign, and a false
     # answer here would delete it and reissue the identity.
-    security unlock-keychain -p "$KCPASS" "$KC" 2>/dev/null || true
+    unlock_signing_keychain
     probe="$(mktemp)"
     cp /bin/echo "$probe"
     codesign --force --strip-disallowed-xattrs --sign "$IDENTITY" "$probe" >/dev/null 2>&1 && signed=0
@@ -40,12 +68,23 @@ identity_can_sign() {
 }
 
 if identity_can_sign; then
+    security set-keychain-settings -lut 300 "$KC" 2>/dev/null || true
+    lock_signing_keychain
     echo "✓ Signing identity already installed."
     exit 0
 fi
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'rm -rf "$WORK"; lock_signing_keychain' EXIT
+
+mkdir -p "$SECRET_DIR"
+chmod 700 "$SECRET_DIR"
+KCPASS="$(umask 077 && openssl rand -hex 32)"
+(
+    umask 077
+    printf '%s' "$KCPASS" > "$SECRET_FILE"
+)
+chmod 600 "$SECRET_FILE"
 
 openssl req -x509 -newkey rsa:2048 -keyout "$WORK/key.pem" -out "$WORK/cert.pem" -days 3650 -nodes \
     -subj "/CN=$IDENTITY/O=Vorssaint" \
@@ -65,7 +104,7 @@ openssl pkcs12 -export -inkey "$WORK/key.pem" -in "$WORK/cert.pem" \
 
 security delete-keychain "$KC" 2>/dev/null || true
 security create-keychain -p "$KCPASS" "$KC"
-security set-keychain-settings "$KC"            # no auto-lock
+security set-keychain-settings -lut 300 "$KC"
 security unlock-keychain -p "$KCPASS" "$KC"
 security import "$WORK/id.p12" -k "$KC" -P "$KCPASS" -T /usr/bin/codesign
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPASS" "$KC" >/dev/null 2>&1
@@ -79,4 +118,5 @@ identity_can_sign || {
     echo "✗ Identity imported but codesign cannot sign with it; keychain search list may be off." >&2
     exit 1
 }
+lock_signing_keychain
 echo "✓ Created signing identity '$IDENTITY'. Future ./build.sh runs use it automatically."

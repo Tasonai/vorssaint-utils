@@ -123,6 +123,7 @@ enum MixerInputVolumeContract {
         static var afterUIDRead: (() -> Void)?
         static var current: UInt32 = 10
         static var uids: [UInt32: String] = [:]
+        static var nullUIDDevices: Set<UInt32> = []
         static var aggregates: Set<UInt32> = []
         static var running: Set<UInt32> = []
         static func key(_ d: UInt32, _ e: UInt32 = 0, _ s: UInt32 = kAudioDevicePropertyVolumeScalar)
@@ -146,6 +147,7 @@ enum MixerInputVolumeContract {
             devices = [10]
             current = 10
             uids = [:]
+            nullUIDDevices = []
             aggregates = []
             running = []
             streamChannels = [:]
@@ -206,7 +208,12 @@ enum MixerInputVolumeContract {
                 }
             case kAudioHardwarePropertyDefaultInputDevice: p.storeBytes(of: current, as: UInt32.self)
             case kAudioDevicePropertyDeviceUID, kAudioObjectPropertyName:
-                p.assumingMemoryBound(to: CFString.self).pointee = (uids[d] ?? "device-\(d)") as CFString
+                if nullUIDDevices.contains(d) {
+                    p.assumingMemoryBound(to: Unmanaged<CFString>?.self).pointee = nil
+                } else {
+                    p.assumingMemoryBound(to: Unmanaged<CFString>?.self).pointee =
+                        Unmanaged.passRetained((uids[d] ?? "device-\(d)") as CFString)
+                }
                 let callback = afterUIDRead
                 afterUIDRead = nil
                 callback?()
@@ -923,5 +930,12 @@ enum MixerInputVolumeContract {
             !MicMuteService.shared.isMuted && HAL.levels[HAL.key(10)] == 0.5
                 && HAL.levels[HAL.key(10, 1)] == 0.5 && HAL.levels[HAL.key(10, 2)] == 0.5,
             "an unmute after updating brings back the channels an earlier version lowered")
+        HAL.reset()
+        HAL.devices = [10, 20]
+        HAL.nullUIDDevices = [20]
+        check(
+            AudioInputDeviceManager.inputDevices(defaultUID: "device-10").map(\.uid) == ["device-10"]
+                && MicMuteService.inputDevices().map(\.uid) == ["device-10"],
+            "a CoreAudio HAL NULL CFStringRef return is skipped cleanly without crashing")
     }
 }

@@ -167,10 +167,27 @@ enum Sudoers {
         // SSO-enrolled Macs (name@company.com, #915) and the old validation
         // rejected it before the password prompt could even appear.
         let rule = SudoersSupport.clamshellRule(uid: getuid())
-        // Clear any earlier-named rule first, then write and validate the new one
-        // (a failed check rolls back). Same password prompt either way.
-        let legacy = legacyRulePaths.joined(separator: " ")
-        let command = "mkdir -p /etc/sudoers.d && chmod 0755 /etc/sudoers.d && rm -f \(legacy) && echo '\(rule)' > \(rulePath) && chmod 0440 \(rulePath) && /usr/sbin/visudo -c -f \(rulePath) || { rm -f \(rulePath); exit 1; }"
+        // Clear any earlier-named rule first, then stage, validate with visudo
+        // and atomically move the new rule into place (removing the temporary
+        // file on failure so a broken file never lands in sudoers.d).
+        let legacy = legacyRulePaths.map { "'\($0)'" }.joined(separator: " ")
+        let command = """
+        PATH=/usr/sbin:/usr/bin:/bin
+        export PATH
+        umask 0337
+        RULE='\(rulePath)'
+        DIR="$(/usr/bin/dirname "$RULE")"
+        TMP="$DIR/.vorssaint-clamshell.tmp.$$"
+        /bin/mkdir -p "$DIR" && \
+        /usr/sbin/chown root:wheel "$DIR" && \
+        /bin/chmod 0755 "$DIR" && \
+        /bin/rm -f \(legacy) "$TMP" && \
+        printf '%s\\n' '\(rule)' > "$TMP" && \
+        /usr/sbin/chown root:wheel "$TMP" && \
+        /bin/chmod 0440 "$TMP" && \
+        /usr/sbin/visudo -c -f "$TMP" >/dev/null 2>&1 && \
+        /bin/mv -f "$TMP" "$RULE" || { /bin/rm -f "$TMP"; exit 1; }
+        """
         AdminShell.run(command, prompt: L10n.shared.s.adminPromptSudoersInstall) { ok in
             completion(ok && isConfigured())
         }
@@ -178,8 +195,8 @@ enum Sudoers {
 
     static func remove(completion: @escaping (Bool) -> Void) {
         // Also removes the rules left behind by earlier app names.
-        let all = ([rulePath] + legacyRulePaths).joined(separator: " ")
-        AdminShell.run("rm -f \(all)",
+        let all = ([rulePath] + legacyRulePaths).map { "'\($0)'" }.joined(separator: " ")
+        AdminShell.run("PATH=/usr/sbin:/usr/bin:/bin /bin/rm -f \(all)",
                        prompt: L10n.shared.s.adminPromptSudoersRemove) { ok in
             completion(ok)
         }

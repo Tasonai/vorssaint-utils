@@ -149,10 +149,11 @@ final class ShelfService: ObservableObject {
 
     private let tempDir: URL = {
         let id = Bundle.main.bundleIdentifier ?? "com.vorssaint.utils"
-        let dir = FileManager.default.temporaryDirectory
+        let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("VorssaintShelf", isDirectory: true)
-            .appendingPathComponent(id, isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        PrivateFileStore.createDirectory(at: root)
+        let dir = root.appendingPathComponent(id, isDirectory: true)
+        PrivateFileStore.createDirectory(at: dir)
         return dir
     }()
 
@@ -1658,6 +1659,7 @@ final class ShelfService: ObservableObject {
             PrivateFileStore.createDirectory(at: store)
             directory = store
         } else {
+            PrivateFileStore.createDirectory(at: tempDir)
             directory = tempDir
         }
         let url = directory.appendingPathComponent("\(UUID().uuidString).\(fileExtension)")

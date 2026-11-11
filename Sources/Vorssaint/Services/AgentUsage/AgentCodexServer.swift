@@ -82,12 +82,28 @@ enum AgentCodexServer {
         HomebrewEnvironment.loginShellExports(shellPath: HomebrewCommandBuilder.currentShellPath)["PATH"]
     }
 
+    static func isUnsafeEnvironmentKey(_ key: String) -> Bool {
+        let upper = key.uppercased()
+        if upper.hasPrefix("DYLD_") || upper.hasPrefix("LD_") { return true }
+        switch upper {
+        case "PERL5OPT", "PERL5LIB", "PERLLIB", "PERL5DB", "PERL5SHELL", "PERL_UNICODE",
+             "NODE_OPTIONS", "NODE_EXTRA_CA_CERTS", "NODE_PATH", "NODE_REPL_EXTERNAL_MODULE", "NODE_REDIRECT_WARNINGS",
+             "SSL_CERT_FILE", "SSL_CERT_DIR", "OPENSSL_CONF", "OPENSSL_ENGINES", "OPENSSL_MODULES",
+             "PYTHONSTARTUP", "PYTHONPATH", "PYTHONHOME",
+             "RUBYOPT", "RUBYLIB",
+             "BASH_ENV", "ENV", "ZDOTDIR", "CDPATH", "IFS", "SHELLOPTS", "BASHOPTS", "PS4":
+            return true
+        default:
+            return false
+        }
+    }
+
     /// An app opened from Finder has only the system folders on its PATH,
     /// and a tool installed with npm needs `node`, which sits beside it or
     /// on the shell's PATH.
     static func environment(for executable: URL, searchPath: String?,
                             base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
-        var environment = base
+        var environment = base.filter { !isUnsafeEnvironmentKey($0.key) }
         let folders = [executable.deletingLastPathComponent().path]
             + (searchPath.map { [$0] } ?? ["/opt/homebrew/bin", "/usr/local/bin"])
             + [base["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"]

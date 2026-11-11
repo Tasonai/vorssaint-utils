@@ -1258,8 +1258,9 @@ final class AppSwitcher: ObservableObject {
         event.keyboardGetUnicodeString(maxStringLength: chars.count,
                                        actualStringLength: &length,
                                        unicodeString: &chars)
-        guard length > 0 else { return nil }
-        return sanitizedSearchInput(String(utf16CodeUnits: chars, count: length))
+        let count = min(max(0, length), chars.count)
+        guard count > 0 else { return nil }
+        return sanitizedSearchInput(String(utf16CodeUnits: chars, count: count))
     }
 
     private func sanitizedSearchInput(_ text: String) -> String {

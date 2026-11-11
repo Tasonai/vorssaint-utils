@@ -2391,10 +2391,9 @@ final class AppVolumeMixer: ObservableObject {
     /// provide, never to override it.
     private static func processBundleIdentifier(of object: AudioObjectID) -> String? {
         guard #available(macOS 14.4, *) else { return nil }
-        var bundleRef: CFString = "" as CFString
-        guard read(object, kAudioProcessPropertyBundleID, &bundleRef) else { return nil }
-        let bundleID = bundleRef as String
-        return bundleID.isEmpty ? nil : bundleID
+        guard let bundleID = readCFString(object, kAudioProcessPropertyBundleID),
+              !bundleID.isEmpty else { return nil }
+        return bundleID
     }
 
     private static let outputVolumeSelectors: [AudioObjectPropertySelector] = [
@@ -2461,15 +2460,10 @@ final class AppVolumeMixer: ObservableObject {
                 deviceID,
                 selector: kAudioDevicePropertyDeviceCanBeDefaultSystemDevice)
 
-            var uidRef: CFString = "" as CFString
-            guard read(deviceID, kAudioDevicePropertyDeviceUID, &uidRef) else { continue }
-            let uid = uidRef as String
-            guard !uid.isEmpty else { continue }
+            guard let uid = readCFString(deviceID, kAudioDevicePropertyDeviceUID),
+                  !uid.isEmpty else { continue }
 
-            var nameRef: CFString = "" as CFString
-            let name = read(deviceID, kAudioObjectPropertyName, &nameRef)
-                ? nameRef as String
-                : uid
+            let name = readCFString(deviceID, kAudioObjectPropertyName) ?? uid
             guard !MicMuteSupport.isOwnDevice(name: name) else { continue }
             let dataSourceName = outputDataSourceName(for: deviceID)
             let terminalTypes: [UInt32] = streams.compactMap { stream in
@@ -2535,14 +2529,14 @@ final class AppVolumeMixer: ObservableObject {
             mSelector: kAudioDevicePropertyDataSourceNameForIDCFString,
             mScope: kAudioObjectPropertyScopeOutput,
             mElement: kAudioObjectPropertyElementMain)
-        var nameRef: CFString = "" as CFString
+        var nameRef: Unmanaged<CFString>? = nil
         let status = withUnsafeMutablePointer(to: &dataSourceID) { dataSourcePointer in
             withUnsafeMutablePointer(to: &nameRef) { namePointer in
                 var translation = AudioValueTranslation(
                     mInputData: UnsafeMutableRawPointer(dataSourcePointer),
                     mInputDataSize: UInt32(MemoryLayout<UInt32>.size),
                     mOutputData: UnsafeMutableRawPointer(namePointer),
-                    mOutputDataSize: UInt32(MemoryLayout<CFString>.size))
+                    mOutputDataSize: UInt32(MemoryLayout<Unmanaged<CFString>?>.size))
                 var size = UInt32(MemoryLayout<AudioValueTranslation>.size)
                 return AudioObjectGetPropertyData(
                     deviceID,
@@ -2554,7 +2548,7 @@ final class AppVolumeMixer: ObservableObject {
             }
         }
         guard status == noErr else { return nil }
-        return nameRef as String
+        return nameRef?.takeRetainedValue() as String?
     }
 
     /// How many channels each output stream of a device carries, in order,
@@ -2601,9 +2595,7 @@ final class AppVolumeMixer: ObservableObject {
         guard read(AudioObjectID(kAudioObjectSystemObject),
                    selector, &defaultDevice),
               defaultDevice != 0 else { return nil }
-        var uidRef: CFString = "" as CFString
-        guard read(defaultDevice, kAudioDevicePropertyDeviceUID, &uidRef) else { return nil }
-        return uidRef as String
+        return readCFString(defaultDevice, kAudioDevicePropertyDeviceUID)
     }
 
     private static func setDefaultDevice(_ deviceID: AudioObjectID,
@@ -2785,6 +2777,22 @@ final class AppVolumeMixer: ObservableObject {
             AudioObjectGetPropertyData(object, &address, 0, nil, &size,
                                        UnsafeMutableRawPointer(pointer)) == noErr
         }
+    }
+
+    fileprivate static func readCFString(_ object: AudioObjectID,
+                                         _ selector: AudioObjectPropertySelector,
+                                         scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> String? {
+        var address = AudioObjectPropertyAddress(mSelector: selector,
+                                                 mScope: scope,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var unmanagedRef: Unmanaged<CFString>? = nil
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let status = withUnsafeMutablePointer(to: &unmanagedRef) { pointer in
+            AudioObjectGetPropertyData(object, &address, 0, nil, &size,
+                                       UnsafeMutableRawPointer(pointer))
+        }
+        guard status == noErr else { return nil }
+        return unmanagedRef?.takeRetainedValue() as String?
     }
 }
 

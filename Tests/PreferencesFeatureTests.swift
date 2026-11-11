@@ -387,5 +387,112 @@ enum PreferencesFeatureTests {
         suite.expect(SudoersSupport.clamshellRule(uid: uid_t.max)
                .range(of: #"^#[0-9]+ [A-Za-z0-9()=:,./ ]+$"#, options: .regularExpression) != nil,
                "the closed-lid sudoers rule never contains shell or sudoers metacharacters")
+
+        // Every exported setting, including unregistered keys, must reject wrong types.
+        for key in SettingsBackupSupport.exportKeys() {
+            let rejectsWrongType = !SettingsBackupSupport.valueLooksRight(key, URL(fileURLWithPath: "/tmp"))
+                && !(SettingsBackupSupport.valueLooksRight(key, Data([0x01]))
+                     && SettingsBackupSupport.valueLooksRight(key, "text"))
+            suite.expect(rejectsWrongType, "backup validation enforces a concrete type for \(key)")
+        }
+        suite.expect(SettingsBackupSupport.valueLooksRight(DefaultsKey.autoQuitEnabled, true)
+                && !SettingsBackupSupport.valueLooksRight(DefaultsKey.autoQuitEnabled, "yes")
+                && SettingsBackupSupport.valueLooksRight(DefaultsKey.onboardingStep, 2)
+                && !SettingsBackupSupport.valueLooksRight(DefaultsKey.onboardingStep, true)
+                && SettingsBackupSupport.valueLooksRight(DefaultsKey.commandBarLinks, Data())
+                && !SettingsBackupSupport.valueLooksRight(DefaultsKey.commandBarLinks, ["bad"])
+                && SettingsBackupSupport.valueLooksRight(DefaultsKey.appVolumes, ["com.apple.Music": 0.5])
+                && !SettingsBackupSupport.valueLooksRight(DefaultsKey.appVolumes, ["com.apple.Music": "loud"]),
+               "unregistered backup keys validate booleans, integers, data blobs and numeric volume maps")
+
+        // Command Bar & Radial Menu backup sanitization: strip scripts, local paths and unsafe URL schemes.
+        let safeWebLink = CommandBarLink(name: "docs", kind: .link, destination: "https://example.com/{query}")
+        let safeMailLink = CommandBarLink(name: "mail", kind: .link, destination: "mailto:ops@example.com")
+        let unsafeSSHLink = CommandBarLink(name: "ssh", kind: .link, destination: "ssh://root@example.com")
+        let injectedScript = CommandBarLink(name: "pwn", kind: .script, destination: "/tmp/evil.sh",
+                                            runsWithoutArgument: true, runsDirectly: true)
+        let injectedPlace = CommandBarLink(name: "secret", kind: .place, destination: "/Users/victim/.ssh")
+        let localScript = CommandBarLink(name: "deploy", kind: .script, destination: "/usr/local/bin/deploy")
+        let shortcutA = GlobalShortcut(keyCode: 0, modifiers: [.command, .option])
+        let shortcutB = GlobalShortcut(keyCode: 11, modifiers: [.command, .option])
+        let shortcutC = GlobalShortcut(keyCode: 8, modifiers: [.command, .option])
+        let rawShortcuts = CommandBarRowShortcuts.encode([
+            "link.\(safeWebLink.id.uuidString)": shortcutA,
+            "link.\(injectedScript.id.uuidString)": shortcutB,
+            "app./Users/victim/Evil.app": shortcutC,
+        ])!
+
+        let safeSlice = RadialMenuItem(kind: .url, name: "Web", payload: "https://example.com")
+        let unsafeSlice = RadialMenuItem(kind: .url, name: "SSH", payload: "ssh://example.com")
+        let appSlice = RadialMenuItem(kind: .app, name: "EvilApp", payload: "/tmp/Evil.app")
+        let fileSlice = RadialMenuItem(kind: .file, name: "EvilFile", payload: "/tmp/evil.command")
+        let localAppSlice = RadialMenuItem(kind: .app, name: "Safari", payload: "/Applications/Safari.app")
+        let profileID = UUID()
+        let rawProfiles = RadialMenuSupport.encodeProfiles([
+            RadialMenuProfile(id: profileID, name: "Main",
+                              shortcut: shortcutA.storageValue,
+                              items: [safeSlice, unsafeSlice, appSlice, fileSlice])
+        ])!
+        let localProfiles = RadialMenuSupport.encodeProfiles([
+            RadialMenuProfile(id: profileID, name: "Main",
+                              shortcut: shortcutA.storageValue,
+                              items: [localAppSlice])
+        ])!
+
+        let rawBackup: [String: Any] = [
+            SettingsBackupSupport.formatVersionKey: SettingsBackupSupport.formatVersion,
+            SettingsBackupSupport.settingsKey: [
+                DefaultsKey.commandBarLinks: CommandBarLinks.encode([
+                    safeWebLink, safeMailLink, unsafeSSHLink, injectedScript, injectedPlace,
+                ])!,
+                DefaultsKey.commandBarRowShortcuts: rawShortcuts,
+                DefaultsKey.radialMenuItems: RadialMenuSupport.encode([
+                    safeSlice, unsafeSlice, appSlice, fileSlice,
+                ])!,
+                DefaultsKey.radialMenuProfiles: rawProfiles,
+            ],
+        ]
+        let imported = SettingsBackupSupport.sanitizedSettings(from: rawBackup)
+        let importedLinks = CommandBarLinks.decode(imported?[DefaultsKey.commandBarLinks] as? Data)
+        let importedShortcuts = CommandBarRowShortcuts.decode(imported?[DefaultsKey.commandBarRowShortcuts] as? String)
+        let importedRadial = RadialMenuSupport.decode(imported?[DefaultsKey.radialMenuItems] as? Data)
+        let importedProfiles = (imported?[DefaultsKey.radialMenuProfiles] as? Data)
+            .flatMap(RadialMenuSupport.decodeStoredProfiles) ?? []
+        suite.expect(importedLinks.map(\.id) == [safeWebLink.id, safeMailLink.id]
+                && importedShortcuts == ["link.\(safeWebLink.id.uuidString)": shortcutA],
+               "importing settings strips scripts, places, non-web schemes and shortcuts pointing to stripped rows")
+        suite.expect(importedRadial.map(\.id) == [safeSlice.id]
+                && importedProfiles.first?.items.map(\.id) == [safeSlice.id],
+               "importing radial menus strips local app/file slices and non-http/https/mailto URLs")
+
+        let carriedLinks = CommandBarLinks.decode(SettingsBackupSupport.preservingLocalCommandBarLinks(
+            restored: imported?[DefaultsKey.commandBarLinks] as? Data,
+            local: CommandBarLinks.encode([localScript])))
+        let carriedRadial = RadialMenuSupport.decode(SettingsBackupSupport.preservingLocalRadialMenuItems(
+            restored: imported?[DefaultsKey.radialMenuItems] as? Data,
+            local: RadialMenuSupport.encode([localAppSlice])))
+        let carriedProfiles: [RadialMenuProfile] = SettingsBackupSupport.preservingLocalRadialMenuProfiles(
+            restored: imported?[DefaultsKey.radialMenuProfiles] as? Data,
+            local: localProfiles).flatMap(RadialMenuSupport.decodeStoredProfiles) ?? []
+        suite.expect(carriedLinks.map(\.id) == [safeWebLink.id, safeMailLink.id, localScript.id]
+                && carriedRadial.map(\.id) == [safeSlice.id, localAppSlice.id]
+                && carriedProfiles.first?.items.map(\.id) == [safeSlice.id, localAppSlice.id],
+               "applying a backup preserves existing local scripts and radial paths without importing external ones")
+
+        // Exported backup plists must be owner-only (0600).
+        let backupDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vorssaint-backup-perms-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: backupDir) }
+        PrivateFileStore.createDirectory(at: backupDir)
+        let backupFile = backupDir.appendingPathComponent("Vorssaint Settings.plist")
+        let exportedPayload = SettingsBackupSupport.payload(appVersion: "9.9.9") { key in
+            key == DefaultsKey.commandBarLinks ? CommandBarLinks.encode([safeWebLink, injectedScript]) : nil
+        }
+        let wroteBackup = SettingsBackupSupport.writePayload(exportedPayload, to: backupFile)
+        let perms = (try? FileManager.default.attributesOfItem(atPath: backupFile.path)[.posixPermissions] as? NSNumber)?.intValue ?? 0
+        let exportedLinks = CommandBarLinks.decode(
+            (exportedPayload[SettingsBackupSupport.settingsKey] as? [String: Any])?[DefaultsKey.commandBarLinks] as? Data)
+        suite.expect(wroteBackup && (perms & 0o777) == 0o600 && exportedLinks.map(\.id) == [safeWebLink.id],
+               "exported settings plists strip local scripts and are written with 0600 permissions")
     }
 }

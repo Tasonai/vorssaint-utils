@@ -438,13 +438,10 @@ final class MicMuteService: ObservableObject {
             var isAlive: UInt32 = 1
             if read(deviceID, kAudioDevicePropertyDeviceIsAlive, &isAlive), isAlive == 0 { continue }
 
-            var uidRef: CFString = "" as CFString
-            guard read(deviceID, kAudioDevicePropertyDeviceUID, &uidRef) else { continue }
-            let uid = uidRef as String
-            guard !uid.isEmpty else { continue }
+            guard let uid = readCFString(deviceID, kAudioDevicePropertyDeviceUID),
+                  !uid.isEmpty else { continue }
 
-            var nameRef: CFString = "" as CFString
-            let name = read(deviceID, kAudioObjectPropertyName, &nameRef) ? nameRef as String : uid
+            let name = readCFString(deviceID, kAudioObjectPropertyName) ?? uid
             guard !MicMuteSupport.isOwnDevice(name: name) else { continue }
 
             devices.append(InputDevice(id: deviceID, uid: uid))
@@ -561,6 +558,21 @@ final class MicMuteService: ObservableObject {
             AudioObjectGetPropertyData(object, &address, 0, nil, &size,
                                        UnsafeMutableRawPointer(pointer)) == noErr
         }
+    }
+
+    private static func readCFString(_ object: AudioObjectID,
+                                     _ selector: AudioObjectPropertySelector) -> String? {
+        var address = AudioObjectPropertyAddress(mSelector: selector,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var unmanagedRef: Unmanaged<CFString>? = nil
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let status = withUnsafeMutablePointer(to: &unmanagedRef) { pointer in
+            AudioObjectGetPropertyData(object, &address, 0, nil, &size,
+                                       UnsafeMutableRawPointer(pointer))
+        }
+        guard status == noErr else { return nil }
+        return unmanagedRef?.takeRetainedValue() as String?
     }
 
     // MARK: - Listeners

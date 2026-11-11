@@ -14,10 +14,13 @@ cd "$(dirname "$0")"
 # the script ends.
 ICON_TMP=""
 STAGE_TMP=""
+SIGNING_KC="$HOME/Library/Keychains/vorssaint-signing.keychain-db"
+SIGNING_SECRET_FILE="$HOME/Library/Application Support/Vorssaint/signing-keychain.secret"
 
 cleanup() {
     [[ -n "$ICON_TMP" ]] && rm -rf "$ICON_TMP"
     [[ -n "$STAGE_TMP" ]] && rm -rf "$STAGE_TMP"
+    [[ -f "$SIGNING_KC" ]] && security lock-keychain "$SIGNING_KC" 2>/dev/null || true
     return 0
 }
 trap cleanup EXIT
@@ -74,6 +77,25 @@ developer_id_identity() {
         | sed -E 's/.*"(.*)".*/\1/' || true
 }
 
+unlock_signing_keychain() {
+    [[ -f "$SIGNING_KC" ]] || return 0
+    if [[ -f "$SIGNING_SECRET_FILE" ]]; then
+        local secret
+        secret="$(<"$SIGNING_SECRET_FILE")"
+        if [[ -n "$secret" ]] && security unlock-keychain -p "$secret" "$SIGNING_KC" 2>/dev/null; then
+            security set-keychain-settings -lut 300 "$SIGNING_KC" 2>/dev/null || true
+            return 0
+        fi
+    fi
+    security unlock-keychain -p vorssaint-signing "$SIGNING_KC" 2>/dev/null || true
+    security set-keychain-settings -lut 300 "$SIGNING_KC" 2>/dev/null || true
+}
+
+lock_signing_keychain() {
+    [[ -f "$SIGNING_KC" ]] && security lock-keychain "$SIGNING_KC" 2>/dev/null || true
+    return 0
+}
+
 # A find-identity listing also names certificates codesign then rejects (an
 # expired one fails the build with errSecInternalComponent), and -v excludes
 # every self-signed one; ask codesign itself with a throwaway copy of /bin/echo.
@@ -81,8 +103,7 @@ legacy_identity_installed() {
     local probe signed=1
     # A locked keychain still lists its identities but cannot sign with them,
     # and this one is locked after every reboot; unlock it before asking.
-    security unlock-keychain -p vorssaint-signing \
-        "$HOME/Library/Keychains/vorssaint-signing.keychain-db" 2>/dev/null || true
+    unlock_signing_keychain
     probe="$(mktemp)"
     cp /bin/echo "$probe"
     /usr/bin/codesign --force --strip-disallowed-xattrs --sign "$LEGACY_IDENTITY" "$probe" \
@@ -111,6 +132,7 @@ if (( DEV || INSTALL )) && [[ -z "$(developer_id_identity)" ]] \
         echo "      tccutil reset Accessibility $APP_BUNDLE_ID" >&2
     fi
 fi
+lock_signing_keychain
 
 codesign_with_timestamp_retry() {
     local attempt
@@ -168,20 +190,23 @@ finalize_installed_bundle_after_child() {
             --entitlements "$ENTITLEMENTS" --sign "$devid" "$bundle"
     elif legacy_identity_installed; then
         [[ -f "$helper" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
-            --identifier "$FAN_HELPER_ID" --sign "$LEGACY_IDENTITY" "$helper"
+            --options runtime --identifier "$FAN_HELPER_ID" --sign "$LEGACY_IDENTITY" "$helper"
         [[ -f "$adapter" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
-            --identifier "$NOW_PLAYING_ADAPTER_ID" --sign "$LEGACY_IDENTITY" "$adapter"
-        /usr/bin/codesign --force --strip-disallowed-xattrs --sign "$LEGACY_IDENTITY" "$bundle"
+            --options runtime --identifier "$NOW_PLAYING_ADAPTER_ID" --sign "$LEGACY_IDENTITY" "$adapter"
+        /usr/bin/codesign --force --strip-disallowed-xattrs --options runtime \
+            --entitlements "$ENTITLEMENTS" --sign "$LEGACY_IDENTITY" "$bundle"
     else
         [[ -f "$helper" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
-            --identifier "$FAN_HELPER_ID" --sign - "$helper"
+            --options runtime --identifier "$FAN_HELPER_ID" --sign - "$helper"
         [[ -f "$adapter" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
-            --identifier "$NOW_PLAYING_ADAPTER_ID" --sign - "$adapter"
-        /usr/bin/codesign --force --strip-disallowed-xattrs --sign - "$bundle"
+            --options runtime --identifier "$NOW_PLAYING_ADAPTER_ID" --sign - "$adapter"
+        /usr/bin/codesign --force --strip-disallowed-xattrs --options runtime \
+            --entitlements "$ENTITLEMENTS" --sign - "$bundle"
     fi
     [[ -f "$helper" ]] && /usr/bin/codesign --verify --strict "$helper"
     [[ -f "$adapter" ]] && /usr/bin/codesign --verify --strict "$adapter"
     /usr/bin/codesign --verify --deep --strict "$bundle"
+    lock_signing_keychain
     echo "✓ Signature ready: $bundle"
 }
 
@@ -611,6 +636,11 @@ if (( TEST )); then
     exit $test_status
 fi
 
+DEVID="$(developer_id_identity)"
+if (( DEV )) || [[ -z "$DEVID" ]]; then
+    BUILD_VARIANT_FLAGS+=(-D VORSSAINT_SELF_SIGNED)
+fi
+
 echo "▸ Compiling ($BUILD_CONFIGURATION) against $(basename "$SDK")…"
 APP_SOURCES=(Sources/Vorssaint/**/*.swift)
 if (( ! DEV )); then
@@ -765,16 +795,17 @@ xattr -c -r "$STAGE" 2>/dev/null || true
 #      as a fallback so contributors without a Developer ID still get a constant
 #      designated requirement across their local builds.
 #   3. Ad-hoc — fresh clone with no identity at all.
-DEVID="$(developer_id_identity)"
 codesign_app() {
     local target="$1"
     if [[ -n "$DEVID" ]]; then
         codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp \
             --entitlements "$ENTITLEMENTS" --sign "$DEVID" "$target"
     elif legacy_identity_installed; then
-        codesign --force --strip-disallowed-xattrs --sign "$LEGACY_IDENTITY" "$target"
+        codesign --force --strip-disallowed-xattrs --options runtime \
+            --entitlements "$ENTITLEMENTS" --sign "$LEGACY_IDENTITY" "$target"
     else
-        codesign --force --strip-disallowed-xattrs --sign - "$target"
+        codesign --force --strip-disallowed-xattrs --options runtime \
+            --entitlements "$ENTITLEMENTS" --sign - "$target"
     fi
 }
 
@@ -784,10 +815,11 @@ codesign_fan_helper() {
         codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp \
             --identifier "$FAN_HELPER_ID" --sign "$DEVID" "$target"
     elif legacy_identity_installed; then
-        codesign --force --strip-disallowed-xattrs --identifier "$FAN_HELPER_ID" \
+        codesign --force --strip-disallowed-xattrs --options runtime --identifier "$FAN_HELPER_ID" \
             --sign "$LEGACY_IDENTITY" "$target"
     else
-        codesign --force --strip-disallowed-xattrs --identifier "$FAN_HELPER_ID" --sign - "$target"
+        codesign --force --strip-disallowed-xattrs --options runtime --identifier "$FAN_HELPER_ID" \
+            --sign - "$target"
     fi
 }
 
@@ -797,10 +829,11 @@ codesign_now_playing_adapter() {
         codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp \
             --identifier "$NOW_PLAYING_ADAPTER_ID" --sign "$DEVID" "$target"
     elif legacy_identity_installed; then
-        codesign --force --strip-disallowed-xattrs --identifier "$NOW_PLAYING_ADAPTER_ID" \
+        codesign --force --strip-disallowed-xattrs --options runtime --identifier "$NOW_PLAYING_ADAPTER_ID" \
             --sign "$LEGACY_IDENTITY" "$target"
     else
-        codesign --force --strip-disallowed-xattrs --identifier "$NOW_PLAYING_ADAPTER_ID" --sign - "$target"
+        codesign --force --strip-disallowed-xattrs --options runtime --identifier "$NOW_PLAYING_ADAPTER_ID" \
+            --sign - "$target"
     fi
 }
 
@@ -813,9 +846,9 @@ sign_bundle() {
     if [[ -n "$DEVID" ]]; then
         echo "  signing with Developer ID (hardened runtime): $DEVID"
     elif legacy_identity_installed; then
-        echo "  signing with legacy self-signed identity: $LEGACY_IDENTITY"
+        echo "  signing with legacy self-signed identity (hardened runtime): $LEGACY_IDENTITY"
     else
-        echo "  signing ad-hoc (no identity installed — run Tools/setup-signing.sh)"
+        echo "  signing ad-hoc (hardened runtime; no identity installed — run Tools/setup-signing.sh)"
     fi
     [[ -f "$helper" ]] && codesign_fan_helper "$helper"
     [[ -f "$adapter" ]] && codesign_now_playing_adapter "$adapter"
@@ -834,6 +867,7 @@ sign_bundle() {
     [[ -f "$helper" ]] && codesign --verify --strict "$helper"
     [[ -f "$adapter" ]] && codesign --verify --strict "$adapter"
     codesign --verify --deep --strict "$bundle"
+    lock_signing_keychain
 }
 
 sign_installed_bundle() {

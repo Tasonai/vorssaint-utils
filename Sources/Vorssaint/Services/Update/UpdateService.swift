@@ -342,23 +342,30 @@ final class UpdateService: ObservableObject {
             abortInstall(dmgPath: dmgPath, offered: offered)
             return
         }
-        try? fm.createDirectory(at: resultURL.deletingLastPathComponent(),
-                                withIntermediateDirectories: true)
+        PrivateFileStore.createDirectory(at: resultURL.deletingLastPathComponent())
         try? fm.removeItem(at: resultURL)
         try? fm.removeItem(at: resultURL.appendingPathExtension("progress"))
 
         let appDirectory = (appPath as NSString).deletingLastPathComponent
         let lastFailure = UserDefaults.standard.string(forKey: DefaultsKey.updateLastInstallFailure)
-        if fm.isWritableFile(atPath: appDirectory),
-           !UpdateInstallerSupport.shouldForceAdminInstall(afterFailureCode: lastFailure) {
+        let appOwnedByRoot = ((try? fm.attributesOfItem(atPath: appPath)[.ownerAccountID] as? NSNumber)?.uint32Value == 0)
+        let canElevate = UpdateInstallerSupport.allowsAdminInstall(forAppPath: appPath)
+        let shouldElevate = canElevate && (
+            !fm.isWritableFile(atPath: appDirectory)
+            || appOwnedByRoot
+            || UpdateInstallerSupport.shouldForceAdminInstall(afterFailureCode: lastFailure)
+        )
+        if shouldElevate {
+            // Either the folder is not writable, the installed bundle is root-owned,
+            // or the last attempt died at the copy/swap step: retry with admin
+            // rights instead of failing the same way twice.
+            launchAdminInstaller(appPath: appPath, dmgPath: dmgPath, pid: pid,
+                                 resultPath: resultURL.path, expectedVersion: expectedVersion)
+        } else if fm.isWritableFile(atPath: appDirectory) {
             launchUserInstaller(appPath: appPath, dmgPath: dmgPath, pid: pid,
                                 resultPath: resultURL.path, expectedVersion: expectedVersion)
         } else {
-            // Either the folder is not writable, or the last attempt died at
-            // the copy/swap step: retry with admin rights instead of failing
-            // the same way twice.
-            launchAdminInstaller(appPath: appPath, dmgPath: dmgPath, pid: pid,
-                                 resultPath: resultURL.path, expectedVersion: expectedVersion)
+            failInstall(dmgPath: dmgPath, message: L10n.shared.s.updateInstallFailedBody)
         }
     }
 
@@ -366,11 +373,9 @@ final class UpdateService: ObservableObject {
                                      resultPath: String, expectedVersion: String) {
         let scriptURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("vorssaint-update-\(pid)-\(UUID().uuidString).sh")
-        do {
-            try UpdateInstallerSupport.installerScript()
-                .write(to: scriptURL, atomically: true, encoding: .utf8)
-        } catch {
-            failInstall(dmgPath: dmgPath, message: error.localizedDescription)
+        guard PrivateFileStore.write(Data(UpdateInstallerSupport.installerScript().utf8),
+                                     to: scriptURL) else {
+            failInstall(dmgPath: dmgPath, message: CocoaError(.fileWriteUnknown).localizedDescription)
             return
         }
 
@@ -399,6 +404,10 @@ final class UpdateService: ObservableObject {
     /// exit — and so it survives that exit.
     private func launchAdminInstaller(appPath: String, dmgPath: String, pid: Int32,
                                       resultPath: String, expectedVersion: String) {
+        guard UpdateInstallerSupport.allowsAdminInstall(forAppPath: appPath) else {
+            abortInstall(dmgPath: dmgPath, offered: expectedVersion)
+            return
+        }
         let command = UpdateInstallerSupport.elevatedInstallCommand(appPath: appPath,
                                                                     dmgPath: dmgPath,
                                                                     pid: pid,
@@ -528,7 +537,9 @@ final class BoundedUpdateDownloadDelegate: NSObject, URLSessionDataDelegate {
         let temporaryFileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("Vorssaint-update-\(UUID().uuidString).download")
         fileURL = temporaryFileURL
-        guard FileManager.default.createFile(atPath: temporaryFileURL.path, contents: nil) else {
+        guard FileManager.default.createFile(atPath: temporaryFileURL.path,
+                                             contents: nil,
+                                             attributes: [.posixPermissions: 0o600]) else {
             throw CocoaError(.fileWriteUnknown)
         }
         do {

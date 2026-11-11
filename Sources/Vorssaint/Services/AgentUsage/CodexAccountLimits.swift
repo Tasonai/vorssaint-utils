@@ -123,8 +123,8 @@ enum CodexAccountUsageReader {
         // Neither a sign-in, a provider nor a shared state folder Vorssaint
         // was opened with may point a check at another account.
         let allowed = ["HOME", "USER", "LOGNAME", "TMPDIR", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
-                       "http_proxy", "https_proxy", "all_proxy", "no_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR",
-                       "NODE_EXTRA_CA_CERTS", "DO_NOT_TRACK", "DISABLE_TELEMETRY"]
+                       "http_proxy", "https_proxy", "all_proxy", "no_proxy",
+                       "DO_NOT_TRACK", "DISABLE_TELEMETRY"]
         var result = AgentCodexServer.environment(for: executable, searchPath: searchPath,
                                                   base: base.filter { allowed.contains($0.key) })
         result["CODEX_HOME"] = directory.path

@@ -821,6 +821,13 @@ enum UtilitiesFeatureTests {
                 && RadialMenuSupport.normalizedURL("example.com:8080/x") == "https://example.com:8080/x"
                 && RadialMenuSupport.normalizedURL("localhost:3000") == "https://localhost:3000",
                "digit-after-colon means a port only when the prefix looks like a host")
+        suite.expect(RadialMenuSupport.autoOpenURL("https://example.com/a")?.absoluteString == "https://example.com/a"
+                && RadialMenuSupport.autoOpenURL("mailto:team@example.com")?.scheme == "mailto"
+                && RadialMenuSupport.autoOpenURL("ssh://root@example.com") == nil
+                && RadialMenuSupport.autoOpenURL("vnc://10.0.0.2") == nil
+                && RadialMenuSupport.autoOpenURL("file:///etc/passwd") == nil
+                && RadialMenuSupport.autoOpenURL("tel:5551234") == nil,
+               "radial URL auto-open allows only http, https and mailto schemes")
         suite.expect(RadialMenuSupport.needsAccessibility([starter[3]]) == false
                 && RadialMenuSupport.needsAccessibility(starter)
                 && RadialMenuSupport.needsAccessibility([

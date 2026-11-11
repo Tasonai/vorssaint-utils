@@ -71,8 +71,10 @@ enum BundleMigration {
         """
         let scriptURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("vorssaint-rename-\(pid)-\(UUID().uuidString).sh")
+        guard PrivateFileStore.write(Data(script.utf8), to: scriptURL) else {
+            return false   // could not stage the rename; keep running as we are
+        }
         do {
-            try script.write(to: scriptURL, atomically: true, encoding: .utf8)
             // Its own session: the script waits for this app to exit before it
             // renames the bundle, which it can only do from outside our session.
             try DetachedProcess.spawn("/bin/sh", [scriptURL.path, oldPath, newPath, "\(pid)"])

@@ -974,24 +974,41 @@ enum UpdateFeatureTests {
         }
         suite.expect(installerScript.contains("spctl --status"),
                "installer script skips Gatekeeper assessment when the user disabled it")
+        let dmgStageCopy = installerScript.range(of: "/bin/cp \"$DMG\" \"$STAGED_DMG\"")
         let dmgVerification = installerScript.range(of: "DMG_VERIFY_REQ")
-        let dmgMount = installerScript.range(of: "/usr/bin/hdiutil attach")
-        suite.expect(dmgVerification != nil && dmgMount != nil
+        let dmgMount = installerScript.range(of: "/usr/bin/hdiutil attach \"$STAGED_DMG\" -readonly -noautoopen -nobrowse")
+        suite.expect(dmgStageCopy != nil && dmgVerification != nil && dmgMount != nil
+               && dmgStageCopy!.lowerBound < dmgVerification!.lowerBound
                && dmgVerification!.lowerBound < dmgMount!.lowerBound,
-               "installer verifies the release signer before mounting the DMG")
+               "installer stages the DMG into a private 0700 directory before verifying and mounting it read-only")
         suite.expect(installerScript.contains("BUNDLE_VERSION=")
                && installerScript.contains("\"$BUNDLE_VERSION\" = \"$EXPECTED_VERSION\""),
                "installer requires the signed app to match the offered release version")
-        suite.expect(installerScript.contains("chown -R"),
-               "an elevated install hands the bundle back to the user")
+        suite.expect(installerScript.contains("/usr/sbin/chown -RP root:wheel \"$DEST\"")
+               && installerScript.contains("/bin/chmod -R go-w \"$DEST\"")
+               && !installerScript.contains("chown -R \"$ASUSER\""),
+               "an elevated install keeps the bundle owned by root:wheel without group/other write permissions")
         suite.expect(installerScript.contains("update-old.$PID"),
                "the swap backup name is unique per run so a stale root-owned one never blocks it")
         suite.expect(installerScript.contains("STAGE=\"$DIR/.$NAME.update-new\""),
                "the staged copy is hidden so search never lists it under the staging name")
         suite.expect(installerScript.contains("/bin/rm -rf \"$STAGE\" \"$DEST.update-new\""),
                "a staged copy left under the old visible name is removed along with the hidden one")
-        suite.expect(installerScript.contains("launchctl asuser"),
-               "installer script relaunches as the user when running as root")
+        suite.expect(installerScript.contains("launchctl asuser \"$ASUSER\" /usr/bin/open \"$1\" && return 0")
+               && installerScript.contains("/usr/bin/sudo -n -u \"#$ASUSER\" /usr/bin/open \"$1\" && return 0")
+               && installerScript.contains("    if running_as_root; then\n        [ -n \"$ASUSER\" ] || return 1\n        /bin/launchctl asuser \"$ASUSER\" /usr/bin/open \"$1\" && return 0\n        /usr/bin/sudo -n -u \"#$ASUSER\" /usr/bin/open \"$1\" && return 0\n        return 1\n    fi\n    /usr/bin/open \"$1\""),
+               "installer script relaunches only in user context and never falls back to open as root")
+        suite.expect(UpdateInstallerSupport.allowsAdminInstall(forAppPath: "/Applications/Vorssaint.app",
+                                                               homeDirectory: "/Users/alice")
+               && UpdateInstallerSupport.allowsAdminInstall(forAppPath: "/Applications/Utilities/Vorssaint.app",
+                                                            homeDirectory: "/Users/alice")
+               && !UpdateInstallerSupport.allowsAdminInstall(forAppPath: "/Users/alice/Applications/Vorssaint.app",
+                                                             homeDirectory: "/Users/alice")
+               && !UpdateInstallerSupport.allowsAdminInstall(forAppPath: "/tmp/Vorssaint.app",
+                                                             homeDirectory: "/Users/alice")
+               && !UpdateInstallerSupport.allowsAdminInstall(forAppPath: "/Applications/../Users/alice/Vorssaint.app",
+                                                             homeDirectory: "/Users/alice"),
+               "privileged installer gating accepts only canonical /Applications bundles")
         suite.expect(installerScript.contains("$RESULT.progress") && installerScript.contains("finalize"),
                "installer markers stay in a progress file until the run finishes")
         suite.expect(installerScript.contains("/usr/bin/sudo -n -u \"#$ASUSER\" /bin/sh -c")

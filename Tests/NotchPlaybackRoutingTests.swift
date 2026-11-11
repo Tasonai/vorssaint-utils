@@ -44,6 +44,7 @@ enum NotchPlaybackRoutingContract {
     static var command: Int32?
     static var options: CFDictionary?
     static var requestedArtwork = false
+    static var sendAccepted = true
     static var sendError: UInt32 = 0
     static var sendResponses: [NSNumber]? = [0]
     static var playbackState: UInt32 = 0
@@ -129,6 +130,7 @@ enum NotchPlaybackRoutingContract {
                 NotchPlaybackRoutingContract.destination = path
                 NotchPlaybackRoutingContract.command = value
                 NotchPlaybackRoutingContract.options = settings
+                guard NotchPlaybackRoutingContract.sendAccepted else { return false }
                 completion(NotchPlaybackRoutingContract.sendError, NotchPlaybackRoutingContract.sendResponses as NSArray?)
                 return true
             }
@@ -171,6 +173,20 @@ enum NotchPlaybackRoutingTests {
         let firstClient = first?.path.perform(NSSelectorFromString("client"))?.takeUnretainedValue() as? NSObject
         suite.expect(firstClient?.value(forKey: "processIdentifier") as? Int == 101,
                "the first destination retains its process after another candidate is created")
+        var loopTargetsOk = true
+        for iteration in 0..<250 {
+            autoreleasepool {
+                let candidate = Adapter.makeTarget(
+                    Adapter.NSRunningApplication(bundleIdentifier: "test.loop.\(iteration)",
+                                                 processIdentifier: Int32(1000 + iteration)))
+                let client = candidate?.path.perform(NSSelectorFromString("client"))?.takeUnretainedValue() as? NSObject
+                if candidate == nil || client?.value(forKey: "processIdentifier") as? Int != 1000 + iteration {
+                    loopTargetsOk = false
+                }
+            }
+        }
+        suite.expect(loopTargetsOk,
+               "repeated MRClient alloc/init target construction balances retains across autorelease pools")
         let bundleURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".app")
         defer { try? FileManager.default.removeItem(at: bundleURL) }
         do {
@@ -228,6 +244,10 @@ enum NotchPlaybackRoutingTests {
         Adapter.sendResponses = nil
         suite.expect(!Adapter.send(2, to: music), "a native send without a handler result cannot claim delivery")
         Adapter.sendResponses = [0]
+        Adapter.sendAccepted = false
+        suite.expect(!Adapter.send(2, to: music),
+               "a synchronous false from MRMediaRemoteSendCommandToPlayer balances the DispatchGroup without trapping")
+        Adapter.sendAccepted = true
         var unavailable = music
         unavailable.allowsDirectCommands = false
         Adapter.command = nil

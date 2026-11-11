@@ -631,13 +631,22 @@ private final class NotchAudioLevelReader {
         return sampleRate
     }
 
+    private static func readCFString(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> String? {
+        var address = address(selector)
+        var unmanagedRef: Unmanaged<CFString>? = nil
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let status = withUnsafeMutablePointer(to: &unmanagedRef) { pointer in
+            AudioObjectGetPropertyData(object, &address, 0, nil, &size, UnsafeMutableRawPointer(pointer))
+        }
+        guard status == noErr else { return nil }
+        return unmanagedRef?.takeRetainedValue() as String?
+    }
+
     private static func hostDeviceUID() -> String? {
         var defaultDevice = AudioObjectID(0)
         guard read(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultOutputDevice, &defaultDevice),
               defaultDevice != 0 else { return nil }
-        var uid: CFString = "" as CFString
-        guard read(defaultDevice, kAudioDevicePropertyDeviceUID, &uid) else { return nil }
-        return uid as String
+        return readCFString(defaultDevice, kAudioDevicePropertyDeviceUID)
     }
 }
 

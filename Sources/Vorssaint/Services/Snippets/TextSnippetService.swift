@@ -325,10 +325,11 @@ final class TextSnippetService {
         }
 
         var length = 0
-        var characters = [UniChar](repeating: 0, count: 4)
-        event.keyboardGetUnicodeString(maxStringLength: 4, actualStringLength: &length, unicodeString: &characters)
-        guard length > 0 else { return Unmanaged.passUnretained(event) }
-        let typed = String(utf16CodeUnits: characters, count: length)
+        var characters = [UniChar](repeating: 0, count: 20)
+        event.keyboardGetUnicodeString(maxStringLength: characters.count, actualStringLength: &length, unicodeString: &characters)
+        let count = min(max(0, length), characters.count)
+        guard count > 0 else { return Unmanaged.passUnretained(event) }
+        let typed = String(utf16CodeUnits: characters, count: count)
 
         if let first = typed.first, TextSnippetSupport.delimiters.contains(first) {
             // A delimiter can complete an afterDelimiter trigger. The typed

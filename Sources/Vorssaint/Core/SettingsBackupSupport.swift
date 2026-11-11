@@ -238,12 +238,22 @@ enum SettingsBackupSupport {
         settings = portableMouseExceptions(settings)
         settings = portableWindowLayoutIgnoredApps(settings)
         settings = portableThumbnailPauseLists(settings)
+        settings = portableCommandBarSettings(settings)
+        settings = portableRadialMenuSettings(settings)
         settings = exportedAppVolumes(settings)
         return [
             formatVersionKey: formatVersion,
             appVersionKey: appVersion,
             settingsKey: settings,
         ]
+    }
+
+    static func writePayload(_ payload: [String: Any], to url: URL) -> Bool {
+        guard let data = try? PropertyListSerialization.data(fromPropertyList: payload,
+                                                             format: .xml,
+                                                             options: 0)
+        else { return false }
+        return PrivateFileStore.write(data, to: url)
     }
 
     /// Validates an incoming file and returns only the keys this build knows
@@ -256,8 +266,9 @@ enum SettingsBackupSupport {
         else { return nil }
         let allowed = exportKeys()
         let filtered = settings.filter { allowed.contains($0.key) && valueLooksRight($0.key, $0.value) }
-        return portableNotchDisplay(portableThumbnailPauseLists(portableWindowLayoutIgnoredApps(
+        let sanitized = portableNotchDisplay(portableThumbnailPauseLists(portableWindowLayoutIgnoredApps(
             portableMouseExceptions(portableMediaSettings(filtered)))))
+        return portableRadialMenuSettings(portableCommandBarSettings(sanitized))
     }
 
     /// 3.4.1 and earlier play a saved app volume as the gain itself. A backup
@@ -479,6 +490,205 @@ enum SettingsBackupSupport {
         return (try? JSONEncoder().encode(presets)) ?? restored
     }
 
+    static func isPortableCommandBarLink(_ link: CommandBarLink) -> Bool {
+        guard link.kind == .link else { return false }
+        let expanded = CommandBarLinks.expand(link.destination,
+                                              kind: .link,
+                                              query: "x",
+                                              clipboard: "x",
+                                              selection: "x",
+                                              date: "2026-01-01")
+        guard let url = CommandBarLinks.url(for: link, expanded: expanded),
+              let scheme = url.scheme?.lowercased()
+        else { return false }
+        switch scheme {
+        case "http", "https":
+            return url.host?.isEmpty == false
+        case "mailto":
+            let recipient = String(url.absoluteString.dropFirst("mailto:".count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return !recipient.isEmpty
+        default:
+            return false
+        }
+    }
+
+    private static func isLocalPathRowShortcutKey(_ key: String) -> Bool {
+        (key.hasPrefix("app.") && !key.hasPrefix("app.bundle."))
+            || (key.hasPrefix("uninstall.") && !key.hasPrefix("uninstall.bundle."))
+    }
+
+    private static func portableCommandBarSettings(_ settings: [String: Any]) -> [String: Any] {
+        var result = settings
+        var allowedLinkRowKeys = Set<String>()
+        if let rawLinks = result[DefaultsKey.commandBarLinks] as? Data {
+            let portable = CommandBarLinks.decode(rawLinks).filter(isPortableCommandBarLink)
+            allowedLinkRowKeys = Set(portable.map { "link.\($0.id.uuidString)" })
+            if let encoded = CommandBarLinks.encode(portable) {
+                result[DefaultsKey.commandBarLinks] = encoded
+            } else {
+                result.removeValue(forKey: DefaultsKey.commandBarLinks)
+            }
+        }
+        if let rawShortcuts = result[DefaultsKey.commandBarRowShortcuts] as? String {
+            let shortcuts = CommandBarRowShortcuts.decode(rawShortcuts)
+            let filtered = shortcuts.filter { key, _ in
+                if key.hasPrefix("link.") {
+                    return allowedLinkRowKeys.contains(key)
+                }
+                return !isLocalPathRowShortcutKey(key)
+            }
+            if let encoded = CommandBarRowShortcuts.encode(filtered) {
+                result[DefaultsKey.commandBarRowShortcuts] = encoded
+            } else {
+                result.removeValue(forKey: DefaultsKey.commandBarRowShortcuts)
+            }
+        }
+        return result
+    }
+
+    static func preservingLocalCommandBarLinks(restored: Data?, local: Data?) -> Data? {
+        let portable = CommandBarLinks.decode(restored).filter(isPortableCommandBarLink)
+        let localOnly = CommandBarLinks.decode(local).filter { $0.kind == .script || $0.kind == .place }
+        guard !portable.isEmpty || !localOnly.isEmpty else { return restored }
+        var seen = Set<UUID>()
+        var combined: [CommandBarLink] = []
+        for link in portable + localOnly where seen.insert(link.id).inserted {
+            combined.append(link)
+        }
+        return CommandBarLinks.encode(combined)
+    }
+
+    static func preservingLocalCommandBarRowShortcuts(restored: String?,
+                                                      local: String?,
+                                                      localLinks: Data?) -> String? {
+        var merged = CommandBarRowShortcuts.decode(restored)
+        let localShortcuts = CommandBarRowShortcuts.decode(local)
+        guard !localShortcuts.isEmpty else { return CommandBarRowShortcuts.encode(merged) }
+        let localLinkKeys = Set(
+            CommandBarLinks.decode(localLinks)
+                .filter { $0.kind == .script || $0.kind == .place }
+                .map { "link.\($0.id.uuidString)" }
+        )
+        let usedCombinations = Set(merged.values)
+        for (key, shortcut) in localShortcuts {
+            guard localLinkKeys.contains(key) || isLocalPathRowShortcutKey(key) else { continue }
+            guard merged[key] == nil,
+                  !usedCombinations.contains(shortcut),
+                  CommandBarRowShortcuts.hasRoom(for: key, in: merged)
+            else { continue }
+            merged[key] = shortcut
+        }
+        return CommandBarRowShortcuts.encode(merged)
+    }
+
+    private static func portableRadialItem(_ item: RadialMenuItem) -> RadialMenuItem? {
+        var copy = item
+        switch item.kind {
+        case .app, .file:
+            return nil
+        case .url:
+            guard let url = RadialMenuSupport.autoOpenURL(item.payload) else { return nil }
+            copy.payload = url.absoluteString
+            return copy
+        case .submenu:
+            let children = item.children.compactMap(portableRadialItem)
+            guard !children.isEmpty else { return nil }
+            copy.children = children
+            return copy
+        default:
+            return copy
+        }
+    }
+
+    private static func portableRadialMenuSettings(_ settings: [String: Any]) -> [String: Any] {
+        var result = settings
+        if let rawItems = result[DefaultsKey.radialMenuItems] as? Data {
+            let items = RadialMenuSupport.decode(rawItems).compactMap(portableRadialItem)
+            if let encoded = RadialMenuSupport.encode(items) {
+                result[DefaultsKey.radialMenuItems] = encoded
+            } else {
+                result.removeValue(forKey: DefaultsKey.radialMenuItems)
+            }
+        }
+        if let rawProfiles = result[DefaultsKey.radialMenuProfiles] as? Data {
+            if let stored = RadialMenuSupport.decodeStoredProfiles(rawProfiles) {
+                let sanitized = stored.map { profile -> RadialMenuProfile in
+                    var next = profile
+                    next.items = profile.items.compactMap(portableRadialItem)
+                    return next
+                }
+                if let encoded = RadialMenuSupport.encodeProfiles(sanitized) {
+                    result[DefaultsKey.radialMenuProfiles] = encoded
+                } else {
+                    result.removeValue(forKey: DefaultsKey.radialMenuProfiles)
+                }
+            } else {
+                result.removeValue(forKey: DefaultsKey.radialMenuProfiles)
+            }
+        }
+        return result
+    }
+
+    private static func mergingLocalRadialItems(portable: [RadialMenuItem],
+                                                local: [RadialMenuItem]) -> [RadialMenuItem] {
+        var seen = Set(portable.map(\.id))
+        var merged = portable.map { item -> RadialMenuItem in
+            guard item.kind == .submenu,
+                  let localSubmenu = local.first(where: { $0.id == item.id && $0.kind == .submenu })
+            else { return item }
+            var copy = item
+            copy.children = mergingLocalRadialItems(portable: item.children, local: localSubmenu.children)
+            return copy
+        }
+        for localItem in local where merged.count < RadialMenuSupport.maxItemsPerWheel {
+            switch localItem.kind {
+            case .app, .file:
+                if seen.insert(localItem.id).inserted {
+                    merged.append(localItem)
+                }
+            case .submenu:
+                guard !seen.contains(localItem.id) else { continue }
+                let localChildren = mergingLocalRadialItems(portable: [], local: localItem.children)
+                if !localChildren.isEmpty {
+                    var copy = localItem
+                    copy.children = localChildren
+                    seen.insert(copy.id)
+                    merged.append(copy)
+                }
+            default:
+                break
+            }
+        }
+        return RadialMenuSupport.sanitized(merged)
+    }
+
+    static func preservingLocalRadialMenuItems(restored: Data?, local: Data?) -> Data? {
+        guard let restored else { return nil }
+        let portable = RadialMenuSupport.decode(restored).compactMap(portableRadialItem)
+        guard let local else { return RadialMenuSupport.encode(portable) }
+        let localItems = RadialMenuSupport.decode(local)
+        return RadialMenuSupport.encode(mergingLocalRadialItems(portable: portable, local: localItems))
+    }
+
+    static func preservingLocalRadialMenuProfiles(restored: Data?, local: Data?) -> Data? {
+        guard let restored, let restoredProfiles = RadialMenuSupport.decodeStoredProfiles(restored) else {
+            return nil
+        }
+        let localProfiles = local.flatMap(RadialMenuSupport.decodeStoredProfiles) ?? []
+        let merged = restoredProfiles.map { profile -> RadialMenuProfile in
+            var copy = profile
+            let portableItems = profile.items.compactMap(portableRadialItem)
+            if let localProfile = localProfiles.first(where: { $0.id == profile.id }) {
+                copy.items = mergingLocalRadialItems(portable: portableItems, local: localProfile.items)
+            } else {
+                copy.items = portableItems
+            }
+            return copy
+        }
+        return RadialMenuSupport.encodeProfiles(merged)
+    }
+
     /// A backup is a file the user can hand around and edit, so a value has to
     /// look like the setting it claims to be before it is written back. The
     /// registered defaults already say what each setting is, and a value of
@@ -487,25 +697,79 @@ enum SettingsBackupSupport {
     /// code that trusts its own settings.
     static func valueLooksRight(_ key: String, _ value: Any) -> Bool {
         switch key {
-        case DefaultsKey.notchQuickAccessSide, DefaultsKey.notchQuickAccessSecond, DefaultsKey.notchQuickAccessThird:
+        case DefaultsKey.autoQuitEnabled,
+             DefaultsKey.shelfEnabled,
+             DefaultsKey.finderCutPasteEnabled,
+             DefaultsKey.appVolumesArePositions,
+             DefaultsKey.menuBarCPU,
+             DefaultsKey.menuBarGPU,
+             DefaultsKey.menuBarMemory,
+             DefaultsKey.menuBarNetwork,
+             DefaultsKey.menuBarBattery,
+             DefaultsKey.menuBarPower,
+             DefaultsKey.hasOnboarded:
+            return isBoolean(value)
+        case DefaultsKey.onboardingStep,
+             DefaultsKey.featuresOnboardingVersion:
+            return isInteger(value)
+        case DefaultsKey.textSnippets,
+             DefaultsKey.radialMenuItems,
+             DefaultsKey.radialMenuProfiles,
+             DefaultsKey.commandBarLinks:
+            return value is Data
+        case DefaultsKey.commandBarRowShortcuts,
+             DefaultsKey.language,
+             DefaultsKey.preferredInputDevice,
+             DefaultsKey.panelSectionOrder,
+             DefaultsKey.panelUtilityOrder,
+             DefaultsKey.panelControlOrder,
+             DefaultsKey.panelToggleOrder,
+             DefaultsKey.panelSystemOrder,
+             DefaultsKey.panelNetworkOrder,
+             DefaultsKey.panelDiskOrder,
+             DefaultsKey.panelPowerOrder,
+             DefaultsKey.panelCollapsedSections,
+             DefaultsKey.quickLauncherItemOrder,
+             DefaultsKey.notchQuickAccessSide,
+             DefaultsKey.notchQuickAccessSecond,
+             DefaultsKey.notchQuickAccessThird,
+             DefaultsKey.lastUpdateIntroVersion,
+             DefaultsKey.supportUpdateIntroVersion,
+             DefaultsKey.updateHighlightsSeenVersion,
+             DefaultsKey.featureHubKeptFeatures,
+             DefaultsKey.brightnessUpdatePromptState,
+             DefaultsKey.panelCollapsedResetVersion:
             return value is String
-        default: break
+        case DefaultsKey.mixerCallAppVolumeEnabled,
+             DefaultsKey.soundOutputSwitcherDeviceUIDs,
+             DefaultsKey.systemShortcutTakeOverKeys:
+            return value is [String]
+        case DefaultsKey.appOutputDevices,
+             DefaultsKey.mixerHiddenApps:
+            return value is [String: String]
+        case DefaultsKey.appVolumes:
+            guard let dict = value as? [String: Any] else { return false }
+            return dict.values.allSatisfy(isNumber)
+        default:
+            break
+        }
+        if AppFeature.availabilityDefaults[key] != nil {
+            return isBoolean(value)
         }
         guard let expected = Defaults.registeredDefaults[key] else {
-            // Not a registered setting, so there is nothing to compare
-            // against; the allowed list is the only gate for these.
-            return true
+            return false
         }
         switch expected {
         case is Bool: return isBoolean(value)
         case is Int: return isInteger(value)
         case is Double: return isNumber(value)
         case is String: return value is String
+        case is Data: return value is Data
         case is [String]: return value is [String]
         case is [String: String]: return value is [String: String]
         case is [Any]: return value is [Any]
         case is [String: Any]: return value is [String: Any]
-        default: return true
+        default: return false
         }
     }
 

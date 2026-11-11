@@ -56,27 +56,55 @@ enum UpdateInstallerSupport {
         }
         cleanup_script() { case "$SCRIPT" in /*) /bin/rm -f "$SCRIPT";; esac; }
         relaunch() {
-            if [ -n "$ASUSER" ] && [ "$(/usr/bin/id -u)" = "0" ]; then
-                /bin/launchctl asuser "$ASUSER" /usr/bin/open "$1" && return
+            if running_as_root; then
+                [ -n "$ASUSER" ] || return 1
+                /bin/launchctl asuser "$ASUSER" /usr/bin/open "$1" && return 0
+                /usr/bin/sudo -n -u "#$ASUSER" /usr/bin/open "$1" && return 0
+                return 1
             fi
             /usr/bin/open "$1"
         }
         while kill -0 "$PID" 2>/dev/null; do sleep 0.3; done
-        note fail-dmg-verify
-        DMG_VERIFY_REQ='anchor apple generic and certificate leaf[subject.OU] = "3D485NHW29"'
-        if ! /usr/bin/codesign -v --strict -R="$DMG_VERIFY_REQ" "$DMG" 2>/dev/null; then
+        if running_as_root; then
+            REAL_APP_DIR="$(cd -P -- "$(/usr/bin/dirname "$APP")" 2>/dev/null && /bin/pwd -P)" || REAL_APP_DIR=""
+            case "$REAL_APP_DIR" in
+                /Applications|/Applications/*) [ ! -L "$APP" ] ;;
+                *) false ;;
+            esac || {
+                note fail-swap
+                /bin/rm -f "$DMG"
+                finalize
+                relaunch "$APP"
+                cleanup_script
+                exit 1
+            }
+        fi
+        note fail-tempdir
+        WORKDIR="$(/usr/bin/mktemp -d)" && /bin/chmod 0700 "$WORKDIR" || { /bin/rm -f "$DMG"; finalize; relaunch "$APP"; cleanup_script; exit 1; }
+        STAGED_DMG="$WORKDIR/update.dmg"
+        MNT="$WORKDIR/mnt"
+        if [ -L "$DMG" ] || [ ! -f "$DMG" ] || ! /bin/cp "$DMG" "$STAGED_DMG" 2>/dev/null || ! /bin/mkdir -m 0700 "$MNT" 2>/dev/null; then
             /bin/rm -f "$DMG"
+            /bin/rm -rf "$WORKDIR"
             finalize
             relaunch "$APP"
             cleanup_script
             exit 1
         fi
-        note fail-tempdir
-        MNT="$(/usr/bin/mktemp -d)" || { /bin/rm -f "$DMG"; finalize; relaunch "$APP"; cleanup_script; exit 1; }
+        /bin/chmod 0600 "$STAGED_DMG" 2>/dev/null
+        /bin/rm -f "$DMG"
+        note fail-dmg-verify
+        DMG_VERIFY_REQ='anchor apple generic and certificate leaf[subject.OU] = "3D485NHW29"'
+        if ! /usr/bin/codesign -v --strict -R="$DMG_VERIFY_REQ" "$STAGED_DMG" 2>/dev/null; then
+            /bin/rm -rf "$WORKDIR"
+            finalize
+            relaunch "$APP"
+            cleanup_script
+            exit 1
+        fi
         note fail-mount
-        if ! /usr/bin/hdiutil attach "$DMG" -nobrowse -quiet -mountpoint "$MNT"; then
-            /bin/rmdir "$MNT" 2>/dev/null
-            /bin/rm -f "$DMG"
+        if ! /usr/bin/hdiutil attach "$STAGED_DMG" -readonly -noautoopen -nobrowse -quiet -mountpoint "$MNT"; then
+            /bin/rm -rf "$WORKDIR"
             finalize
             relaunch "$APP"
             cleanup_script
@@ -137,10 +165,15 @@ enum UpdateInstallerSupport {
                             && /bin/mv "$STAGE" "$DEST"; then
                             LAUNCH="$DEST"
                             note ok
-                            # Installed as root: hand the bundle to the user, or
-                            # the next user-path update cannot replace it.
-                            if [ "$(/usr/bin/id -u)" = "0" ] && [ -n "$ASUSER" ]; then
-                                /usr/sbin/chown -R "$ASUSER" "$DEST" 2>/dev/null
+                            # Installed as root: keep root:wheel ownership and
+                            # drop group/other write bits so embedded privileged
+                            # helpers stay root-owned and unmodifiable by users.
+                            if running_as_root; then
+                                /usr/sbin/chown -RP root:wheel "$DEST" 2>/dev/null
+                                /bin/chmod -R go-w "$DEST" 2>/dev/null
+                            else
+                                /usr/sbin/chown -RP "$(/usr/bin/id -u):$(/usr/bin/id -g)" "$DEST" 2>/dev/null
+                                /bin/chmod -R go-w "$DEST" 2>/dev/null
                             fi
                             /bin/rm -rf "$BACKUP"
                             # If the bundle was renamed, remove the old-named one.
@@ -157,8 +190,7 @@ enum UpdateInstallerSupport {
         /usr/bin/hdiutil detach "$MNT" -quiet 2>/dev/null \
             || /usr/bin/hdiutil detach "$MNT" -force -quiet 2>/dev/null \
             || true
-        /bin/rmdir "$MNT" 2>/dev/null
-        /bin/rm -f "$DMG"
+        /bin/rm -rf "$WORKDIR"
         finalize
         relaunch "$LAUNCH"
         cleanup_script
@@ -198,6 +230,48 @@ enum UpdateInstallerSupport {
     /// elevating would just add a password prompt to the same failure.
     static func shouldForceAdminInstall(afterFailureCode code: String?) -> Bool {
         code == "fail-copy" || code == "fail-swap"
+    }
+
+    /// Privileged (`root`) updates are restricted to canonical `/Applications`
+    /// bundles so an elevated installer never runs inside `$HOME` or any
+    /// arbitrary user-writable path, even if a failure marker is set.
+    static func allowsAdminInstall(forAppPath appPath: String,
+                                   homeDirectory: String = NSHomeDirectory()) -> Bool {
+        guard appPath.hasPrefix("/"),
+              !appPath.contains("\0"),
+              !appPath.contains("\n")
+        else { return false }
+        let fm = FileManager.default
+        if (try? fm.attributesOfItem(atPath: appPath)[.type] as? FileAttributeType) == .typeSymbolicLink {
+            return false
+        }
+        let standardized = (appPath as NSString).standardizingPath
+        guard standardized.hasPrefix("/Applications/"),
+              standardized.hasSuffix(".app"),
+              standardized != "/Applications/.app"
+        else { return false }
+        let resolvedParent = URL(fileURLWithPath: standardized)
+            .deletingLastPathComponent()
+            .resolvingSymlinksInPath()
+            .path
+        let resolved = URL(fileURLWithPath: standardized)
+            .resolvingSymlinksInPath()
+            .path
+        guard (resolvedParent == "/Applications" || resolvedParent.hasPrefix("/Applications/")),
+              resolved.hasPrefix("/Applications/"),
+              resolved.hasSuffix(".app")
+        else { return false }
+
+        let trimmedHome = (homeDirectory as NSString).standardizingPath
+        if !trimmedHome.isEmpty, trimmedHome != "/" {
+            let homePrefix = trimmedHome.hasSuffix("/") ? trimmedHome : trimmedHome + "/"
+            let resolvedHome = URL(fileURLWithPath: trimmedHome).resolvingSymlinksInPath().path
+            let resolvedHomePrefix = resolvedHome.hasSuffix("/") ? resolvedHome : resolvedHome + "/"
+            if standardized.hasPrefix(homePrefix) || resolved.hasPrefix(resolvedHomePrefix) {
+                return false
+            }
+        }
+        return true
     }
 
     /// Whether a new download fraction crossed into the next whole percent,

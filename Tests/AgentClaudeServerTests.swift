@@ -118,9 +118,16 @@ enum AgentClaudeServerTests {
                                    "DISABLE_ERROR_REPORTING": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
                                    "HTTP_PROXY": "http://other.invalid", "HTTPS_PROXY": "http://proxy.invalid:8080",
                                    "NO_PROXY": "localhost", "NODE_EXTRA_CA_CERTS": "/etc/proxy.pem"]
-                            && AgentClaudeServer.environment(["PATH": "/usr/bin"], home: folder)
+                            && AgentClaudeServer.environment([
+                                "PATH": "/usr/bin",
+                                "DYLD_INSERT_LIBRARIES": "/tmp/evil.dylib",
+                                "NODE_OPTIONS": "--require /tmp/evil.js",
+                                "NODE_EXTRA_CA_CERTS": "/tmp/ambient.pem",
+                                "PERL5OPT": "-Mevil",
+                                "BASH_ENV": "/tmp/evil.sh",
+                            ], home: folder)
                                 == ["PATH": "/usr/bin", "DISABLE_AUTOUPDATER": "1"],
-                         "a check keeps the person's Claude Code opt-outs and proxy, never updates it and turns nothing else off")
+                         "a check keeps the person's Claude Code opt-outs and proxy, never updates it and strips ambient injection variables")
             let tool = folder.appending(path: "claude")
             try Data(standIn.utf8).write(to: tool)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tool.path)

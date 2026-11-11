@@ -20,8 +20,7 @@ enum UpdateShowcaseInfo {
            FileManager.default.fileExists(atPath: url.path) {
             return url
         }
-        let desktopDemo = URL(fileURLWithPath: "/Users/vorssaint/Desktop/demo.gif")
-        return FileManager.default.fileExists(atPath: desktopDemo.path) ? desktopDemo : nil
+        return nil
     }
 
     static var cacheDirectory: URL {
@@ -110,12 +109,15 @@ final class UpdateShowcaseMediaLoader: ObservableObject {
                         return
                     }
                     do {
-                        try FileManager.default.createDirectory(
-                            at: UpdateShowcaseInfo.cacheDirectory,
-                            withIntermediateDirectories: true)
+                        let cacheRoot = UpdateShowcaseInfo.cacheDirectory.deletingLastPathComponent()
+                        PrivateFileStore.createDirectory(at: cacheRoot)
+                        PrivateFileStore.createDirectory(at: UpdateShowcaseInfo.cacheDirectory)
                         let target = UpdateShowcaseInfo.cachedMediaURL
-                        try? FileManager.default.removeItem(at: target)
-                        try FileManager.default.moveItem(at: tempURL, to: target)
+                        let data = try Data(contentsOf: tempURL)
+                        guard PrivateFileStore.write(data, to: target) else {
+                            throw CocoaError(.fileWriteUnknown)
+                        }
+                        try? FileManager.default.removeItem(at: tempURL)
                         DispatchQueue.main.async { self.state = .ready(target) }
                     } catch {
                         DispatchQueue.main.async { self.state = .failed }

@@ -69,5 +69,20 @@ enum UpdateAdminInstallContract {
             }
             withExtendedLifetime(service) {}
         }
+
+        for disallowed in ["/Users/someone/Applications/Vorssaint.app",
+                           "/tmp/Vorssaint.app",
+                           "/Volumes/External/Vorssaint.app",
+                           "/Applications/../tmp/Vorssaint.app"] {
+            events = []
+            ExtraBrightnessService.shared.onScreen = true
+            AdminShell.answer = nil
+            let service = Service()
+            service.launchAdminInstaller(appPath: disallowed, dmgPath: "/tmp/update.dmg",
+                                         pid: 42, resultPath: "/tmp/update-result", expectedVersion: "9.9.9")
+            suite.expect(events == ["offer 9.9.9"] && AdminShell.answer == nil && ExtraBrightnessService.shared.onScreen,
+                         "elevated install refuses \(disallowed) outside canonical /Applications without prompting")
+            withExtendedLifetime(service) {}
+        }
     }
 }

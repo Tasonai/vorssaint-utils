@@ -406,7 +406,10 @@ enum NotchNativePlayback {
             delivered = error == 0 && (responses as? [NSNumber])?.contains(where: { $0.intValue == 0 }) == true
             resultLock.unlock()
             group.leave()
-        }) else { return false }
+        }) else {
+            group.leave()
+            return false
+        }
         guard group.wait(timeout: .now() + 2) == .success else { return false }
         return resultLock.withLock { delivered }
     }
@@ -432,26 +435,39 @@ enum NotchNativePlayback {
     }
 
     private static func makeTarget(_ app: NSRunningApplication) -> Target? {
+        typealias LocalPlayerPathFn = @convention(c) (AnyClass, Selector) -> Unmanaged<AnyObject>?
+        typealias AllocFn = @convention(c) (AnyClass, Selector) -> UnsafeMutableRawPointer?
+        typealias InitWithBundleIDFn = @convention(c) (UnsafeMutableRawPointer, Selector, NSString) -> Unmanaged<AnyObject>?
+        let localPathSel = NSSelectorFromString("localPlayerPath")
+        let allocSel = NSSelectorFromString("alloc")
+        let initSel = NSSelectorFromString("initWithBundleIdentifier:")
         guard !app.isTerminated, let identifier = resolvedBundleIdentifier(for: app),
               let pathClass = NSClassFromString("MRPlayerPath"),
               let clientClass = NSClassFromString("MRClient"),
-              class_getClassMethod(pathClass, NSSelectorFromString("localPlayerPath")) != nil,
-              class_getInstanceMethod(clientClass, NSSelectorFromString("initWithBundleIdentifier:")) != nil,
-              let localPath = (pathClass as AnyObject).perform(NSSelectorFromString("localPlayerPath"))?.takeUnretainedValue() as? NSObject,
+              let localPathMethod = class_getClassMethod(pathClass, localPathSel),
+              let allocMethod = class_getClassMethod(clientClass, allocSel),
+              let initMethod = class_getInstanceMethod(clientClass, initSel),
+              let localPath = unsafeBitCast(method_getImplementation(localPathMethod), to: LocalPlayerPathFn.self)(
+                  pathClass, localPathSel)?.takeUnretainedValue() as? NSObject,
               let path = localPath.copy() as? NSObject,
-              let allocation = (clientClass as AnyObject).perform(NSSelectorFromString("alloc"))?.takeRetainedValue(),
-              let client = allocation.perform(NSSelectorFromString("initWithBundleIdentifier:"), with: identifier)?.takeUnretainedValue() as? NSObject else { return nil }
+              let rawClient = unsafeBitCast(method_getImplementation(allocMethod), to: AllocFn.self)(
+                  clientClass, allocSel),
+              let client = unsafeBitCast(method_getImplementation(initMethod), to: InitWithBundleIDFn.self)(
+                  rawClient, initSel, identifier as NSString)?.takeRetainedValue() as? NSObject else { return nil }
         // The native local path is shared. Only mutate our own copy, otherwise
         // constructing the next candidate redirects previously selected paths.
         typealias SetPID = @convention(c) (AnyObject, Selector, Int32) -> Void
+        typealias SetObject = @convention(c) (AnyObject, Selector, AnyObject?) -> Void
         let setPID = NSSelectorFromString("setProcessIdentifier:")
-        guard client.responds(to: setPID), path.responds(to: NSSelectorFromString("setClient:")),
-              path.responds(to: NSSelectorFromString("setPlayer:")) else { return nil }
+        let setClient = NSSelectorFromString("setClient:")
+        let setPlayer = NSSelectorFromString("setPlayer:")
+        guard client.responds(to: setPID), path.responds(to: setClient),
+              path.responds(to: setPlayer) else { return nil }
         unsafeBitCast(client.method(for: setPID), to: SetPID.self)(client, setPID, app.processIdentifier)
-        path.perform(NSSelectorFromString("setClient:"), with: client)
+        unsafeBitCast(path.method(for: setClient), to: SetObject.self)(path, setClient, client)
         // Nil resolves this app's active player; "default" is a different player
         // for apps which publish multiple sessions.
-        path.perform(NSSelectorFromString("setPlayer:"), with: nil)
+        unsafeBitCast(path.method(for: setPlayer), to: SetObject.self)(path, setPlayer, nil)
         return Target(pid: app.processIdentifier, bundleIdentifier: identifier, path: path)
     }
 }

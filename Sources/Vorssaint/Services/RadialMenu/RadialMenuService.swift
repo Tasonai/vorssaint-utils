@@ -737,9 +737,10 @@ final class RadialMenuService: ObservableObject {
             }
             NSWorkspace.shared.open(URL(fileURLWithPath: path))
         case .url:
-            if let normalized = RadialMenuSupport.normalizedURL(item.payload),
-               let url = URL(string: normalized) {
+            if let url = RadialMenuSupport.autoOpenURL(item.payload) {
                 NSWorkspace.shared.open(url)
+            } else {
+                NSSound.beep()
             }
         case .shortcut:
             if let shortcut = GlobalShortcut(storageValue: item.payload) {

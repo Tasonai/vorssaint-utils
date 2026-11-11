@@ -759,8 +759,9 @@ final class AutoQuitService: ObservableObject {
         event.keyboardGetUnicodeString(maxStringLength: characters.count,
                                        actualStringLength: &length,
                                        unicodeString: &characters)
-        guard length > 0 else { return nil }
-        return String(utf16CodeUnits: characters, count: length).lowercased()
+        let count = min(max(0, length), characters.count)
+        guard count > 0 else { return nil }
+        return String(utf16CodeUnits: characters, count: count).lowercased()
     }
 
     private func markCloseButtonRequest(pid: pid_t) {

@@ -11,6 +11,7 @@ import Foundation
 final class SystemScreenshotWatcher {
     static let shared = SystemScreenshotWatcher()
 
+    private let queue = DispatchQueue(label: "com.vorssaint.utils.system-screenshot-watcher", qos: .userInitiated)
     private var source: DispatchSourceFileSystemObject?
     private var fileDescriptor: Int32 = -1
     private var seenURLs = Set<URL>()
@@ -42,45 +43,57 @@ final class SystemScreenshotWatcher {
     }
 
     func start() {
+        queue.async { [weak self] in
+            self?.startOnQueue()
+        }
+    }
+
+    func stop() {
+        queue.async { [weak self] in
+            self?.stopOnQueue()
+        }
+    }
+
+    private func startOnQueue() {
         guard !isStarted else { return }
         let dir = Self.targetDirectory
 
-        fileDescriptor = open(dir.path, O_EVTONLY)
-        guard fileDescriptor >= 0 else { return }
+        let fd = open(dir.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        fileDescriptor = fd
 
         // Populate initial existing files so we don't treat them as new
         if let existing = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) {
             seenURLs = Set(existing)
+        } else {
+            seenURLs.removeAll()
         }
 
         let source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: fileDescriptor,
+            fileDescriptor: fd,
             eventMask: [.write],
-            queue: DispatchQueue.global(qos: .userInitiated)
+            queue: queue
         )
 
         source.setEventHandler { [weak self] in
             self?.directoryChanged()
         }
 
-        source.setCancelHandler { [weak self] in
-            guard let self else { return }
-            if self.fileDescriptor >= 0 {
-                close(self.fileDescriptor)
-                self.fileDescriptor = -1
-            }
+        source.setCancelHandler {
+            close(fd)
         }
 
         self.source = source
-        source.resume()
         isStarted = true
+        source.resume()
     }
 
-    func stop() {
+    private func stopOnQueue() {
         guard isStarted else { return }
+        isStarted = false
+        fileDescriptor = -1
         source?.cancel()
         source = nil
-        isStarted = false
     }
 
     private func directoryChanged() {
