@@ -50,6 +50,15 @@ enum NotchPrivacyTests {
         suite.expect(!evaluateBody.contains("CameraPreviewService.shared")
                          && !evaluateBody.contains("MicMuteService.shared"),
                      "CameraMicrophonePrivacyMonitor never reads main-thread @Published singletons on halQueue")
+        suite.expect(!monitorSource.contains("withTimeInterval: 1.5"),
+                     "CameraMicrophonePrivacyMonitor eliminates continuous 1.5s background polling")
+        suite.expect(monitorSource.contains("CMIOObjectAddPropertyListenerBlock")
+                         && monitorSource.contains("kCMIODevicePropertyDeviceIsRunningSomewhere"),
+                     "CameraMicrophonePrivacyMonitor listens to CoreMediaIO camera running-state callbacks")
+        suite.expect(monitorSource.contains("screensDidSleepNotification")
+                         && monitorSource.contains("screensDidWakeNotification")
+                         && monitorSource.contains("activeReconcileTolerance"),
+                     "CameraMicrophonePrivacyMonitor pauses reconciliation during display sleep and configures timer tolerance")
 
         NotchPrivacyMuteContract.run(suite)
     }

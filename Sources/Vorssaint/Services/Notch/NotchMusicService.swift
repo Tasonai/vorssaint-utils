@@ -91,6 +91,20 @@ final class NotchMusicService: ObservableObject {
 
     private init() {}
 
+    /// True when the persistent Now Playing adapter is running in Automatic
+    /// mode and has already delivered its initial reply, allowing consumers
+    /// like `RadialNowPlayingService` to reuse `playback` and `artwork`
+    /// without spawning an extra `/usr/bin/perl` subprocess.
+    var isTrackingAutomaticNowPlaying: Bool {
+        wantsPlayback && process?.isRunning == true && !awaitingPlayback && sourceIsAutomatic
+    }
+
+    /// True while the persistent Now Playing adapter is starting up in
+    /// Automatic mode and waiting on its first reply.
+    var isAwaitingInitialAutomaticNowPlaying: Bool {
+        wantsPlayback && process?.isRunning == true && awaitingPlayback && sourceIsAutomatic
+    }
+
     private static var adapter: [String]? {
         guard let script = Bundle.main.url(forResource: "now-playing", withExtension: "pl"),
               let library = Bundle.main.privateFrameworksURL?.appendingPathComponent("libVorssaintNowPlaying.dylib"),

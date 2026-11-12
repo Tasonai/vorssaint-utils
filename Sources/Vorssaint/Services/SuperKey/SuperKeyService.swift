@@ -82,7 +82,7 @@ final class SuperKeyService: ObservableObject {
     private var exceptionObservation: AnyCancellable?
     /// The mapping is written off the main thread, and in the order it was
     /// asked for: a queue of one keeps an apply and a clear from crossing.
-    private let mappingQueue = DispatchQueue(label: "com.vorssaint.utils.superkey-mapping")
+    private let mappingQueue = DispatchQueue(label: "com.vorssaint.utils.superkey-mapping", qos: .utility)
     /// Lives only while the mapping is owned and clears it if this process is
     /// killed before applicationWillTerminate can run.
     private var mappingGuard: SuperKeyMappingGuard.Handle?
@@ -455,7 +455,13 @@ final class SuperKeyService: ObservableObject {
                 ownedSource: ownedSource
             )
             if !enabled {
-                let guardConfirmed = self.mappingGuard?.stop() ?? false
+                let guardConfirmed: Bool
+                if failure == nil {
+                    self.mappingGuard?.dismissAfterConfirmedClear()
+                    guardConfirmed = true
+                } else {
+                    guardConfirmed = self.mappingGuard?.stop() ?? false
+                }
                 self.mappingGuard = nil
                 let marker = SuperKeySupport.mappingMarkerAfterClear(
                     previous: previousMarker,
@@ -486,11 +492,23 @@ final class SuperKeyService: ObservableObject {
     /// Modifier Keys rules cannot be read here: hidd keeps
     /// `HIDKeyboardModifierMappingPairs` per client connection, so hidutil
     /// answers null for rules written by System Settings.
+    private func runHIDUtil(_ arguments: [String]) -> (status: Int32, output: String) {
+        dispatchPrecondition(condition: .notOnQueue(.main))
+        let result = BoundedProcessRunner.run(
+            hidutilPath,
+            arguments,
+            timeout: SuperKeyMappingGuard.commandTimeout,
+            maxOutputBytes: SuperKeyMappingGuard.maxOutputBytes
+        )
+        let status: Int32 = result.timedOut ? -1 : result.status
+        return (status, String(decoding: result.output, as: UTF8.self))
+    }
+
     private func performMapping(_ enabled: Bool,
                                 source: SuperKeySource,
                                 ownedSource: SuperKeySource?) -> SuperKeyMappingFailure? {
-        let report = Shell.run(
-            hidutilPath,
+        dispatchPrecondition(condition: .notOnQueue(.main))
+        let report = runHIDUtil(
             ["property", "--matching", keyboardMatch,
              "--get", SuperKeySupport.userMappingProperty]
         )
@@ -544,14 +562,12 @@ final class SuperKeyService: ObservableObject {
                 }
             }
         }
-        let write = Shell.run(
-            hidutilPath,
+        let write = runHIDUtil(
             ["property", "--matching", keyboardMatch,
              "--set", SuperKeySupport.mappingArgument(wanted)]
         )
         guard write.status == 0 else { return .systemRefused }
-        let readback = Shell.run(
-            hidutilPath,
+        let readback = runHIDUtil(
             ["property", "--matching", keyboardMatch,
              "--get", SuperKeySupport.userMappingProperty]
         )

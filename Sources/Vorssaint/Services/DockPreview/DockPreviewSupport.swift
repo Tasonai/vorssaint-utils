@@ -27,6 +27,24 @@ enum DockPreviewFrameSupport {
     }
 }
 
+struct DockPreviewHoverGeneration: Equatable {
+    private(set) var current: UInt64 = 0
+
+    @discardableResult
+    mutating func advance() -> UInt64 {
+        current &+= 1
+        return current
+    }
+
+    mutating func invalidate() {
+        current &+= 1
+    }
+
+    func accepts(_ generation: UInt64) -> Bool {
+        generation != 0 && generation == current
+    }
+}
+
 enum DockPreviewOrientation: String, Equatable {
     case bottom
     case left

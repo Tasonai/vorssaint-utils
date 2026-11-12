@@ -18,5 +18,13 @@ enum NetworkAddressTests {
                "an interface that is not running is excluded")
         expect(!NetworkAddressService.includesLocalAddress(name: "en0", flags: running, family: AF_INET6),
                "IPv6 interfaces are excluded from the local list")
+        expect(NetworkAddressService.refreshTolerance >= 0.5
+               && NetworkAddressService.refreshTolerance >= NetworkAddressService.refreshInterval * 0.15,
+               "NetworkAddressService configures >=0.5s timer tolerance for XNU wakeup coalescing")
+        let sectionSource = (try? String(contentsOfFile: "Sources/Vorssaint/UI/MenuPanel/NetworkSection.swift", encoding: .utf8)) ?? ""
+        expect(sectionSource.contains("service.startMonitoring()")
+               && sectionSource.contains("service.stopMonitoring()")
+               && !sectionSource.contains("service.refreshLocalAddresses()"),
+               "NetworkAddressBlock gates getifaddrs polling on visibility and panel state instead of SystemMonitor snapshots")
     }
 }

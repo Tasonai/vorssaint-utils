@@ -65,36 +65,107 @@ struct AgentTokens: Equatable {
     }
 }
 
+/// Thread-safe string interning pool mapping repeated `model`, `project`,
+/// `session`, and log `source` strings to compact `UInt32` identifiers so
+/// hundreds of thousands of usage entries share one heap copy per unique string.
+/// Identifier `0` is permanently reserved for the empty string `""`.
+final class AgentStringInterner: @unchecked Sendable {
+    static let shared = AgentStringInterner()
+    static let emptyID: UInt32 = 0
+
+    private let lock = NSLock()
+    private var strings: [String] = [""]
+    private var idsByString: [String: UInt32] = ["": 0]
+
+    init() {}
+
+    func intern(_ string: String) -> UInt32 {
+        if string.isEmpty { return Self.emptyID }
+        lock.lock()
+        defer { lock.unlock() }
+        if let existing = idsByString[string] {
+            return existing
+        }
+        let nextID = UInt32(strings.count)
+        strings.append(string)
+        idsByString[string] = nextID
+        return nextID
+    }
+
+    func resolve(_ id: UInt32) -> String {
+        if id == Self.emptyID { return "" }
+        lock.lock()
+        defer { lock.unlock() }
+        let index = Int(id)
+        guard index >= 0 && index < strings.count else { return "" }
+        return strings[index]
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return strings.count
+    }
+}
+
 /// One billed model response.
-struct AgentUsageRecord: Equatable {
+struct AgentUsageRecord: Equatable, CustomReflectable {
     let provider: AgentProvider
+    /// Whether cost was reported directly by the provider rather than derived from list pricing.
+    var reportedCost: Bool = false
+    let modelID: UInt32
+    let projectID: UInt32
+    let sessionID: UInt32
+    private let rawRequests: Int32
     let date: Date
-    let model: String
-    let project: String
-    let session: String
-    /// Model requests represented by this record; checkpoints may hold several.
-    let requests: Int
     var tokens: AgentTokens
     /// What the response would cost at API list prices, in US dollars. Nil
     /// when the model has no known price.
     var cost: Double?
     /// What cache reads saved against paying the full input price.
     var savings: Double
-    /// Whether cost was reported directly by the provider rather than derived from list pricing.
-    var reportedCost: Bool = false
+
+    var model: String { AgentStringInterner.shared.resolve(modelID) }
+    var project: String { AgentStringInterner.shared.resolve(projectID) }
+    var session: String { AgentStringInterner.shared.resolve(sessionID) }
+    /// Model requests represented by this record; checkpoints may hold several.
+    var requests: Int { Int(rawRequests) }
+
+    var hasEmptyModel: Bool { modelID == AgentStringInterner.emptyID }
+    var hasEmptyProject: Bool { projectID == AgentStringInterner.emptyID }
 
     init(provider: AgentProvider, date: Date, model: String, project: String, session: String,
          requests: Int = 1, tokens: AgentTokens, cost: Double?, savings: Double, reportedCost: Bool = false) {
+        let interner = AgentStringInterner.shared
         self.provider = provider
+        self.reportedCost = reportedCost
+        self.modelID = interner.intern(model)
+        self.projectID = interner.intern(project)
+        self.sessionID = interner.intern(session)
+        self.rawRequests = Int32(clamping: requests)
         self.date = date
-        self.model = model
-        self.project = project
-        self.session = session
-        self.requests = requests
         self.tokens = tokens
         self.cost = cost
         self.savings = savings
-        self.reportedCost = reportedCost
+    }
+
+    var customMirror: Mirror {
+        Mirror(
+            self,
+            children: [
+                "provider": provider,
+                "date": date,
+                "model": model,
+                "project": project,
+                "session": session,
+                "requests": requests,
+                "tokens": tokens,
+                "cost": cost as Any,
+                "savings": savings,
+                "reportedCost": reportedCost,
+            ],
+            displayStyle: .struct
+        )
     }
 }
 

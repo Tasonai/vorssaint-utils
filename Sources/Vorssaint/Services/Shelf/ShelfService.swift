@@ -4,6 +4,7 @@
 import AppKit
 import Carbon.HIToolbox
 import Combine
+import QuartzCore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -107,8 +108,8 @@ final class ShelfService: ObservableObject {
     private let autoHideDelay: TimeInterval = 5
     private let autoHideFadeDuration: TimeInterval = 0.22
     private var autoHideTimer: Timer?
-    private var autoHideFadeTimer: Timer?
-    private var autoHideFadeStart: Date?
+    private var autoHideFadeGeneration: UInt64 = 0
+    private var isAutoHideFading = false
     private var pointerInsidePanel = false
     @Published private(set) var dropTargeted = false
     @Published private(set) var hotkeyRegistrationFailed = false
@@ -2453,10 +2454,19 @@ final class ShelfService: ObservableObject {
     }
 
     private func cancelAutoHideFade() {
-        autoHideFadeTimer?.invalidate()
-        autoHideFadeTimer = nil
-        autoHideFadeStart = nil
-        panel?.alphaValue = 1
+        autoHideFadeGeneration &+= 1
+        guard isAutoHideFading else {
+            panel?.alphaValue = 1
+            return
+        }
+        isAutoHideFading = false
+        if let panel {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                panel.animator().alphaValue = 1
+            }
+            panel.alphaValue = 1
+        }
     }
 
     private var shouldHoldOpen: Bool {
@@ -2497,31 +2507,29 @@ final class ShelfService: ObservableObject {
 
     private func fadeOutAndHide() {
         guard let panel, panel.isVisible else { return }
-        autoHideFadeTimer?.invalidate()
-        autoHideFadeStart = Date()
+        autoHideFadeGeneration &+= 1
+        let generation = autoHideFadeGeneration
+        isAutoHideFading = true
         panel.alphaValue = 1
 
-        autoHideFadeTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
-            guard let self, let panel = self.panel, panel.isVisible else {
-                timer.invalidate()
-                return
-            }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = autoHideFadeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 0
+        } completionHandler: { [weak self] in
+            guard let self, self.autoHideFadeGeneration == generation else { return }
+            self.isAutoHideFading = false
+            guard let panel = self.panel, panel.isVisible else { return }
             self.updatePointerInsidePanel()
             guard !self.shouldHoldOpen else {
-                timer.invalidate()
-                self.autoHideFadeTimer = nil
-                self.autoHideFadeStart = nil
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0
+                    panel.animator().alphaValue = 1
+                }
                 panel.alphaValue = 1
                 self.scheduleAutoHideIfIdle()
                 return
             }
-            let elapsed = Date().timeIntervalSince(self.autoHideFadeStart ?? Date())
-            let progress = min(1, elapsed / self.autoHideFadeDuration)
-            panel.alphaValue = 1 - CGFloat(progress)
-            guard progress >= 1 else { return }
-            timer.invalidate()
-            self.autoHideFadeTimer = nil
-            self.autoHideFadeStart = nil
             panel.orderOut(nil)
             ShelfTooltipPopover.shared.hide()
             panel.alphaValue = 1
@@ -2532,7 +2540,6 @@ final class ShelfService: ObservableObject {
             // The classic panel leaving is the docked shelf's cue to return.
             self.scheduleDockedSync()
         }
-        autoHideFadeTimer?.tolerance = 0.02
     }
 
     /// Re-fits the panel to its content (anchored at the top-left) after items

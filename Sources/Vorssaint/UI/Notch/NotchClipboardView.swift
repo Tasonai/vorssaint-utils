@@ -765,14 +765,30 @@ private struct ClipboardKeyMonitor: NSViewRepresentable {
 /// installed later shows up without a restart.
 @MainActor
 private enum ClipboardSourceApps {
-    struct App { let name: String; let icon: NSImage }
-    private static var cache: [String: App] = [:]
+    final class App: NSObject {
+        let name: String
+        let icon: NSImage
+        init(name: String, icon: NSImage) {
+            self.name = name
+            self.icon = icon
+        }
+    }
+
+    private static let cache: NSCache<NSString, App> = {
+        let cache = NSCache<NSString, App>()
+        cache.countLimit = 128
+        cache.totalCostLimit = 8 * 1024 * 1024
+        return cache
+    }()
 
     static func app(for bundleID: String) -> App? {
-        if let cached = cache[bundleID] { return cached }
+        let key = bundleID as NSString
+        if let cached = cache.object(forKey: key) { return cached }
         guard let url = InstalledApps.url(for: bundleID) else { return nil }
-        let app = App(name: InstalledApps.name(for: bundleID), icon: NSWorkspace.shared.icon(forFile: url.path))
-        cache[bundleID] = app
+        let rawIcon = InstalledApps.cachedFileIcon(atPath: url.path)
+        let icon = ImageThumbnailer.thumbnail(for: rawIcon, pointSize: 20) ?? rawIcon
+        let app = App(name: InstalledApps.cachedName(for: bundleID), icon: icon)
+        cache.setObject(app, forKey: key, cost: ImageThumbnailer.estimatedBitmapCost(pointSize: 20))
         return app
     }
 }
@@ -781,14 +797,20 @@ private enum ClipboardSourceApps {
 /// paths: the page draws its rows again whenever the pointer moves between them.
 @MainActor
 private enum ClipboardFileIcons {
-    private static var cache: [[String]: NSImage] = [:]
+    private static let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 256
+        cache.totalCostLimit = 12 * 1024 * 1024
+        return cache
+    }()
 
     static func icon(for paths: [String]) -> NSImage? {
-        if let cached = cache[paths] { return cached }
-        guard let icon = NSWorkspace.shared.icon(forFiles: paths) else { return nil }
-        // Entries come and go over days; a full cache starts again.
-        if cache.count >= 256 { cache.removeAll() }
-        cache[paths] = icon
+        guard !paths.isEmpty else { return nil }
+        let key = paths.joined(separator: "\0") as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        guard let rawIcon = NSWorkspace.shared.icon(forFiles: paths) else { return nil }
+        let icon = ImageThumbnailer.thumbnail(for: rawIcon, pointSize: 32) ?? rawIcon
+        cache.setObject(icon, forKey: key, cost: ImageThumbnailer.estimatedBitmapCost(pointSize: 32))
         return icon
     }
 }

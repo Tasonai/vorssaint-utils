@@ -8,11 +8,100 @@ import Foundation
 /// Everything read so far, one record per response. Not thread-safe: the
 /// usage service confines it to its own queue.
 final class AgentUsageStore {
+    /// Inline interned log-path list avoiding heap `Array<String>` allocations
+    /// for 1–2 log sources per record across hundreds of thousands of entries.
+    struct SourceList: Equatable {
+        private var first: UInt32 = AgentStringInterner.emptyID
+        private var second: UInt32 = AgentStringInterner.emptyID
+        private var overflow: [UInt32]? = nil
+
+        init(single id: UInt32) {
+            self.first = id
+        }
+
+        init(_ paths: [String]) {
+            let interner = AgentStringInterner.shared
+            for path in paths where !path.isEmpty {
+                appendUnique(interner.intern(path))
+            }
+        }
+
+        var isEmpty: Bool {
+            first == AgentStringInterner.emptyID
+        }
+
+        func contains(_ id: UInt32) -> Bool {
+            guard id != AgentStringInterner.emptyID else { return false }
+            if first == id || second == id { return true }
+            return overflow?.contains(id) == true
+        }
+
+        func containsAny(in ids: Set<UInt32>) -> Bool {
+            if first != AgentStringInterner.emptyID && ids.contains(first) { return true }
+            if second != AgentStringInterner.emptyID && ids.contains(second) { return true }
+            if let overflow {
+                return overflow.contains(where: ids.contains)
+            }
+            return false
+        }
+
+        mutating func appendUnique(_ id: UInt32) {
+            guard id != AgentStringInterner.emptyID, !contains(id) else { return }
+            if first == AgentStringInterner.emptyID {
+                first = id
+            } else if second == AgentStringInterner.emptyID {
+                second = id
+            } else if overflow != nil {
+                overflow?.append(id)
+            } else {
+                overflow = [id]
+            }
+        }
+
+        mutating func removeAll(in ids: Set<UInt32>) {
+            guard containsAny(in: ids) else { return }
+            var remaining: [UInt32] = []
+            if first != AgentStringInterner.emptyID && !ids.contains(first) {
+                remaining.append(first)
+            }
+            if second != AgentStringInterner.emptyID && !ids.contains(second) {
+                remaining.append(second)
+            }
+            if let overflow {
+                for id in overflow where !ids.contains(id) {
+                    remaining.append(id)
+                }
+            }
+            first = remaining.count > 0 ? remaining[0] : AgentStringInterner.emptyID
+            second = remaining.count > 1 ? remaining[1] : AgentStringInterner.emptyID
+            overflow = remaining.count > 2 ? Array(remaining.dropFirst(2)) : nil
+        }
+
+        func insertIDs(into set: inout Set<UInt32>) {
+            if first != AgentStringInterner.emptyID { set.insert(first) }
+            if second != AgentStringInterner.emptyID { set.insert(second) }
+            if let overflow {
+                for id in overflow { set.insert(id) }
+            }
+        }
+
+        func resolvedPaths() -> [String] {
+            let interner = AgentStringInterner.shared
+            var result: [String] = []
+            if first != AgentStringInterner.emptyID { result.append(interner.resolve(first)) }
+            if second != AgentStringInterner.emptyID { result.append(interner.resolve(second)) }
+            if let overflow {
+                result.append(contentsOf: overflow.map { interner.resolve($0) })
+            }
+            return result
+        }
+    }
+
     private(set) var records: [AgentUsageRecord] = []
     private var billables: [AgentBillable] = []
     /// The logs each response was read from: most in one, a resumed or
     /// archived session's again in another.
-    private var sources: [[String]] = []
+    private var sources: [SourceList] = []
     private var index: [String: Int] = [:]
     private let summary = AgentUsageSummaryCache()
     private(set) var limits: [AgentProvider: AgentLimits] = [:]
@@ -67,7 +156,7 @@ final class AgentUsageStore {
                 let turn = provider == .copilot ? nil : tracksTurns ? file : parent
                 add(record, billable: billable, key: key, source: file, turn: turn, subagent: !tracksTurns)
             case .usageModel(let key, let model):
-                guard let position = index[key], records[position].model.isEmpty else { continue }
+                guard let position = index[key], records[position].hasEmptyModel else { continue }
                 let old = records[position]
                 records[position] = AgentUsageRecord(provider: old.provider, date: old.date, model: model,
                     project: old.project, session: old.session, requests: old.requests,
@@ -162,10 +251,11 @@ final class AgentUsageStore {
     /// model and project alone.
     private func add(_ record: AgentUsageRecord, billable: AgentBillable, key: String, source: String,
                      turn file: String?, subagent: Bool) {
+        let sourceID = AgentStringInterner.shared.intern(source)
         var delta = record.tokens
         var extra = record.cost ?? 0
         if let position = index[key] {
-            if !sources[position].contains(source) { sources[position].append(source) }
+            sources[position].appendUnique(sourceID)
             let old = records[position]
             let merged = old.tokens.merged(with: record.tokens)
             if merged == old.tokens {
@@ -239,7 +329,7 @@ final class AgentUsageStore {
             index[key] = records.count
             records.append(record)
             billables.append(billable)
-            sources.append([source])
+            sources.append(SourceList(single: sourceID))
         }
         guard let file else { return }
         // Noted before the turn check, which skips a reply dated before its
@@ -252,8 +342,8 @@ final class AgentUsageStore {
         turn.cost += extra
         turn.lastActivity = max(turn.lastActivity, record.date)
         if !subagent {
-            if !record.model.isEmpty { turn.model = record.model }
-            if !record.project.isEmpty { turn.project = record.project }
+            if !record.hasEmptyModel { turn.model = record.model }
+            if !record.hasEmptyProject { turn.project = record.project }
         }
         turns[file] = turn
     }
@@ -392,7 +482,7 @@ final class AgentUsageStore {
         var keys = [String](repeating: "", count: records.count)
         for (key, position) in index { keys[position] = key }
         let kept = records.indices.filter { records[$0].provider != .opencode }.map {
-            Saved.Record(key: keys[$0], record: records[$0], billable: billables[$0], sources: sources[$0])
+            Saved.Record(key: keys[$0], record: records[$0], billable: billables[$0], sources: sources[$0].resolvedPaths())
         }
         return Saved(records: kept,
                      limits: limits.values.sorted { $0.provider.rawValue < $1.provider.rawValue },
@@ -405,7 +495,7 @@ final class AgentUsageStore {
         self.init()
         records = saved.records.map(\.record)
         billables = saved.records.map(\.billable)
-        sources = saved.records.map(\.sources)
+        sources = saved.records.map { SourceList($0.sources) }
         for (position, entry) in saved.records.enumerated() { index[entry.key] = position }
         limits = Dictionary(saved.limits.map { ($0.provider, $0) }, uniquingKeysWith: { $1 })
         codexPlan = saved.codexPlan
@@ -425,10 +515,12 @@ final class AgentUsageStore {
     /// goes, one another log also holds stays. Their turns end without a
     /// notice.
     func forget(files: Set<String>) {
+        guard !files.isEmpty else { return }
         for file in files { forget(file: file) }
+        let fileIDs = Set(files.map { AgentStringInterner.shared.intern($0) })
         var emptied = false
-        for position in sources.indices where sources[position].contains(where: files.contains) {
-            sources[position].removeAll(where: files.contains)
+        for position in sources.indices where sources[position].containsAny(in: fileIDs) {
+            sources[position].removeAll(in: fileIDs)
             emptied = emptied || sources[position].isEmpty
         }
         if emptied { keepRecords { !sources[$0].isEmpty } }
@@ -436,21 +528,36 @@ final class AgentUsageStore {
 
     /// The logs holding a response that one of `files` also holds.
     func files(sharingWith files: Set<String>) -> Set<String> {
+        guard !files.isEmpty else { return [] }
+        let fileIDs = Set(files.map { AgentStringInterner.shared.intern($0) })
+        var sharingIDs = Set<UInt32>()
+        for list in sources where list.containsAny(in: fileIDs) {
+            list.insertIDs(into: &sharingIDs)
+        }
         var sharing = Set<String>()
-        for list in sources where list.contains(where: files.contains) { sharing.formUnion(list) }
+        sharing.reserveCapacity(sharingIDs.count)
+        for id in sharingIDs {
+            sharing.insert(AgentStringInterner.shared.resolve(id))
+        }
         return sharing
     }
 
     /// Every log that gave a response or holds a turn.
     var files: Set<String> {
-        Set(sources.joined()).union(turns.keys).union(waiting.keys)
+        var sourceIDs = Set<UInt32>()
+        for list in sources { list.insertIDs(into: &sourceIDs) }
+        var all = Set(turns.keys).union(waiting.keys)
+        for id in sourceIDs {
+            all.insert(AgentStringInterner.shared.resolve(id))
+        }
+        return all
     }
 
     private func keepRecords(where keep: (Int) -> Bool) {
         summary.invalidate()
         var kept: [AgentUsageRecord] = []
         var keptBillables: [AgentBillable] = []
-        var keptSources: [[String]] = []
+        var keptSources: [SourceList] = []
         var positions: [Int: Int] = [:]
         for offset in records.indices where keep(offset) {
             positions[offset] = kept.count

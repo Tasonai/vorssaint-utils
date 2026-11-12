@@ -535,16 +535,38 @@ private struct QuickEntryView: View, Equatable {
     /// Looked up once per app. An app removed since the copy has nothing to
     /// show, and the card keeps the kind's symbol. A miss is not kept, so an
     /// app installed later shows up without a restart.
-    private static var sourceApps: [String: (name: String, icon: NSImage)] = [:]
+    private final class SourceAppEntry: NSObject {
+        let name: String
+        let icon: NSImage
+        init(name: String, icon: NSImage) {
+            self.name = name
+            self.icon = icon
+        }
+    }
+
+    private static let sourceApps: NSCache<NSString, SourceAppEntry> = {
+        let cache = NSCache<NSString, SourceAppEntry>()
+        cache.countLimit = 128
+        cache.totalCostLimit = 8 * 1024 * 1024
+        return cache
+    }()
 
     private var sourceApp: (name: String, icon: NSImage)? {
         guard let bundleID = entry.sourceBundleID else { return nil }
-        if let cached = Self.sourceApps[bundleID] { return cached }
-        let app = InstalledApps.url(for: bundleID).map {
-            (name: InstalledApps.name(for: bundleID), icon: NSWorkspace.shared.icon(forFile: $0.path))
+        let key = bundleID as NSString
+        if let cached = Self.sourceApps.object(forKey: key) {
+            return (cached.name, cached.icon)
         }
-        if let app { Self.sourceApps[bundleID] = app }
-        return app
+        guard let url = InstalledApps.url(for: bundleID) else { return nil }
+        let rawIcon = InstalledApps.cachedFileIcon(atPath: url.path)
+        let icon = ImageThumbnailer.thumbnail(for: rawIcon, pointSize: 20) ?? rawIcon
+        let resolvedName = InstalledApps.cachedName(for: bundleID)
+        Self.sourceApps.setObject(
+            SourceAppEntry(name: resolvedName, icon: icon),
+            forKey: key,
+            cost: ImageThumbnailer.estimatedBitmapCost(pointSize: 20)
+        )
+        return (resolvedName, icon)
     }
 
     /// A copied file keeps its own icon over the app's: that app is nearly

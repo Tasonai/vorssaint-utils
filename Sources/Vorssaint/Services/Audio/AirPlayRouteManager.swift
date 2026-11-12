@@ -417,9 +417,11 @@ final class AirPlayRouteManager: NSObject, ObservableObject {
         let wanted = AirPlayAvailability.runsBackupCheck(rendererRunning: streaming, mixerActive: onChange != nil,
                                                          available: isAvailable)
         if wanted, pollTimer == nil {
-            pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            let timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
                 self?.refreshActiveDevice()
             }
+            timer.tolerance = 0.3
+            pollTimer = timer
         } else if !wanted, let timer = pollTimer {
             timer.invalidate()
             pollTimer = nil

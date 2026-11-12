@@ -1791,7 +1791,8 @@ enum ClipboardImageStore {
     static func fileIcon(atPath path: String) -> NSImage {
         if let cached = fileIcons.object(forKey: path as NSString) { return cached }
         let icon = NSWorkspace.shared.icon(forFile: path)
-        fileIcons.setObject(icon, forKey: path as NSString)
+        let cost = max(1, Int(ceil(icon.size.width)) * Int(ceil(icon.size.height)) * 16)
+        fileIcons.setObject(icon, forKey: path as NSString, cost: cost)
         fileIconPaths = fileIconPaths.filter { fileIcons.object(forKey: $0 as NSString) != nil }
         fileIconPaths.insert(path)
         return icon
@@ -1801,8 +1802,30 @@ enum ClipboardImageStore {
     private static let fileIcons: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
         cache.countLimit = 120
+        cache.totalCostLimit = 8 * 1024 * 1024
         return cache
     }()
+
+    private static let imageDimensionsCache: NSCache<NSString, NSValue> = {
+        let cache = NSCache<NSString, NSValue>()
+        cache.countLimit = 256
+        cache.totalCostLimit = 64 * 1024
+        return cache
+    }()
+
+    private static let fileSizeLabelCache: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.countLimit = 256
+        cache.totalCostLimit = 64 * 1024
+        return cache
+    }()
+
+    private static func fileMetadataCacheKey(atPath path: String) -> NSString? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path) else { return nil }
+        let size = (attrs[.size] as? NSNumber)?.int64Value ?? -1
+        let mod = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(path)#\(size)#\(mod)" as NSString
+    }
 
     static func isImageFile(atPath path: String) -> Bool {
         ClipboardHistoryImageSupport.isImageFilePath(path)
@@ -1816,36 +1839,57 @@ enum ClipboardImageStore {
         }
         guard isImageFile(atPath: path) else { return nil }
         let url = URL(fileURLWithPath: path)
+        let sourceOptions = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false,
+        ] as CFDictionary
         let options = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCache: false,
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
         ] as CFDictionary
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions),
               let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options)
         else { return nil }
         let image = NSImage(cgImage: cgImage, size: .zero)
         thumbnails.setObject(image, forKey: key,
-                             cost: cgImage.bytesPerRow * cgImage.height)
+                             cost: max(1, cgImage.width * cgImage.height * 4))
         return image
     }
 
     static func imageDimensions(atPath path: String) -> (width: Int, height: Int)? {
         guard isImageFile(atPath: path) else { return nil }
+        let cacheKey = fileMetadataCacheKey(atPath: path) ?? (path as NSString)
+        if let cached = imageDimensionsCache.object(forKey: cacheKey) {
+            let size = cached.sizeValue
+            let w = Int(size.width)
+            let h = Int(size.height)
+            if w > 0, h > 0 { return (w, h) }
+        }
         let url = URL(fileURLWithPath: path)
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, sourceOptions) as? [CFString: Any]
         else { return nil }
         guard let rawWidth = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
               let rawHeight = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
               rawWidth > 0, rawHeight > 0
         else { return nil }
         let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
+        let resolved: (width: Int, height: Int)
         if (5...8).contains(orientation) {
-            return (rawHeight, rawWidth)
+            resolved = (rawHeight, rawWidth)
+        } else {
+            resolved = (rawWidth, rawHeight)
         }
-        return (rawWidth, rawHeight)
+        imageDimensionsCache.setObject(
+            NSValue(size: NSSize(width: resolved.width, height: resolved.height)),
+            forKey: cacheKey,
+            cost: 32
+        )
+        return resolved
     }
 
     static func imageDimensionsLabel(atPath path: String) -> String? {
@@ -1854,9 +1898,17 @@ enum ClipboardImageStore {
     }
 
     static func fileSizeString(atPath path: String) -> String? {
+        if let cacheKey = fileMetadataCacheKey(atPath: path),
+           let cached = fileSizeLabelCache.object(forKey: cacheKey) {
+            return cached as String
+        }
         guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.fileSizeKey]),
               let bytes = values.fileSize, bytes >= 0 else { return nil }
-        return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        let formatted = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        if let cacheKey = fileMetadataCacheKey(atPath: path) {
+            fileSizeLabelCache.setObject(formatted as NSString, forKey: cacheKey, cost: formatted.utf8.count + 16)
+        }
+        return formatted
     }
 
     static func cleanup(keeping names: Set<String>, filePaths: Set<String>) {

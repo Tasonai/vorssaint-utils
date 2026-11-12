@@ -12,6 +12,7 @@ struct NetworkSection: View {
     @StateObject private var addresses = NetworkAddressService()
     @Environment(\.colorScheme) private var colorScheme
     var collapsible = true
+    var panelVisible = true
     @AppStorage(DefaultsKey.monitorGraphNetwork) private var showGraph = true
     @AppStorage(DefaultsKey.monitorNetSpeed) private var netSpeed = true
     @AppStorage(DefaultsKey.monitorNetApps) private var netApps = true
@@ -52,16 +53,31 @@ struct NetworkSection: View {
             .panelCard()
         }
         .onAppear {
+            guard panelVisible else { return }
             if netApps {
                 startNetworkMonitoringIfNeeded()
             }
             refreshAppRows(force: true, delay: 0.2)
         }
         .onReceive(monitor.$snapshot) { _ in
+            guard panelVisible else { return }
             refreshAppRows(force: false, delay: 0.2)
         }
-        .onChange(of: netApps) { _, visible in
+        .onChange(of: panelVisible) { _, visible in
             if visible {
+                if netApps {
+                    startNetworkMonitoringIfNeeded()
+                }
+                refreshAppRows(force: true, delay: 0.2)
+            } else {
+                appRefreshSerial &+= 1
+                appRowsLoading = false
+                stopNetworkMonitoringIfNeeded()
+                addresses.stopMonitoring()
+            }
+        }
+        .onChange(of: netApps) { _, visible in
+            if visible, panelVisible {
                 startNetworkMonitoringIfNeeded()
                 refreshAppRows(force: true, delay: 0.2)
             } else {
@@ -76,6 +92,7 @@ struct NetworkSection: View {
             appRows = []
             appRowsLoading = false
             stopNetworkMonitoringIfNeeded()
+            addresses.cancel()
         }
     }
 
@@ -128,7 +145,7 @@ struct NetworkSection: View {
         case .speed: speedBlock(editing: editing)
         case .apps: appUsageBlock(editing: editing)
         case .totals: totalsRow(editing: editing)
-        case .addresses: NetworkAddressBlock(service: addresses, isVisible: $netAddresses, editing: editing)
+        case .addresses: NetworkAddressBlock(service: addresses, isVisible: $netAddresses, editing: editing, panelVisible: panelVisible)
         case .test: speedTestRow(editing: editing)
         }
     }
@@ -407,7 +424,9 @@ private struct NetworkAddressBlock: View {
     @ObservedObject var service: NetworkAddressService
     @Binding var isVisible: Bool
     var editing: Bool
+    var panelVisible: Bool
     @ObservedObject private var l10n = L10n.shared
+    @State private var isMounted = false
 
     var body: some View {
         if !isVisible {
@@ -431,10 +450,23 @@ private struct NetworkAddressBlock: View {
                 if editing { PanelInlineHideButton(isVisible: $isVisible) }
             }
             // The interfaces are read only while this line is on screen: a
-            // hidden block or a collapsed card costs nothing per snapshot.
-            .onAppear { service.refreshLocalAddresses() }
-            .onReceive(SystemMonitor.shared.$snapshot) { _ in service.refreshLocalAddresses() }
-            .onDisappear { service.cancel() }
+            // hidden block, collapsed card or closed panel pauses the timer.
+            .onAppear {
+                isMounted = true
+                if panelVisible { service.startMonitoring() }
+            }
+            .onChange(of: panelVisible) { _, visible in
+                guard isMounted else { return }
+                if visible {
+                    service.startMonitoring()
+                } else {
+                    service.stopMonitoring()
+                }
+            }
+            .onDisappear {
+                isMounted = false
+                service.cancel()
+            }
         }
     }
 }

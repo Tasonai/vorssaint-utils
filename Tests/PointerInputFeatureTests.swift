@@ -2799,6 +2799,11 @@ enum PointerInputFeatureTests {
                    "mouseTapRefusals = mouseTap == nil ? self.mouseTapRefusals + 1 : 0")
                && refusalResets == 1,
                "a refused mouse tap is worth one rebuild, and the count survives it")
+        suite.expect(superKeyServiceCode.contains("BoundedProcessRunner.run(")
+               && superKeyServiceCode.contains("dispatchPrecondition(condition: .notOnQueue(.main))")
+               && superKeyServiceCode.contains("dismissAfterConfirmedClear()")
+               && !superKeyServiceCode.contains("Shell.run(hidutilPath"),
+               "Super Key runs hidutil off the main thread via BoundedProcessRunner and skips redundant standby-guard passes")
 
         var noRepeatHoldState = SuperKeySupport.State()
         _ = noRepeatHoldState.decide(.triggerDown(

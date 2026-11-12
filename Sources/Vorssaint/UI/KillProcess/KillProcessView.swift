@@ -14,11 +14,10 @@ struct KillProcessView: View {
     @Environment(\.controlActiveState) private var controlActiveState
     @State private var refreshTimer: Timer?
     @State private var pendingAction: PendingAction?
-    @State private var hoveredPID: pid_t?
 
     private var strings: KillProcessFeatureStrings { FeatureStrings.killProcess(l10n.language) }
 
-    private enum PendingAction {
+    fileprivate enum PendingAction {
         case kill(KillProcessEntry, force: Bool)
         case killAll(name: String, force: Bool)
         case killTree(KillProcessEntry, force: Bool)
@@ -169,7 +168,8 @@ struct KillProcessView: View {
 
     @ViewBuilder
     private var list: some View {
-        if service.filteredEntries.isEmpty {
+        let displayed = service.filteredEntries
+        if displayed.isEmpty {
             // A transient ps hiccup no longer clears `entries` (KillProcessService
             // keeps the last good snapshot), so an empty list here means either
             // the very first load hasn't landed yet, or a search genuinely
@@ -180,8 +180,17 @@ struct KillProcessView: View {
                 loadingState
             }
         } else {
-            List(service.filteredEntries) { entry in row(entry) }
-                .listStyle(.inset)
+            List(displayed) { entry in
+                KillProcessRowView(
+                    entry: entry,
+                    strings: strings,
+                    canRestart: service.canRestart(entry),
+                    onPendingAction: { pendingAction = $0 },
+                    onRestart: { service.restart(entry) },
+                    onCopy: copy
+                )
+            }
+            .listStyle(.inset)
         }
     }
 
@@ -201,86 +210,6 @@ struct KillProcessView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func row(_ entry: KillProcessEntry) -> some View {
-        HStack(spacing: 10) {
-            Image(nsImage: ResponsibleProcess.icon(for: entry.pid))
-                .resizable().frame(width: 22, height: 22)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(entry.name).font(.system(size: 12.5)).lineLimit(1).truncationMode(.middle)
-                    if entry.groupedCount > 1 {
-                        Text(String(format: strings.processCountFormat, entry.groupedCount))
-                            .font(.system(size: 10)).foregroundStyle(.tertiary)
-                    }
-                }
-                Text(entry.path)
-                    .font(.system(size: 10.5)).foregroundStyle(.tertiary)
-                    .lineLimit(1).truncationMode(.head)
-            }
-            Spacer()
-            Text(String(format: "%.1f%%", locale: MetricFormat.locale, entry.cpuPercent))
-                .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .trailing)
-            Text(MetricFormat.bytes(UInt64(max(0, entry.memoryBytes))))
-                .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-                .frame(width: 72, alignment: .trailing)
-            Text(String(entry.pid))
-                .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-                .frame(width: 56, alignment: .trailing)
-            Button(strings.killButton) {
-                pendingAction = .kill(entry, force: false)
-            }
-            .frame(minWidth: 44)
-            .disabled(entry.isProtected)
-            .opacity(hoveredPID == entry.pid ? 1 : 0)
-            .allowsHitTesting(hoveredPID == entry.pid)
-            Menu {
-                rowActions(for: entry)
-            } label: {
-                Image(systemName: "ellipsis")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .frame(minWidth: 44)
-            .opacity(hoveredPID == entry.pid ? 1 : 0)
-            .allowsHitTesting(hoveredPID == entry.pid)
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        .onHover { isHovered in
-            if isHovered {
-                hoveredPID = entry.pid
-            } else if hoveredPID == entry.pid {
-                hoveredPID = nil
-            }
-        }
-        .contextMenu {
-            Button(strings.killButton) { pendingAction = .kill(entry, force: false) }
-                .disabled(entry.isProtected)
-            rowActions(for: entry)
-        }
-    }
-
-    @ViewBuilder
-    private func rowActions(for entry: KillProcessEntry) -> some View {
-        Button(strings.forceKillButton) { pendingAction = .kill(entry, force: true) }
-            .disabled(entry.isProtected)
-        Button(String(format: strings.killAllFormat, entry.name)) {
-            pendingAction = .killAll(name: entry.name, force: false)
-        }
-        .disabled(entry.isProtected)
-        Button(strings.killTreeButton) { pendingAction = .killTree(entry, force: false) }
-            .disabled(entry.isProtected)
-        if service.canRestart(entry) {
-            Button(strings.restartButton) { service.restart(entry) }
-        }
-        Divider()
-        Button(strings.copyPID) { copy(String(entry.pid)) }
-        Button(strings.copyPath) { copy(entry.path) }
     }
 
     // MARK: Confirmation
@@ -342,13 +271,103 @@ struct KillProcessView: View {
         }
         guard refreshTimer == nil else { return }
         service.refresh()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             service.refresh()
         }
+        timer.tolerance = 0.6
+        refreshTimer = timer
     }
 
     private func stopTimer() {
         refreshTimer?.invalidate()
         refreshTimer = nil
+    }
+}
+
+private struct KillProcessRowView: View {
+    let entry: KillProcessEntry
+    let strings: KillProcessFeatureStrings
+    let canRestart: Bool
+    let onPendingAction: (KillProcessView.PendingAction) -> Void
+    let onRestart: () -> Void
+    let onCopy: (String) -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(nsImage: ResponsibleProcess.icon(for: entry.pid))
+                .resizable().frame(width: 22, height: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text(entry.name).font(.system(size: 12.5)).lineLimit(1).truncationMode(.middle)
+                    if entry.groupedCount > 1 {
+                        Text(String(format: strings.processCountFormat, entry.groupedCount))
+                            .font(.system(size: 10)).foregroundStyle(.tertiary)
+                    }
+                }
+                Text(entry.path)
+                    .font(.system(size: 10.5)).foregroundStyle(.tertiary)
+                    .lineLimit(1).truncationMode(.head)
+            }
+            Spacer()
+            Text(String(format: "%.1f%%", locale: MetricFormat.locale, entry.cpuPercent))
+                .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                .frame(width: 52, alignment: .trailing)
+            Text(MetricFormat.bytes(UInt64(max(0, entry.memoryBytes))))
+                .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                .frame(width: 72, alignment: .trailing)
+            Text(String(entry.pid))
+                .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .trailing)
+            Button(strings.killButton) {
+                onPendingAction(.kill(entry, force: false))
+            }
+            .frame(minWidth: 44)
+            .disabled(entry.isProtected)
+            .opacity(isHovered ? 1 : 0)
+            .allowsHitTesting(isHovered)
+            Menu {
+                rowActions
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(minWidth: 44)
+            .opacity(isHovered ? 1 : 0)
+            .allowsHitTesting(isHovered)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if isHovered != hovering {
+                isHovered = hovering
+            }
+        }
+        .contextMenu {
+            Button(strings.killButton) { onPendingAction(.kill(entry, force: false)) }
+                .disabled(entry.isProtected)
+            rowActions
+        }
+    }
+
+    @ViewBuilder
+    private var rowActions: some View {
+        Button(strings.forceKillButton) { onPendingAction(.kill(entry, force: true)) }
+            .disabled(entry.isProtected)
+        Button(String(format: strings.killAllFormat, entry.name)) {
+            onPendingAction(.killAll(name: entry.name, force: false))
+        }
+        .disabled(entry.isProtected)
+        Button(strings.killTreeButton) { onPendingAction(.killTree(entry, force: false)) }
+            .disabled(entry.isProtected)
+        if canRestart {
+            Button(strings.restartButton, action: onRestart)
+        }
+        Divider()
+        Button(strings.copyPID) { onCopy(String(entry.pid)) }
+        Button(strings.copyPath) { onCopy(entry.path) }
     }
 }

@@ -58,6 +58,7 @@ struct AppBundleList<Accessory: View>: View {
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded.animation(.easeOut(duration: 0.16))) {
             ForEach(sortedBundleIDs, id: \.self) { bundleID in
+                let displayName = InstalledApps.cachedName(for: bundleID)
                 HStack(spacing: 9) {
                     Image(nsImage: InstalledApps.icon(for: bundleID))
                         .resizable()
@@ -71,7 +72,7 @@ struct AppBundleList<Accessory: View>: View {
                         // must drop: cutting the middle would hide exactly
                         // the component that differs.
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(InstalledApps.name(for: bundleID))
+                            Text(displayName)
                                 .lineLimit(1)
                             Text(location)
                                 .font(.caption)
@@ -81,7 +82,7 @@ struct AppBundleList<Accessory: View>: View {
                         }
                         .help(bundleID)
                     } else {
-                        Text(InstalledApps.name(for: bundleID))
+                        Text(displayName)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
@@ -124,13 +125,7 @@ struct AppBundleList<Accessory: View>: View {
     }
 
     private var sortedBundleIDs: [String] {
-        bundleIDs.sorted {
-            let byName = InstalledApps.name(for: $0)
-                .localizedCaseInsensitiveCompare(InstalledApps.name(for: $1))
-            // Equal display names — three runtimes all named "java" — fall
-            // back to the identity so the rows hold one order between renders.
-            return byName == .orderedSame ? $0 < $1 : byName == .orderedAscending
-        }
+        InstalledApps.sortedIdentities(bundleIDs)
     }
 
     private var appPickerSheet: some View {

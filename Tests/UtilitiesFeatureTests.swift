@@ -936,6 +936,90 @@ enum UtilitiesFeatureTests {
                 && nowPlayingBuildScript.contains("Resources/now-playing.pl")
                 && nowPlayingBuildScript.contains("Contents/Frameworks/$NOW_PLAYING_ADAPTER"),
                "build.sh compiles the Now Playing adapter and stages the library and its perl loader")
+        do {
+            var fallbackFetchCount = 0
+            let sharedImage = NSImage(size: NSSize(width: 76, height: 76))
+            let sharedSnapshot = RadialNowPlayingSnapshot(
+                title: "Shared Track",
+                artist: "Shared Artist",
+                album: "Shared Album",
+                artworkData: nil,
+                appBundleIdentifier: "com.apple.Music",
+                appPID: 77
+            )
+            var currentShared = RadialNowPlayingSharedReading(
+                isTracking: true,
+                playbackIsActive: true,
+                snapshot: sharedSnapshot,
+                artwork: sharedImage
+            )
+            let coordinator = RadialNowPlayingCoordinator(
+                sharedNowPlayingProvider: { currentShared },
+                fallbackFetcher: { completion in
+                    fallbackFetchCount += 1
+                    completion(nowPlayingSnapshot)
+                },
+                backingScaleProvider: { 2 },
+                deliverOnMain: { $0() }
+            )
+            var observedStates: [RadialNowPlayingState] = []
+            coordinator.refresh { observedStates.append($0) }
+            suite.expect(fallbackFetchCount == 0
+                    && observedStates == [.playing(sharedSnapshot)]
+                    && coordinator.cachedArtwork === sharedImage,
+                   "RadialNowPlayingCoordinator reuses NotchMusicService without spawning perl and preserves predecoded artwork")
+            currentShared = RadialNowPlayingSharedReading(
+                isTracking: true,
+                playbackIsActive: false,
+                snapshot: sharedSnapshot,
+                artwork: sharedImage
+            )
+            observedStates = []
+            coordinator.refresh { observedStates.append($0) }
+            suite.expect(fallbackFetchCount == 0
+                    && observedStates == [.nothingPlaying]
+                    && coordinator.cachedArtwork == nil,
+                   "paused shared Now Playing resolves immediately to Nothing Playing without spawning perl")
+            let oversizedArtworkImage = NSImage(size: NSSize(width: 512, height: 512))
+            oversizedArtworkImage.lockFocus()
+            NSColor.systemPink.setFill()
+            NSRect(x: 0, y: 0, width: 512, height: 512).fill()
+            oversizedArtworkImage.unlockFocus()
+            let artworkPNG = RadialMenuFaviconFetcher.scaledPNGData(from: oversizedArtworkImage, targetSize: 256)
+            let fallbackTrack = RadialNowPlayingSnapshot(
+                title: "Fallback Track",
+                artist: "Artist",
+                album: nil,
+                artworkData: artworkPNG,
+                appBundleIdentifier: "com.spotify.client",
+                appPID: 88
+            )
+            currentShared = RadialNowPlayingSharedReading(
+                isTracking: false,
+                playbackIsActive: false,
+                snapshot: nil,
+                artwork: nil
+            )
+            coordinator.fallbackFetcher = { completion in
+                fallbackFetchCount += 1
+                completion(fallbackTrack)
+            }
+            observedStates = []
+            coordinator.refresh { observedStates.append($0) }
+            let firstDecoded = coordinator.cachedArtwork
+            let secondDecoded = RadialNowPlayingArtworkCache.artwork(for: fallbackTrack, pointSize: 76, scale: 2)
+            suite.expect(fallbackFetchCount == 1
+                    && observedStates == [.loading, .playing(fallbackTrack)]
+                    && firstDecoded != nil
+                    && firstDecoded === secondDecoded,
+                   "fallback Now Playing pre-decodes and caches resized artwork once per snapshot")
+            let radialServiceSource = (try? String(
+                contentsOfFile: "Sources/Vorssaint/Services/RadialMenu/RadialNowPlayingService.swift",
+                encoding: .utf8
+            )) ?? ""
+            suite.expect(!radialServiceSource.contains("NSImage(data:"),
+                   "RadialNowPlayingService never decodes raw artwork Data inside SwiftUI body")
+        }
         let radialQuickToggle = RadialMenuItem(kind: .quickToggle,
                                                payload: RadialMenuQuickToggle.darkMode.rawValue)
         suite.expect(RadialMenuSupport.sanitized([radialQuickToggle]) == [radialQuickToggle]

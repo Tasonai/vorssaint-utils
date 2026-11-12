@@ -2,12 +2,17 @@
 // Copyright (C) 2026 Vorssaint
 
 import AppKit
+import Combine
 import SwiftUI
 
 struct NotchView: View {
+    private struct MusicPresence: Equatable {
+        var playback: Bool?
+    }
+
     @ObservedObject var service: NotchService
     @ObservedObject private var l10n = L10n.shared
-    @ObservedObject private var music = NotchMusicService.shared
+    @State private var music = MusicPresence(playback: NotchMusicService.shared.playback != nil ? true : nil)
     @ObservedObject private var launcher = QuickLauncherService.shared
     @ObservedObject private var updates = UpdateService.shared
     @AppStorage(DefaultsKey.notchLiquidGlassEnabled) private var glass = false
@@ -54,6 +59,12 @@ struct NotchView: View {
             }
             .onChange(of: contrast) {
                 DispatchQueue.main.async { service.refreshPresentation(animated: false) }
+            }
+            .onReceive(NotchMusicService.shared.$playback.map { $0 != nil }.removeDuplicates()) { hasPlayback in
+                let next: Bool? = hasPlayback ? true : nil
+                if music.playback != next {
+                    music.playback = next
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .environment(\.colorScheme, .dark)
@@ -671,7 +682,6 @@ struct NotchRestingStrip: View {
     @ObservedObject var service: NotchService
     /// Another display's strip, when the island shows on every display.
     var displayGeometry: NotchGeometry? = nil
-    @ObservedObject private var music = NotchMusicService.shared
     @AppStorage(DefaultsKey.notchLowBatteryTint) private var lowBatteryTint = false
     @AppStorage(DefaultsKey.notchLowBatteryThreshold) private var lowBatteryThreshold = NotchSupport.defaultLowBatteryThreshold
     @AppStorage(DefaultsKey.notchLowBatteryEarly) private var earlyBatteryWarning = false
@@ -711,11 +721,7 @@ struct NotchRestingStrip: View {
                         Color.clear
                         switch service.idleContent {
                         case .music:
-                            if let artwork = music.artwork {
-                                Image(nsImage: artwork).resizable().scaledToFill()
-                                    .frame(width: min(22, geometry.stripHeight - 6), height: min(22, geometry.stripHeight - 6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                            }
+                            NotchRestingMusicArtworkWing(stripHeight: geometry.stripHeight)
                         case .battery:
                             Image(systemName: batterySymbol).font(.system(size: 12))
                                 .foregroundStyle(batteryTint)
@@ -735,10 +741,7 @@ struct NotchRestingStrip: View {
                         HStack(spacing: 4) {
                             switch service.idleContent {
                             case .music:
-                                if music.playback?.isPlaying == true {
-                                    NotchLiveEqualizerBars(bars: 3, barWidth: 2, height: 11,
-                                                           tint: music.artworkTint?.color ?? .white)
-                                }
+                                NotchRestingMusicBarsWing()
                             case .battery:
                                 if let percent = service.power.chargePercent {
                                     Text("\(percent)%").font(.system(size: 9, weight: .medium)).monospacedDigit()
@@ -784,6 +787,30 @@ struct NotchRestingStrip: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .contentShape(Rectangle())
         .accessibilityHidden(true)
+    }
+}
+
+private struct NotchRestingMusicArtworkWing: View {
+    let stripHeight: CGFloat
+    @ObservedObject private var music = NotchMusicService.shared
+
+    var body: some View {
+        if let artwork = music.artwork {
+            Image(nsImage: artwork).resizable().scaledToFill()
+                .frame(width: min(22, stripHeight - 6), height: min(22, stripHeight - 6))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+        }
+    }
+}
+
+private struct NotchRestingMusicBarsWing: View {
+    @ObservedObject private var music = NotchMusicService.shared
+
+    var body: some View {
+        if music.playback?.isPlaying == true {
+            NotchLiveEqualizerBars(bars: 3, barWidth: 2, height: 11,
+                                   tint: music.artworkTint?.color ?? .white)
+        }
     }
 }
 

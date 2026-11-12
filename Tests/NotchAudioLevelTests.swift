@@ -201,12 +201,37 @@ enum NotchAudioLevelLifecycleContract {
             drain()
         }
         defer {
+            while service.visibleConsumerCount > 0 {
+                service.releaseConsumer()
+            }
             enable(false)
             NSWorkspace.shared.accessibilityDisplayShouldReduceMotion = false
             music.playback = nil
             Reader.instances.removeAll()
             drain()
         }
+        music.playback = playback()
+        enable(true)
+        expect(service.visibleConsumerCount == 0 && Reader.instances.isEmpty && service.levels == nil,
+               "background playback without visible equalizer bars never starts a CoreAudio tap")
+        service.retainConsumer()
+        service.retainConsumer()
+        drain()
+        expect(service.visibleConsumerCount == 2 && Reader.instances.count == 1,
+               "retaining visible equalizer consumers starts a single shared audio reader")
+        if let gatedReader = Reader.instances.last {
+            gatedReader.onLevels([0.35, 0.2, 0.1, 0, 0, 0, 0])
+            drain()
+            service.releaseConsumer()
+            expect(service.visibleConsumerCount == 1 && !gatedReader.stopped && service.levels != nil,
+                   "releasing one of two visible consumers keeps the reader alive for the remaining view")
+            service.releaseConsumer()
+            expect(service.visibleConsumerCount == 0 && gatedReader.stopped && service.levels == nil,
+                   "releasing the last visible consumer immediately tears down the tap and resets levels to idle")
+        }
+        enable(false)
+        Reader.instances.removeAll()
+        service.retainConsumer()
         music.playback = playback()
         enable(true)
         guard let first = Reader.instances.last else {

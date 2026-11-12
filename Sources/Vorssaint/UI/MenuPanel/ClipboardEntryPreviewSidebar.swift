@@ -177,7 +177,7 @@ struct ClipboardEntryPreviewSidebar: View {
                     .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 8) {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                    Image(nsImage: ClipboardImageStore.fileIcon(atPath: path))
                         .resizable()
                         .frame(width: 32, height: 32)
                     VStack(alignment: .leading, spacing: 2) {
@@ -225,7 +225,7 @@ struct ClipboardEntryPreviewSidebar: View {
                                 .frame(width: 20, height: 20)
                                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                         } else {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                            Image(nsImage: ClipboardImageStore.fileIcon(atPath: path))
                                 .resizable()
                                 .frame(width: 18, height: 18)
                         }

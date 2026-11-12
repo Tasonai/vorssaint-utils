@@ -9,7 +9,36 @@ import SystemConfiguration
 /// View-owned. Every reading comes from the local interface list, so no
 /// request leaves the machine and there is no provider to name.
 final class NetworkAddressService: ObservableObject {
+    static let refreshInterval: TimeInterval = 5.0
+    static let refreshTolerance: TimeInterval = 1.0
+
     @Published private(set) var localAddresses: [String] = []
+    private let readQueue = DispatchQueue(label: "com.vorssaint.network-addresses", qos: .utility)
+    private var refreshTimer: Timer?
+    private var generation: UInt64 = 0
+    private var reading = false
+
+    deinit {
+        refreshTimer?.invalidate()
+    }
+
+    func startMonitoring() {
+        guard refreshTimer == nil else { return }
+        scheduleAsyncRefresh()
+        let timer = Timer(timeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
+            self?.scheduleAsyncRefresh()
+        }
+        timer.tolerance = Self.refreshTolerance
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
+    }
+
+    func stopMonitoring() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        generation &+= 1
+        reading = false
+    }
 
     func refreshLocalAddresses() {
         let addresses = Self.readLocalAddresses()
@@ -17,7 +46,25 @@ final class NetworkAddressService: ObservableObject {
         localAddresses = addresses
     }
 
+    private func scheduleAsyncRefresh() {
+        guard !reading else { return }
+        reading = true
+        let expected = generation
+        readQueue.async { [weak self] in
+            let addresses = Self.readLocalAddresses()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.reading = false
+                guard self.generation == expected else { return }
+                if addresses != self.localAddresses {
+                    self.localAddresses = addresses
+                }
+            }
+        }
+    }
+
     func cancel() {
+        stopMonitoring()
         localAddresses = []
     }
 

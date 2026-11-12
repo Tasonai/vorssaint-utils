@@ -633,6 +633,235 @@ enum RadialNowPlayingSupport {
     }
 }
 
+struct RadialNowPlayingSharedReading {
+    var isTracking: Bool
+    var isAwaitingInitialReply: Bool = false
+    var playbackIsActive: Bool
+    var snapshot: RadialNowPlayingSnapshot?
+    var artwork: NSImage?
+}
+
+enum RadialNowPlayingArtworkCache {
+    static let cardPointSize: CGFloat = 76
+
+    private static let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 16
+        cache.totalCostLimit = 4 * 1024 * 1024
+        return cache
+    }()
+
+    static func artwork(for snapshot: RadialNowPlayingSnapshot,
+                        predecoded: NSImage? = nil,
+                        pointSize: CGFloat = cardPointSize,
+                        scale: CGFloat = 2) -> NSImage? {
+        let effectiveScale = max(1, scale)
+        if let predecoded, snapshot.artworkData == nil {
+            let key = fallbackIdentityKey(for: snapshot, pointSize: pointSize, scale: effectiveScale)
+            if let cached = cache.object(forKey: key) { return cached }
+            cache.setObject(predecoded, forKey: key, cost: estimatedByteCost(of: predecoded, scale: effectiveScale))
+            return predecoded
+        }
+        guard let data = snapshot.artworkData, !data.isEmpty else {
+            return predecoded
+        }
+        let key = dataKey(data: data, pointSize: pointSize, scale: effectiveScale)
+        if let cached = cache.object(forKey: key) {
+            return cached
+        }
+        if let predecoded {
+            cache.setObject(predecoded, forKey: key, cost: estimatedByteCost(of: predecoded, scale: effectiveScale))
+            return predecoded
+        }
+        guard let (decoded, byteCost) = decodeThumbnail(from: data, pointSize: pointSize, scale: effectiveScale) else {
+            return nil
+        }
+        cache.setObject(decoded, forKey: key, cost: byteCost)
+        return decoded
+    }
+
+    private static func decodeThumbnail(from data: Data,
+                                        pointSize: CGFloat,
+                                        scale: CGFloat) -> (NSImage, Int)? {
+        let maxPixel = max(16, Int((pointSize * scale).rounded(.up)))
+        let sourceOptions: [CFString: Any] = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false,
+        ]
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions as CFDictionary) else {
+            return nil
+        }
+        let thumbOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary) else {
+            return nil
+        }
+        let logicalSize = NSSize(width: CGFloat(cgImage.width) / scale,
+                                 height: CGFloat(cgImage.height) / scale)
+        let image = NSImage(cgImage: cgImage, size: logicalSize)
+        return (image, max(1, cgImage.width * cgImage.height * 4))
+    }
+
+    private static func estimatedByteCost(of image: NSImage, scale: CGFloat) -> Int {
+        if let rep = image.representations.first, rep.pixelsWide > 0, rep.pixelsHigh > 0 {
+            return max(1, rep.pixelsWide * rep.pixelsHigh * 4)
+        }
+        let width = max(1, Int((image.size.width * scale).rounded(.up)))
+        let height = max(1, Int((image.size.height * scale).rounded(.up)))
+        return max(1, width * height * 4)
+    }
+
+    private static func dataKey(data: Data, pointSize: CGFloat, scale: CGFloat) -> NSString {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        let count = data.count
+        hash = (hash ^ UInt64(count)) &* 1_099_511_628_211
+        data.withUnsafeBytes { raw in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            let sampleSpan = min(64, bytes.count)
+            for index in 0..<sampleSpan {
+                hash = (hash ^ UInt64(bytes[index])) &* 1_099_511_628_211
+            }
+            if bytes.count > sampleSpan {
+                let midStart = max(0, bytes.count / 2 - sampleSpan / 2)
+                for index in midStart..<min(bytes.count, midStart + sampleSpan) {
+                    hash = (hash ^ UInt64(bytes[index])) &* 1_099_511_628_211
+                }
+                let tailStart = max(0, bytes.count - sampleSpan)
+                for index in tailStart..<bytes.count {
+                    hash = (hash ^ UInt64(bytes[index])) &* 1_099_511_628_211
+                }
+            }
+        }
+        return "\(count):\(String(hash, radix: 16)):\(Int(pointSize.rounded()))@\(Int((scale * 100).rounded()))" as NSString
+    }
+
+    private static func fallbackIdentityKey(for snapshot: RadialNowPlayingSnapshot,
+                                            pointSize: CGFloat,
+                                            scale: CGFloat) -> NSString {
+        let identity = [
+            snapshot.appBundleIdentifier ?? "",
+            snapshot.appPID.map(String.init) ?? "",
+            snapshot.title ?? "",
+            snapshot.artist ?? "",
+            snapshot.album ?? "",
+        ].joined(separator: "|")
+        return "shared:\(identity):\(Int(pointSize.rounded()))@\(Int((scale * 100).rounded()))" as NSString
+    }
+}
+
+final class RadialNowPlayingCoordinator {
+    var sharedNowPlayingProvider: () -> RadialNowPlayingSharedReading
+    var awaitInitialSharedReply: ((@escaping () -> Void) -> (() -> Void)?)?
+    var fallbackFetcher: (@escaping (RadialNowPlayingSnapshot?) -> Void) -> Void
+    var backingScaleProvider: () -> CGFloat
+    var deliverOnMain: (@escaping () -> Void) -> Void
+
+    private var generation = 0
+    private var cancelPendingAwait: (() -> Void)?
+    private(set) var state = RadialNowPlayingState.nothingPlaying
+    private(set) var cachedArtwork: NSImage?
+
+    init(sharedNowPlayingProvider: @escaping () -> RadialNowPlayingSharedReading,
+         awaitInitialSharedReply: ((@escaping () -> Void) -> (() -> Void)?)? = nil,
+         fallbackFetcher: @escaping (@escaping (RadialNowPlayingSnapshot?) -> Void) -> Void,
+         backingScaleProvider: @escaping () -> CGFloat = { max(1, NSScreen.main?.backingScaleFactor ?? 2) },
+         deliverOnMain: @escaping (@escaping () -> Void) -> Void = { block in
+             if Thread.isMainThread { block() }
+             else { DispatchQueue.main.async(execute: block) }
+         }) {
+        self.sharedNowPlayingProvider = sharedNowPlayingProvider
+        self.awaitInitialSharedReply = awaitInitialSharedReply
+        self.fallbackFetcher = fallbackFetcher
+        self.backingScaleProvider = backingScaleProvider
+        self.deliverOnMain = deliverOnMain
+    }
+
+    func refresh(update: @escaping (RadialNowPlayingState) -> Void,
+                 onResolved: ((RadialNowPlayingState) -> Void)? = nil) {
+        generation += 1
+        let requestedGeneration = generation
+        cancelPendingAwait?()
+        cancelPendingAwait = nil
+
+        let shared = sharedNowPlayingProvider()
+        if shared.isTracking {
+            applyShared(shared, update: update, onResolved: onResolved)
+            return
+        }
+
+        state = .loading
+        cachedArtwork = nil
+        update(.loading)
+
+        if shared.isAwaitingInitialReply, let awaitInitialSharedReply {
+            cancelPendingAwait = awaitInitialSharedReply { [weak self] in
+                self?.deliverOnMain {
+                    guard let self, self.generation == requestedGeneration else { return }
+                    self.cancelPendingAwait = nil
+                    let refreshedShared = self.sharedNowPlayingProvider()
+                    if refreshedShared.isTracking {
+                        self.applyShared(refreshedShared, update: update, onResolved: onResolved)
+                    } else {
+                        self.fetchViaFallback(generation: requestedGeneration,
+                                              update: update,
+                                              onResolved: onResolved)
+                    }
+                }
+            }
+            if cancelPendingAwait != nil { return }
+        }
+
+        fetchViaFallback(generation: requestedGeneration, update: update, onResolved: onResolved)
+    }
+
+    private func applyShared(_ shared: RadialNowPlayingSharedReading,
+                             update: (RadialNowPlayingState) -> Void,
+                             onResolved: ((RadialNowPlayingState) -> Void)?) {
+        let activeSnapshot = shared.playbackIsActive ? shared.snapshot : nil
+        let nextState = activeSnapshot.map(RadialNowPlayingState.playing) ?? .nothingPlaying
+        let scale = backingScaleProvider()
+        cachedArtwork = activeSnapshot.flatMap { snapshot in
+            RadialNowPlayingArtworkCache.artwork(
+                for: snapshot,
+                predecoded: shared.artwork,
+                pointSize: RadialNowPlayingArtworkCache.cardPointSize,
+                scale: scale
+            )
+        }
+        state = nextState
+        update(nextState)
+        onResolved?(nextState)
+    }
+
+    private func fetchViaFallback(generation requestedGeneration: Int,
+                                  update: @escaping (RadialNowPlayingState) -> Void,
+                                  onResolved: ((RadialNowPlayingState) -> Void)?) {
+        let scale = backingScaleProvider()
+        fallbackFetcher { [weak self] snapshot in
+            let predecoded = snapshot.flatMap {
+                RadialNowPlayingArtworkCache.artwork(
+                    for: $0,
+                    pointSize: RadialNowPlayingArtworkCache.cardPointSize,
+                    scale: scale
+                )
+            }
+            self?.deliverOnMain {
+                guard let self, self.generation == requestedGeneration else { return }
+                let nextState = snapshot.map(RadialNowPlayingState.playing) ?? .nothingPlaying
+                self.cachedArtwork = predecoded
+                self.state = nextState
+                update(nextState)
+                onResolved?(nextState)
+            }
+        }
+    }
+}
+
 enum RadialMenuSupport {
     /// Pointer events that can update a visible wheel's highlighted slice.
     /// AppKit reports movement with a held extra mouse button as

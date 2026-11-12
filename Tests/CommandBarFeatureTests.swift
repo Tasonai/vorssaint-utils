@@ -3210,6 +3210,10 @@ enum CommandBarKillProcessOrderContract {
             suite.expect(service.killProcessEntries == expected,
                          "the Command Bar lists processes in the Kill Process page's \(sort) order, found \(service.killProcessEntries)")
         }
+        let killViewSource = (try? String(contentsOfFile: "Sources/Vorssaint/UI/KillProcess/KillProcessView.swift", encoding: .utf8)) ?? ""
+        suite.expect(killViewSource.contains("private struct KillProcessRowView: View")
+                         && !killViewSource.contains("hoveredPID"),
+                     "KillProcessView isolates per-row hover state in KillProcessRowView without parent table invalidation")
     }
 }
 

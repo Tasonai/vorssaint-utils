@@ -32,6 +32,7 @@ final class RecentCaptureService: ObservableObject {
 
     private init() {
         thumbnailCache.countLimit = ScreenshotSupport.recentCaptureLimit
+        thumbnailCache.totalCostLimit = 32 * 1024 * 1024
         hotkey.onPress = { [weak self] in self?.showHistoryWindow() }
         reload()
     }
@@ -344,7 +345,13 @@ final class RecentCaptureService: ObservableObject {
         let key = name as NSString
         if let cached = thumbnailCache.object(forKey: key) { return cached }
         guard let image = NSImage(contentsOf: root.appendingPathComponent(name)) else { return nil }
-        thumbnailCache.setObject(image, forKey: key)
+        let cost: Int
+        if let rep = image.representations.first, rep.pixelsWide > 0, rep.pixelsHigh > 0 {
+            cost = max(1, rep.pixelsWide * rep.pixelsHigh * 4)
+        } else {
+            cost = max(1, Int(ceil(image.size.width)) * Int(ceil(image.size.height)) * 4)
+        }
+        thumbnailCache.setObject(image, forKey: key, cost: cost)
         return image
     }
 

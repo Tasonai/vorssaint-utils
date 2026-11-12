@@ -190,6 +190,15 @@ enum WindowEnumerator {
                     marksHiddenSpaces: true)
     }
 
+    static func listWindowsForDockPreview(for pid: pid_t,
+                                          maximumCount: Int = 12,
+                                          snapshot: Snapshot) -> [SwitcherItem] {
+        listWindows(for: pid, maximumCount: maximumCount,
+                    currentSpaceOnly: UserDefaults.standard.bool(forKey: DefaultsKey.dockPreviewCurrentSpaceOnly),
+                    marksHiddenSpaces: true,
+                    snapshot: snapshot)
+    }
+
     /// A desktop can change after enumeration, including between pinned refreshes.
     static func dockPreviewMayActivate(_ item: SwitcherItem) -> Bool {
         guard UserDefaults.standard.bool(forKey: DefaultsKey.dockPreviewCurrentSpaceOnly),

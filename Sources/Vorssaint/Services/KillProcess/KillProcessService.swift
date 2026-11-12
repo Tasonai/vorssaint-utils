@@ -52,10 +52,18 @@ final class KillProcessService: ObservableObject {
         let startDescription: String
     }
 
-    @Published private(set) var entries: [KillProcessEntry] = []
-    @Published var query: String = ""
-    @Published private(set) var sortBy: SortBy
-    @Published private(set) var sortAscending: Bool
+    @Published private(set) var entries: [KillProcessEntry] = [] {
+        didSet { recomputeSortedEntries() }
+    }
+    @Published var query: String = "" {
+        didSet { recomputeFilteredEntries() }
+    }
+    @Published private(set) var sortBy: SortBy {
+        didSet { recomputeSortedEntries() }
+    }
+    @Published private(set) var sortAscending: Bool {
+        didSet { recomputeSortedEntries() }
+    }
     @Published private(set) var groupRelated: Bool
     @Published private(set) var isRefreshing = false
     /// True once a `ps` snapshot has completed successfully at least once, so
@@ -63,6 +71,9 @@ final class KillProcessService: ObservableObject {
     /// "search matched nothing" - both look like an empty `entries` array
     /// otherwise.
     @Published private(set) var hasLoadedOnce = false
+
+    private var cachedSortedEntries: [KillProcessEntry] = []
+    private var cachedFilteredEntries: [KillProcessEntry] = []
 
     private let cacheLock = NSLock()
     private var lastRefresh: TimeInterval = 0
@@ -103,9 +114,21 @@ final class KillProcessService: ObservableObject {
     }
 
     var filteredEntries: [KillProcessEntry] {
+        cachedFilteredEntries
+    }
+
+    private func recomputeSortedEntries() {
+        cachedSortedEntries = sortedEntries
+        recomputeFilteredEntries()
+    }
+
+    private func recomputeFilteredEntries() {
         let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !needle.isEmpty else { return sortedEntries }
-        return sortedEntries.filter {
+        guard !needle.isEmpty else {
+            cachedFilteredEntries = cachedSortedEntries
+            return
+        }
+        cachedFilteredEntries = cachedSortedEntries.filter {
             $0.name.lowercased().contains(needle) || String($0.pid) == needle
         }
     }

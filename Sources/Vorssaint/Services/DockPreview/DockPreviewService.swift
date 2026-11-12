@@ -39,6 +39,8 @@ final class DockPreviewService: ObservableObject {
     private var dockHoldObservers: [NSObjectProtocol] = []
     private var dockHoldInputTap: CFMachPort?
     private var dockHoldInputSource: CFRunLoopSource?
+    private let enumerationQueue = DispatchQueue(label: "com.vorssaint.dock-preview.enumeration", qos: .userInitiated)
+    private var hoverGeneration = DockPreviewHoverGeneration()
     private var pendingHover: PendingHover?
     private var pendingHide: DispatchWorkItem?
     private var lastMoveSampledAt: TimeInterval = 0
@@ -673,6 +675,7 @@ final class DockPreviewService: ObservableObject {
         }
 
         cancelPendingHover()
+        let generation = hoverGeneration.advance()
         let delay = delay ?? openDelay
         let token = UUID()
         let work = DispatchWorkItem { [weak self] in
@@ -680,7 +683,7 @@ final class DockPreviewService: ObservableObject {
         }
         pendingHover = PendingHover(token: token, app: hit.app, iconFrame: hit.iconFrame, workItem: work)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-        schedulePrefetch(token: token, pid: hit.app.processIdentifier, delay: delay)
+        schedulePrefetch(token: token, generation: generation, pid: hit.app.processIdentifier, delay: delay)
     }
 
     /// Reads the app's window list part-way through the arming delay, so the
@@ -689,15 +692,24 @@ final class DockPreviewService: ObservableObject {
     /// Skipped while a panel is up: a switch runs on a delay as short as the
     /// reading's own head start, so the reading would land the moment the
     /// cursor does, and a reading under way cannot be called back.
-    private func schedulePrefetch(token: UUID, pid: pid_t, delay: TimeInterval) {
+    private func schedulePrefetch(token: UUID, generation: UInt64, pid: pid_t, delay: TimeInterval) {
         guard !isVisible else { return }
         let work = DispatchWorkItem { [weak self] in
-            guard let self, self.pendingHover?.token == token else { return }
-            let list = Self.previewableWindows(for: pid)
-            // The list took Accessibility round trips to read: the hover it was
-            // taken for can have been cancelled or handed on in the meantime.
-            guard self.pendingHover?.token == token else { return }
-            self.pendingHover?.windows = list
+            guard let self,
+                  self.hoverGeneration.accepts(generation),
+                  self.pendingHover?.token == token else { return }
+            let snapshot = WindowEnumerator.snapshot()
+            self.enumerationQueue.async { [weak self] in
+                let list = Self.previewableWindows(for: pid, snapshot: snapshot)
+                DispatchQueue.main.async { [weak self] in
+                    // The list took Accessibility round trips to read: the hover it was
+                    // taken for can have been cancelled or handed on in the meantime.
+                    guard let self,
+                          self.hoverGeneration.accepts(generation),
+                          self.pendingHover?.token == token else { return }
+                    self.pendingHover?.windows = list
+                }
+            }
         }
         pendingHover?.prefetchWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + DockPreviewSupport.prefetchDelay(openDelay: delay),
@@ -706,6 +718,14 @@ final class DockPreviewService: ObservableObject {
 
     private static func previewableWindows(for pid: pid_t) -> [SwitcherItem] {
         let windows = WindowEnumerator.listWindowsForDockPreview(for: pid, maximumCount: 12)
+            .filter { $0.windowID != nil }
+        let order = DockPreviewWindowOrder.fromDefaults(
+            orderByCreation: UserDefaults.standard.bool(forKey: DefaultsKey.dockPreviewOrderByCreation))
+        return DockPreviewSupport.orderedWindows(windows, order: order)
+    }
+
+    private static func previewableWindows(for pid: pid_t, snapshot: WindowEnumerator.Snapshot) -> [SwitcherItem] {
+        let windows = WindowEnumerator.listWindowsForDockPreview(for: pid, maximumCount: 12, snapshot: snapshot)
             .filter { $0.windowID != nil }
         let order = DockPreviewWindowOrder.fromDefaults(
             orderByCreation: UserDefaults.standard.bool(forKey: DefaultsKey.dockPreviewOrderByCreation))
@@ -735,7 +755,27 @@ final class DockPreviewService: ObservableObject {
         cancelPendingHover()
         cancelPendingHide()
 
-        let list = prefetched ?? Self.previewableWindows(for: hit.app.processIdentifier)
+        if let prefetched {
+            _ = hoverGeneration.advance()
+            presentSession(hit, list: prefetched)
+            return
+        }
+
+        let generation = hoverGeneration.advance()
+        let pid = hit.app.processIdentifier
+        let snapshot = WindowEnumerator.snapshot()
+        enumerationQueue.async { [weak self] in
+            let list = Self.previewableWindows(for: pid, snapshot: snapshot)
+            DispatchQueue.main.async { [weak self] in
+                guard let self,
+                      self.hoverGeneration.accepts(generation),
+                      !(self.isPinned && self.isVisible) else { return }
+                self.presentSession(hit, list: list)
+            }
+        }
+    }
+
+    private func presentSession(_ hit: DockHit, list: [SwitcherItem]) {
         // An app with no real windows shows nothing; if a panel is already up
         // (the user moved here from another app), close it cleanly.
         guard !list.isEmpty else {
@@ -807,6 +847,7 @@ final class DockPreviewService: ObservableObject {
     }
 
     private func cancelPendingHover() {
+        hoverGeneration.invalidate()
         pendingHover?.workItem.cancel()
         pendingHover?.prefetchWorkItem?.cancel()
         pendingHover = nil
@@ -890,16 +931,28 @@ final class DockPreviewService: ObservableObject {
               windows.contains(where: { $0.windowID == windowID })
         else { return }
 
-        let refreshed = WindowEnumerator.listWindows(for: item.pid, maximumCount: 12)
-        guard !refreshed.contains(where: { $0.windowID == windowID }) else {
-            guard attempt < 2 else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-                self?.finishClosing(item, windowID: windowID, attempt: attempt + 1)
-            }
-            return
-        }
+        let snapshot = WindowEnumerator.snapshot()
+        let pid = item.pid
+        enumerationQueue.async { [weak self] in
+            let refreshed = WindowEnumerator.listWindows(for: pid, maximumCount: 12, snapshot: snapshot)
+            DispatchQueue.main.async { [weak self] in
+                guard let self,
+                      self.isVisible,
+                      self.currentSessionPID == pid,
+                      self.windows.contains(where: { $0.windowID == windowID })
+                else { return }
 
-        applyClosedWindowRemoval(windowID)
+                guard !refreshed.contains(where: { $0.windowID == windowID }) else {
+                    guard attempt < 2 else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                        self?.finishClosing(item, windowID: windowID, attempt: attempt + 1)
+                    }
+                    return
+                }
+
+                self.applyClosedWindowRemoval(windowID)
+            }
+        }
     }
 
     private func applyClosedWindowRemoval(_ closedWindowID: CGWindowID) {
@@ -1509,7 +1562,10 @@ final class DockPreviewPinnedPanel: ObservableObject, Identifiable {
     private let appPID: pid_t
     private let onClose: (UUID) -> Void
     private let previewProvider = WindowPreviewProvider()
+    private let enumerationQueue = DispatchQueue(label: "com.vorssaint.dock-preview.pinned-enumeration", qos: .utility)
     private var refreshTimer: Timer?
+    private var isRefreshingWindows = false
+    private var isClosed = false
     private var pendingMinimizeConfirmations: [CGWindowID: UUID] = [:]
 
     init(appPID: pid_t,
@@ -1603,6 +1659,7 @@ final class DockPreviewPinnedPanel: ObservableObject, Identifiable {
     }
 
     func closePreviewPanel() {
+        isClosed = true
         refreshTimer?.invalidate()
         pendingMinimizeConfirmations.removeAll()
         previewProvider.cancel()
@@ -1682,54 +1739,67 @@ final class DockPreviewPinnedPanel: ObservableObject, Identifiable {
         let timer = Timer(timeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             self?.refreshWindows()
         }
+        timer.tolerance = Self.refreshInterval * 0.2
         RunLoop.main.add(timer, forMode: .common)
         refreshTimer = timer
     }
 
     private func refreshWindows() {
-        let previousIDs = windows.compactMap(\.windowID)
-        let refreshed = DockPreviewSupport.orderedWindows(
-            WindowEnumerator.listWindowsForDockPreview(for: appPID, maximumCount: Self.maximumWindowCount)
-                .filter { $0.windowID != nil },
-            order: DockPreviewWindowOrder.fromDefaults(
-                orderByCreation: UserDefaults.standard.bool(
-                    forKey: DefaultsKey.dockPreviewOrderByCreation)))
-        guard !refreshed.isEmpty else {
-            closePreviewPanel()
-            return
-        }
+        guard !isClosed, !isRefreshingWindows else { return }
+        isRefreshingWindows = true
+        let snapshot = WindowEnumerator.snapshot()
+        let pid = appPID
+        let maxCount = Self.maximumWindowCount
+        let orderByCreation = UserDefaults.standard.bool(forKey: DefaultsKey.dockPreviewOrderByCreation)
+        enumerationQueue.async { [weak self] in
+            let refreshed = DockPreviewSupport.orderedWindows(
+                WindowEnumerator.listWindowsForDockPreview(for: pid, maximumCount: maxCount, snapshot: snapshot)
+                    .filter { $0.windowID != nil },
+                order: DockPreviewWindowOrder.fromDefaults(orderByCreation: orderByCreation)
+            )
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.isRefreshingWindows = false
+                guard !self.isClosed else { return }
+                let previousIDs = self.windows.compactMap(\.windowID)
+                guard !refreshed.isEmpty else {
+                    self.closePreviewPanel()
+                    return
+                }
 
-        let refreshedIDs = refreshed.compactMap(\.windowID)
-        let windowIDsChanged = refreshedIDs != previousIDs
-        let windowsChanged = refreshed != windows
-        let missingPreview = refreshed.contains { item in
-            guard let windowID = item.previewWindowID else { return false }
-            return previews[windowID] == nil
-        }
-        guard windowIDsChanged || windowsChanged || missingPreview else { return }
+                let refreshedIDs = refreshed.compactMap(\.windowID)
+                let windowIDsChanged = refreshedIDs != previousIDs
+                let windowsChanged = refreshed != self.windows
+                let missingPreview = refreshed.contains { item in
+                    guard let windowID = item.previewWindowID else { return false }
+                    return self.previews[windowID] == nil
+                }
+                guard windowIDsChanged || windowsChanged || missingPreview else { return }
 
-        windows = refreshed
-        previews = previews.filter { refreshedIDs.contains($0.key) }
-        for item in refreshed {
-            guard let windowID = item.previewWindowID,
-                  previews[windowID] == nil,
-                  let cached = WindowPreviewProvider.shared.cachedPreview(for: windowID)
-            else { continue }
-            previews[windowID] = cached
-        }
+                self.windows = refreshed
+                self.previews = self.previews.filter { refreshedIDs.contains($0.key) }
+                for item in refreshed {
+                    guard let windowID = item.previewWindowID,
+                          self.previews[windowID] == nil,
+                          let cached = WindowPreviewProvider.shared.cachedPreview(for: windowID)
+                    else { continue }
+                    self.previews[windowID] = cached
+                }
 
-        if let selectedWindowID, !refreshedIDs.contains(selectedWindowID) {
-            self.selectedWindowID = refreshedIDs.first
-        } else if selectedWindowID == nil {
-            selectedWindowID = refreshedIDs.first
-        }
+                if let selectedWindowID = self.selectedWindowID, !refreshedIDs.contains(selectedWindowID) {
+                    self.selectedWindowID = refreshedIDs.first
+                } else if self.selectedWindowID == nil {
+                    self.selectedWindowID = refreshedIDs.first
+                }
 
-        if windowIDsChanged {
-            resizePanel()
+                if windowIDsChanged {
+                    self.resizePanel()
+                }
+                self.refreshMissingPreviews(for: refreshed,
+                                            windowIDsChanged: windowIDsChanged,
+                                            missingPreview: missingPreview)
+            }
         }
-        refreshMissingPreviews(for: refreshed,
-                               windowIDsChanged: windowIDsChanged,
-                               missingPreview: missingPreview)
     }
 
     private func refreshMissingPreviews(for items: [SwitcherItem],
@@ -1745,26 +1815,36 @@ final class DockPreviewPinnedPanel: ObservableObject, Identifiable {
     }
 
     private func finishClosing(_ item: SwitcherItem, windowID: CGWindowID, attempt: Int) {
-        guard windows.contains(where: { $0.windowID == windowID }) else { return }
+        guard !isClosed, windows.contains(where: { $0.windowID == windowID }) else { return }
 
-        let refreshed = WindowEnumerator.listWindows(for: item.pid, maximumCount: 12)
-        guard !refreshed.contains(where: { $0.windowID == windowID }) else {
-            guard attempt < 2 else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-                self?.finishClosing(item, windowID: windowID, attempt: attempt + 1)
+        let snapshot = WindowEnumerator.snapshot()
+        let pid = item.pid
+        enumerationQueue.async { [weak self] in
+            let refreshed = WindowEnumerator.listWindows(for: pid, maximumCount: 12, snapshot: snapshot)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isClosed, self.windows.contains(where: { $0.windowID == windowID }) else {
+                    return
+                }
+
+                guard !refreshed.contains(where: { $0.windowID == windowID }) else {
+                    guard attempt < 2 else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                        self?.finishClosing(item, windowID: windowID, attempt: attempt + 1)
+                    }
+                    return
+                }
+
+                self.windows.removeAll { $0.windowID == windowID }
+                self.previews.removeValue(forKey: windowID)
+                if self.selectedWindowID == windowID {
+                    self.selectedWindowID = self.windows.first?.windowID
+                }
+                if self.windows.isEmpty {
+                    self.closePreviewPanel()
+                } else {
+                    self.resizePanel()
+                }
             }
-            return
-        }
-
-        windows.removeAll { $0.windowID == windowID }
-        previews.removeValue(forKey: windowID)
-        if selectedWindowID == windowID {
-            selectedWindowID = windows.first?.windowID
-        }
-        if windows.isEmpty {
-            closePreviewPanel()
-        } else {
-            resizePanel()
         }
     }
 

@@ -276,10 +276,23 @@ final class NotchService: ObservableObject {
     private var inputSourceID: String?
     /// The accepted Command Bar selection awaiting its source-change reading.
     private var ownInputSourceID: String?
+    private struct FrontmostAXObserver {
+        let pid: pid_t
+        let observer: AXObserver
+        let appElement: AXUIElement
+        let notifications: [String]
+    }
+    private static let safetyFallbackInterval: TimeInterval = 8.0
+    private static let safetyFallbackTolerance: TimeInterval = 2.0
     private var notchNeedsMonitor = false
-    private var menuSpaceTimer: Timer?
+    private var menuSpaceTimer: Timer? {
+        didSet { syncCoalescedFullscreenTimer() }
+    }
     private var appFullscreenTimer: Timer?
     private var appFullscreenDisplays: Set<CGDirectDisplayID> = []
+    private var appFullscreenReading = false
+    private var frontmostWindowObserver: FrontmostAXObserver?
+    private var frontmostWindowEventWork: DispatchWorkItem?
     private var menuSpaceReading = false
     private var menuSpaceGeneration = 0
     private var menuBarMeasurements = NotchMenuBarMeasurements()
@@ -1191,6 +1204,7 @@ final class NotchService: ObservableObject {
         updateFullscreenDisplays()
         updateScreen()
         syncAppFullscreenMonitoring()
+        syncFrontmostWindowObserver()
         syncPointerFollowing()
         syncGestures()
         NotchTimerService.shared.syncWithPreferences()
@@ -1300,6 +1314,8 @@ final class NotchService: ObservableObject {
     private func tearDownPresentation() {
         cancelRelocation()
         screenRefreshWork?.cancel(); screenRefreshWork = nil
+        frontmostWindowEventWork?.cancel(); frontmostWindowEventWork = nil
+        detachFrontmostWindowObserver()
         stopAppFullscreenMonitoring()
         nextMascotVisitWork?.cancel(); nextMascotVisitWork = nil
         mascotVisitWork?.cancel(); mascotVisitWork = nil
@@ -3461,8 +3477,8 @@ final class NotchService: ObservableObject {
             && (idleContent != .none || compactActivity != nil || !geometry.isNotched || mascotWantsRoom)
         guard wanted else { stopMenuSpaceMonitoring(); return }
         guard menuSpaceTimer == nil else { return }
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.readMenuSpace() }
-        timer.tolerance = 0.2
+        let timer = Timer(timeInterval: 8.0, repeats: true) { [weak self] _ in self?.readMenuSpace() }
+        timer.tolerance = 2.0
         menuSpaceTimer = timer
         RunLoop.main.add(timer, forMode: .common)
         readMenuSpace()
@@ -3491,6 +3507,7 @@ final class NotchService: ObservableObject {
     }
 
     private func readMenuSpace() {
+        readAppFullscreen()
         // The displayed menus belong to the menu bar's owner, which is not the
         // frontmost application while an accessory app such as a launcher has
         // focus; that app's own menu geometry was never laid out. When our own
@@ -3701,17 +3718,32 @@ final class NotchService: ObservableObject {
     }
 
     /// A game can enter or leave its own full screen while it stays
-    /// frontmost, with no Space or app change to announce it. A light poll
-    /// follows that only while the island hides in full screen.
+    /// frontmost, with no Space or app change to announce it. Event-driven
+    /// AX/occlusion/Space notifications handle standard transitions while a
+    /// single coalesced low-frequency safety timer reconciles edge cases.
     private func syncAppFullscreenMonitoring() {
         guard running, !suspended, UserDefaults.standard.bool(forKey: DefaultsKey.notchHideInFullscreen) else {
             stopAppFullscreenMonitoring()
             return
         }
-        appFullscreenDisplays = NotchAppFullscreen.coveredDisplays()
+        readAppFullscreen()
+        syncCoalescedFullscreenTimer()
+    }
+
+    private func syncCoalescedFullscreenTimer() {
+        let needsStandaloneTimer = running && !suspended
+            && menuSpaceTimer == nil
+            && UserDefaults.standard.bool(forKey: DefaultsKey.notchHideInFullscreen)
+        if !needsStandaloneTimer {
+            appFullscreenTimer?.invalidate()
+            appFullscreenTimer = nil
+            return
+        }
         guard appFullscreenTimer == nil else { return }
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.readAppFullscreen() }
-        timer.tolerance = 0.3
+        let timer = Timer(timeInterval: Self.safetyFallbackInterval, repeats: true) { [weak self] _ in
+            self?.readAppFullscreen()
+        }
+        timer.tolerance = Self.safetyFallbackTolerance
         appFullscreenTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
@@ -3719,16 +3751,111 @@ final class NotchService: ObservableObject {
     private func stopAppFullscreenMonitoring() {
         appFullscreenTimer?.invalidate()
         appFullscreenTimer = nil
+        appFullscreenReading = false
         appFullscreenDisplays = []
     }
 
-    /// Only a change reevaluates the island, so a steady game costs one
-    /// window list read per second.
+    /// Queries WindowServer off the main thread and reevaluates the island only
+    /// when the covered display set changes.
     private func readAppFullscreen() {
-        let covered = NotchAppFullscreen.coveredDisplays()
-        guard covered != appFullscreenDisplays else { return }
-        appFullscreenDisplays = covered
-        fullscreenEnvironmentDidChange()
+        guard running, !suspended,
+              UserDefaults.standard.bool(forKey: DefaultsKey.notchHideInFullscreen),
+              !appFullscreenReading else { return }
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        if frontmostPID == nil || frontmostPID == ownPID {
+            if !appFullscreenDisplays.isEmpty {
+                appFullscreenDisplays = []
+                fullscreenEnvironmentDidChange()
+            }
+            return
+        }
+        appFullscreenReading = true
+        menuSpaceQueue.async { [weak self] in
+            let covered = NotchAppFullscreen.coveredDisplays(frontmostPID: frontmostPID, ownPID: ownPID)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.appFullscreenReading = false
+                guard self.running, !self.suspended,
+                      UserDefaults.standard.bool(forKey: DefaultsKey.notchHideInFullscreen),
+                      covered != self.appFullscreenDisplays else { return }
+                self.appFullscreenDisplays = covered
+                self.fullscreenEnvironmentDidChange()
+            }
+        }
+    }
+
+    private static let frontmostAXCallback: AXObserverCallback = { _, _, _, refcon in
+        guard let refcon else { return }
+        let service = Unmanaged<NotchService>.fromOpaque(refcon).takeUnretainedValue()
+        service.scheduleFrontmostWindowEnvironmentRefresh()
+    }
+
+    private func syncFrontmostWindowObserver() {
+        guard running, !suspended, AXIsProcessTrusted(),
+              let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+              pid > 0, pid != ProcessInfo.processInfo.processIdentifier else {
+            detachFrontmostWindowObserver()
+            return
+        }
+        if frontmostWindowObserver?.pid == pid { return }
+        detachFrontmostWindowObserver()
+
+        var created: AXObserver?
+        guard AXObserverCreate(pid, Self.frontmostAXCallback, &created) == .success,
+              let observer = created else { return }
+        let appElement = AXUIElementCreateApplication(pid)
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        let notifications = [
+            kAXFocusedWindowChangedNotification as String,
+            kAXWindowResizedNotification as String,
+            kAXWindowMiniaturizedNotification as String,
+            kAXWindowDeminiaturizedNotification as String,
+            kAXUIElementDestroyedNotification as String,
+            kAXTitleChangedNotification as String
+        ]
+        var registered: [String] = []
+        for name in notifications {
+            if AXObserverAddNotification(observer, appElement, name as CFString, refcon) == .success {
+                registered.append(name)
+            }
+        }
+        guard !registered.isEmpty else { return }
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+        frontmostWindowObserver = FrontmostAXObserver(
+            pid: pid,
+            observer: observer,
+            appElement: appElement,
+            notifications: registered
+        )
+    }
+
+    private func detachFrontmostWindowObserver() {
+        guard let current = frontmostWindowObserver else { return }
+        frontmostWindowObserver = nil
+        for name in current.notifications {
+            _ = AXObserverRemoveNotification(current.observer, current.appElement, name as CFString)
+        }
+        CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(current.observer), .commonModes)
+    }
+
+    private func scheduleFrontmostWindowEnvironmentRefresh() {
+        guard running, !suspended else { return }
+        frontmostWindowEventWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.frontmostWindowEventWork = nil
+            guard self.running, !self.suspended else { return }
+            if self.hiddenInFullscreen || UserDefaults.standard.bool(forKey: DefaultsKey.notchHideInFullscreen) {
+                self.readAppFullscreen()
+                self.fullscreenEnvironmentDidChange()
+            }
+            if self.menuSpaceTimer != nil {
+                self.invalidateMenuSpace()
+            }
+        }
+        frontmostWindowEventWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
     }
 
     private func installObservers() {
@@ -3748,6 +3875,9 @@ final class NotchService: ObservableObject {
         observe(.default, NSApplication.didChangeScreenParametersNotification) { [weak self] in
             self?.screenParametersDidChange()
         }
+        observe(.default, NSApplication.didChangeOcclusionStateNotification) { [weak self] in
+            self?.scheduleFrontmostWindowEnvironmentRefresh()
+        }
         observe(.default, UserDefaults.didChangeNotification) { [weak self] in
             self?.schedulePreferenceSync()
         }
@@ -3761,9 +3891,14 @@ final class NotchService: ObservableObject {
             self?.schedulePreferenceSync()
         }
         observe(workspace, NSWorkspace.activeSpaceDidChangeNotification) { [weak self] in
-            self?.fullscreenEnvironmentDidChange()
+            guard let self, !self.suspended else { return }
+            self.fullscreenEnvironmentDidChange()
+            if self.menuSpaceTimer != nil { self.invalidateMenuSpace() }
         }
-        observe(workspace, NSWorkspace.didActivateApplicationNotification) { [weak self] in self?.applicationDidActivate() }
+        observe(workspace, NSWorkspace.didActivateApplicationNotification) { [weak self] in
+            self?.applicationDidActivate()
+            self?.syncFrontmostWindowObserver()
+        }
         observe(workspace, NSWorkspace.willSleepNotification) { [weak self] in
             self?.updateSession { $0.sleeping = true }
         }

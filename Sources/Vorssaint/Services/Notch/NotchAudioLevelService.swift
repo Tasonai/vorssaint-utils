@@ -17,6 +17,8 @@ final class NotchAudioLevelService: ObservableObject {
 
     /// Band levels from 0 to 1 while a player is being read, nil otherwise.
     @Published private(set) var levels: [Double]?
+    /// Active on-screen equalizer views currently displaying live levels.
+    private(set) var visibleConsumerCount = 0
 
     private var enabled = false
     private var subscription: AnyCancellable?
@@ -28,11 +30,30 @@ final class NotchAudioLevelService: ObservableObject {
 
     private init() {}
 
+    func retainConsumer() {
+        visibleConsumerCount += 1
+        if visibleConsumerCount == 1 {
+            syncSubscription()
+        }
+    }
+
+    func releaseConsumer() {
+        guard visibleConsumerCount > 0 else { return }
+        visibleConsumerCount -= 1
+        if visibleConsumerCount == 0 {
+            syncSubscription()
+        }
+    }
+
     func syncWithPreferences() {
         enabled = AppFeature.notchLiveEqualizer.isAvailable && NotchSupport.isEnabled()
             && NotchAudioLevelSupport.isSupported && NotchAudioLevelSupport.isEnabled()
             && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        if enabled {
+        syncSubscription()
+    }
+
+    private func syncSubscription() {
+        if enabled, visibleConsumerCount > 0 {
             if subscription == nil {
                 silence.rearm()
                 subscription = NotchMusicService.shared.$playback
@@ -55,7 +76,11 @@ final class NotchAudioLevelService: ObservableObject {
     }
 
     private func playbackChanged(_ playback: NotchPlayback?) {
-        guard enabled, let playback, playback.isPlaying,
+        guard enabled, visibleConsumerCount > 0 else {
+            stop()
+            return
+        }
+        guard let playback, playback.isPlaying,
               let pid = playback.track.appPID, pid > 0 else {
             // Pausing or stopping arms the next play to read again.
             silence.rearm()
@@ -111,7 +136,7 @@ final class NotchAudioLevelService: ObservableObject {
     /// their usual motion while a new tap is built, and the wait for sound
     /// starts over, since the new process may be the silent kind.
     private func restart(_ pid: pid_t, on identity: NotchMusicIdentity) {
-        guard enabled, readerPID == pid else { return }
+        guard enabled, visibleConsumerCount > 0, readerPID == pid else { return }
         // Paused, the player may have just let go of its audio: reading again
         // now would only hear silence and write this track off before the next
         // play, which starts a fresh reader on its own.

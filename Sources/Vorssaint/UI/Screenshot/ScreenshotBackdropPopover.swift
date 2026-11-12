@@ -41,16 +41,23 @@ enum BackdropPickerAssets {
     static func thumbnail(for url: URL) -> NSImage? {
         let key = url.path as NSString
         if let cached = BackdropPickerAssets.thumbnailCache.object(forKey: key) { return cached }
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let sourceOptions: [CFString: Any] = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false,
+        ]
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceThumbnailMaxPixelSize: 220,
             kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false,
         ]
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
         else { return nil }
         let image = NSImage(cgImage: cgImage, size: .zero)
-        BackdropPickerAssets.thumbnailCache.setObject(image, forKey: key)
+        let cost = max(1, cgImage.width * cgImage.height * 4)
+        BackdropPickerAssets.thumbnailCache.setObject(image, forKey: key, cost: cost)
         return image
     }
 
@@ -68,6 +75,7 @@ enum BackdropPickerAssets {
     static let thumbnailCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
         cache.countLimit = 24
+        cache.totalCostLimit = 8 * 1024 * 1024
         return cache
     }()
 }

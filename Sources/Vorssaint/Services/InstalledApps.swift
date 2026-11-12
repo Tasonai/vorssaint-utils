@@ -27,8 +27,41 @@ enum InstalledApps {
         }
 
         var icon: NSImage {
-            NSWorkspace.shared.icon(forFile: url.path)
+            InstalledApps.cachedFileIcon(atPath: url.path)
         }
+    }
+
+    private static let iconCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 256
+        cache.totalCostLimit = 16 * 1024 * 1024
+        return cache
+    }()
+
+    private static let displayNameCache: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.countLimit = 512
+        cache.totalCostLimit = 256 * 1024
+        return cache
+    }()
+
+    static func cachedFileIcon(atPath path: String) -> NSImage {
+        let key = path as NSString
+        if let cached = iconCache.object(forKey: key) {
+            return cached
+        }
+        let icon = NSWorkspace.shared.icon(forFile: path)
+        iconCache.setObject(icon, forKey: key, cost: estimatedIconByteCost(icon))
+        return icon
+    }
+
+    private static func estimatedIconByteCost(_ image: NSImage) -> Int {
+        if let rep = image.representations.first, rep.pixelsWide > 0, rep.pixelsHigh > 0 {
+            return max(1, rep.pixelsWide * rep.pixelsHigh * 4)
+        }
+        let width = max(32, Int(image.size.width.rounded(.up)) * 2)
+        let height = max(32, Int(image.size.height.rounded(.up)) * 2)
+        return max(1, width * height * 4)
     }
 
     static func url(for bundleID: String) -> URL? {
@@ -72,9 +105,56 @@ enum InstalledApps {
         return displayName(fromFinderName: finderName(url.path))
     }
 
+    static func cachedName(for bundleID: String) -> String {
+        let key = bundleID as NSString
+        if let cached = displayNameCache.object(forKey: key) {
+            return cached as String
+        }
+        guard let url = fileURL(forIdentity: bundleID) else {
+            return bundleID
+        }
+        let resolved = displayName(fromFinderName: FileManager.default.displayName(atPath: url.path))
+        displayNameCache.setObject(resolved as NSString, forKey: key, cost: max(1, resolved.utf8.count))
+        return resolved
+    }
+
+    /// Pre-computes display names once before sorting (`O(N)` metadata lookups
+    /// instead of `O(N log N)` `NSWorkspace`/`FileManager` queries inside the
+    /// comparator).
+    static func sortedIdentities(
+        _ identities: [String],
+        resolveName: (String) -> String = { cachedName(for: $0) }
+    ) -> [String] {
+        guard identities.count > 1 else { return identities }
+        var nameByIdentity: [String: String] = [:]
+        nameByIdentity.reserveCapacity(identities.count)
+        let keyed = identities.map { identity -> (identity: String, name: String) in
+            if let existing = nameByIdentity[identity] {
+                return (identity, existing)
+            }
+            let resolved = resolveName(identity)
+            nameByIdentity[identity] = resolved
+            return (identity, resolved)
+        }
+        return keyed.sorted {
+            let byName = $0.name.localizedCaseInsensitiveCompare($1.name)
+            // Equal display names — three runtimes all named "java" — fall
+            // back to the identity so the rows hold one order between renders.
+            return byName == .orderedSame
+                ? $0.identity < $1.identity
+                : byName == .orderedAscending
+        }.map(\.identity)
+    }
+
     static func icon(for bundleID: String) -> NSImage {
+        let key = "id:\(bundleID)" as NSString
+        if let cached = iconCache.object(forKey: key) {
+            return cached
+        }
         if let url = fileURL(forIdentity: bundleID) {
-            return NSWorkspace.shared.icon(forFile: url.path)
+            let icon = cachedFileIcon(atPath: url.path)
+            iconCache.setObject(icon, forKey: key, cost: estimatedIconByteCost(icon))
+            return icon
         }
         return NSWorkspace.shared.icon(for: .applicationBundle)
     }

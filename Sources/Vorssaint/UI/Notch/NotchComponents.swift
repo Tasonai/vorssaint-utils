@@ -47,10 +47,34 @@ struct NotchLiveEqualizerBars: View {
     var height: CGFloat = 14
     var tint: Color = .white
     @ObservedObject private var audio = NotchAudioLevelService.shared
+    @State private var isMounted = false
+    @State private var retainsConsumer = false
 
     var body: some View {
         NotchEqualizerBars(isPlaying: isPlaying, bars: bars, barWidth: barWidth, height: height, tint: tint,
                            live: audio.levels)
+            .onAppear {
+                isMounted = true
+                syncConsumerRetention()
+            }
+            .onDisappear {
+                isMounted = false
+                syncConsumerRetention()
+            }
+            .onChange(of: isPlaying) { _, _ in
+                syncConsumerRetention()
+            }
+    }
+
+    private func syncConsumerRetention() {
+        let shouldRetain = isMounted && isPlaying
+        guard shouldRetain != retainsConsumer else { return }
+        retainsConsumer = shouldRetain
+        if shouldRetain {
+            audio.retainConsumer()
+        } else {
+            audio.releaseConsumer()
+        }
     }
 }
 

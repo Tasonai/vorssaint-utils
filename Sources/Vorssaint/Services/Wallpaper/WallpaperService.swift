@@ -280,14 +280,7 @@ final class WallpaperService: ObservableObject {
 
     // iCloud Drive placeholder — pull the bytes before NSWorkspace / store write
     static func needsCloudDownload(_ url: URL) -> Bool {
-        let keys: Set<URLResourceKey> = [
-            .isUbiquitousItemKey,
-            .ubiquitousItemDownloadingStatusKey,
-        ]
-        guard let values = try? url.resourceValues(forKeys: keys),
-              values.isUbiquitousItem == true
-        else { return false }
-        return values.ubiquitousItemDownloadingStatus != .current
+        WallpaperSupport.needsCloudDownload(url)
     }
 
     @MainActor
@@ -623,25 +616,37 @@ final class WallpaperService: ObservableObject {
 enum WallpaperThumbnailCache {
     private static let cache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
-        cache.countLimit = 400
+        cache.countLimit = WallpaperSupport.thumbnailCacheCountLimit
+        cache.totalCostLimit = WallpaperSupport.thumbnailCacheTotalCostLimit
         return cache
     }()
 
     private static let lock = NSLock()
     private static var generation = UUID()
 
-    private static let prefetchQueue = DispatchQueue(
-        label: "com.vorssaint.utils.wallpaper-thumbs",
-        qos: .utility,
-        attributes: .concurrent
-    )
+    private static let decodeQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "com.vorssaint.utils.wallpaper-thumbs"
+        queue.maxConcurrentOperationCount = WallpaperSupport.maxConcurrentThumbnailDecodes
+        queue.qualityOfService = .utility
+        return queue
+    }()
+
+    static var maxConcurrentDecodes: Int { decodeQueue.maxConcurrentOperationCount }
+    static var cacheCountLimit: Int { cache.countLimit }
+    static var cacheTotalCostLimit: Int { cache.totalCostLimit }
 
     static func image(for url: URL, maxPixel: Int = 160) -> NSImage? {
         cache.object(forKey: key(url, maxPixel))
     }
 
-    static func store(_ image: NSImage, for url: URL, maxPixel: Int = 160) {
-        cache.setObject(image, forKey: key(url, maxPixel))
+    static func store(_ image: NSImage, for url: URL, maxPixel: Int = 160, byteCost: Int? = nil) {
+        let cost = byteCost ?? estimatedByteCost(for: image)
+        cache.setObject(image, forKey: key(url, maxPixel), cost: cost)
+    }
+
+    static func estimatedByteCost(for image: NSImage) -> Int {
+        WallpaperSupport.estimatedByteCost(for: image)
     }
 
     static func clear() {
@@ -676,8 +681,13 @@ enum WallpaperThumbnailCache {
     static func prefetch(_ urls: [URL], maxPixel: Int = 160) {
         guard !urls.isEmpty else { return }
         let gen = currentGeneration
-        prefetchQueue.async {
-            prefetchSync(urls, maxPixel: maxPixel, generation: gen)
+        for url in urls {
+            decodeQueue.addOperation {
+                autoreleasepool {
+                    guard currentGeneration == gen else { return }
+                    _ = loadSync(url: url, maxPixel: maxPixel, generation: gen)
+                }
+            }
         }
     }
 
@@ -686,7 +696,9 @@ enum WallpaperThumbnailCache {
         let gen = generation ?? currentGeneration
         for url in urls {
             guard currentGeneration == gen else { return }
-            _ = loadSync(url: url, maxPixel: maxPixel, generation: gen)
+            autoreleasepool {
+                _ = loadSync(url: url, maxPixel: maxPixel, generation: gen)
+            }
         }
     }
 
@@ -694,8 +706,10 @@ enum WallpaperThumbnailCache {
     static func load(url: URL, maxPixel: Int = 160, generation: UUID) async -> NSImage? {
         if let hit = image(for: url, maxPixel: maxPixel) { return hit }
         return await withCheckedContinuation { continuation in
-            prefetchQueue.async {
-                let loaded = loadSync(url: url, maxPixel: maxPixel, generation: generation)
+            decodeQueue.addOperation {
+                let loaded = autoreleasepool {
+                    loadSync(url: url, maxPixel: maxPixel, generation: generation)
+                }
                 continuation.resume(returning: loaded)
             }
         }
@@ -704,25 +718,21 @@ enum WallpaperThumbnailCache {
     static func loadSync(url: URL, maxPixel: Int = 160, generation: UUID? = nil) -> NSImage? {
         if let hit = image(for: url, maxPixel: maxPixel) { return hit }
         if let generation, currentGeneration != generation { return nil }
-        guard let cgImage = decodeCGThumbnail(url: url, maxPixel: maxPixel) else { return nil }
-        if let generation, currentGeneration != generation { return nil }
-        let image = NSImage(cgImage: cgImage,
-                            size: NSSize(width: cgImage.width, height: cgImage.height))
-        store(image, for: url, maxPixel: maxPixel)
-        return image
+        return autoreleasepool {
+            guard let cgImage = decodeCGThumbnail(url: url, maxPixel: maxPixel) else { return nil }
+            if let generation, currentGeneration != generation { return nil }
+            let image = NSImage(cgImage: cgImage,
+                                size: NSSize(width: cgImage.width, height: cgImage.height))
+            let cost = max(1, cgImage.width * cgImage.height * 4)
+            store(image, for: url, maxPixel: maxPixel, byteCost: cost)
+            return image
+        }
     }
 
     private static func decodeCGThumbnail(url: URL, maxPixel: Int) -> CGImage? {
         // reading an iCloud placeholder downloads the whole file; show the
         // placeholder cell instead until apply brings the picture down
-        guard !WallpaperService.needsCloudDownload(url) else { return nil }
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
-        ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        WallpaperSupport.decodeCGThumbnail(url: url, maxPixel: maxPixel)
     }
 
     private static func key(_ url: URL, _ maxPixel: Int) -> NSString {

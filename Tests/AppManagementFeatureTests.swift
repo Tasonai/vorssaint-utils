@@ -660,6 +660,32 @@ enum AppManagementFeatureTests {
                "an app is named from the file manager's name without its .app")
         suite.expect(InstalledApps.name(for: "com.example.not-installed.app") == "com.example.not-installed.app",
                "an identifier that names no installed app is shown as it is, even when it ends in .app")
+        do {
+            var resolveCallCount = 0
+            let sampleIDs = (0..<12).map { "com.example.app.\($0)" }
+            let resolvedNames: [String: String] = [
+                "com.example.app.0": "Zeta",
+                "com.example.app.1": "alpha",
+                "com.example.app.2": "java",
+                "com.example.app.3": "Beta",
+                "com.example.app.4": "java",
+                "com.example.app.5": "Gamma",
+                "com.example.app.6": "Delta",
+                "com.example.app.7": "Epsilon",
+                "com.example.app.8": "Eta",
+                "com.example.app.9": "Theta",
+                "com.example.app.10": "Iota",
+                "com.example.app.11": "Kappa",
+            ]
+            let sortedIDs = InstalledApps.sortedIdentities(sampleIDs) { id in
+                resolveCallCount += 1
+                return resolvedNames[id] ?? id
+            }
+            suite.expect(resolveCallCount == sampleIDs.count
+                    && sortedIDs.first == "com.example.app.1"
+                    && sortedIDs.last == "com.example.app.0",
+                   "InstalledApps.sortedIdentities pre-computes display names once before sorting instead of O(N log N) lookups")
+        }
         for path in ["Sources/Vorssaint/UI/Uninstall/UninstallerView.swift",
                      "Sources/Vorssaint/UI/MenuPanel/PanelUninstallerView.swift"] {
             let pickerSource = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""

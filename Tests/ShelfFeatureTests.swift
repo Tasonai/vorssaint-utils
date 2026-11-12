@@ -612,6 +612,14 @@ enum ShelfFeatureTests {
         suite.expect(shelfViewSource.contains("onDismiss ?? { shelf.close() }")
                 && dockedShelfViewSource.contains("onDismiss: { shelf.collapseDocked() }"),
                "the floating close clears when requested while docked collapse keeps items")
+        let fadeOutBody = shelfServiceSource
+            .components(separatedBy: "private func fadeOutAndHide()")
+            .dropFirst().first?.components(separatedBy: "\n    private func ").first ?? ""
+        suite.expect(fadeOutBody.contains("NSAnimationContext.runAnimationGroup")
+                && fadeOutBody.contains("panel.animator().alphaValue = 0")
+                && !shelfServiceSource.contains("autoHideFadeTimer")
+                && !shelfServiceSource.contains("1.0 / 60.0"),
+               "Shelf auto-hide fades on CoreAnimation instead of a 60Hz main-thread timer")
 
         let shelfFile = ShelfPersistedItem(id: UUID(), kind: .file, title: "notes.pdf",
                                            path: "/tmp/notes.pdf")

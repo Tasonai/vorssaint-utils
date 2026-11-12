@@ -215,6 +215,17 @@ enum NotchFullscreenTests {
                      "a raised window below the menu bar is not full screen")
         suite.expect(covered([window(built, alpha: 0)]).isEmpty, "an invisible overlay is not full screen")
         suite.expect(!Real.covers(built, .zero), "an empty display frame is never covered")
+
+        let notchSource = (try? String(contentsOfFile: "Sources/Vorssaint/Services/Notch/NotchService.swift", encoding: .utf8)) ?? ""
+        suite.expect(notchSource.contains("AXObserverCreate")
+                         && notchSource.contains("kAXFocusedWindowChangedNotification")
+                         && notchSource.contains("kAXWindowResizedNotification")
+                         && notchSource.contains("didChangeOcclusionStateNotification"),
+                     "NotchService drives fullscreen and menu space updates from AXObserver and occlusion notifications")
+        suite.expect(notchSource.contains("menuSpaceTimer == nil")
+                         && notchSource.contains("safetyFallbackInterval: TimeInterval = 8.0")
+                         && notchSource.contains("safetyFallbackTolerance: TimeInterval = 2.0"),
+                     "NotchService coalesces fullscreen safety polling into a single >=6s timer with 2.0s tolerance")
     }
 
     private static func volumeLifecycleChecks(_ topology: Topology, _ suite: TestSuite) {

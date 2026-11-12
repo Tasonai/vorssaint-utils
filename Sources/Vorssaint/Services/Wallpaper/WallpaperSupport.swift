@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Vorssaint
 
+import AppKit
 import Foundation
+import ImageIO
 
 /// Lets a folder scan publish only while its gallery is open and it is the
 /// latest scan. The scan reads this from a worker queue while the UI changes
@@ -399,5 +401,55 @@ enum WallpaperSupport {
         }
 
         return false
+    }
+
+    static let maxConcurrentThumbnailDecodes = 3
+    static let thumbnailCacheCountLimit = 400
+    static let thumbnailCacheTotalCostLimit = 48 * 1024 * 1024
+
+    static func needsCloudDownload(_ url: URL) -> Bool {
+        let keys: Set<URLResourceKey> = [
+            .isUbiquitousItemKey,
+            .ubiquitousItemDownloadingStatusKey,
+        ]
+        guard let values = try? url.resourceValues(forKeys: keys),
+              values.isUbiquitousItem == true
+        else { return false }
+        return values.ubiquitousItemDownloadingStatus != .current
+    }
+
+    static func estimatedByteCost(for image: NSImage) -> Int {
+        if let rep = image.representations.first, rep.pixelsWide > 0, rep.pixelsHigh > 0 {
+            return max(1, rep.pixelsWide * rep.pixelsHigh * 4)
+        }
+        return max(1, Int(ceil(image.size.width)) * Int(ceil(image.size.height)) * 4)
+    }
+
+    static func decodeCGThumbnail(url: URL, maxPixel: Int) -> CGImage? {
+        guard !needsCloudDownload(url) else { return nil }
+        let sourceOptions: [CFString: Any] = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false,
+        ]
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary) else { return nil }
+        let embeddedOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false,
+        ]
+        if let embedded = CGImageSourceCreateThumbnailAtIndex(source, 0, embeddedOptions as CFDictionary),
+           max(embedded.width, embedded.height) >= maxPixel {
+            return embedded
+        }
+        let fullOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, fullOptions as CFDictionary)
     }
 }

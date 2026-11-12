@@ -3447,6 +3447,23 @@ enum SwitcherModelFeatureTests {
         suite.expect(dockPreviewServiceCode.contains("if accepted { self?.endSession() }")
                 && dockPreviewServiceCode.contains("if accepted { self?.closePreviewPanel() }"),
                "an accepted app quit closes both hover and pinned previews immediately")
+        var hoverGeneration = DockPreviewHoverGeneration()
+        suite.expect(!hoverGeneration.accepts(0),
+               "Dock Preview hover generation rejects unissued zero token")
+        let firstHoverToken = hoverGeneration.advance()
+        suite.expect(hoverGeneration.accepts(firstHoverToken),
+               "Dock Preview hover generation accepts the active token")
+        let secondHoverToken = hoverGeneration.advance()
+        suite.expect(!hoverGeneration.accepts(firstHoverToken)
+                && hoverGeneration.accepts(secondHoverToken),
+               "moving to another Dock icon invalidates an in-flight window enumeration token")
+        hoverGeneration.invalidate()
+        suite.expect(!hoverGeneration.accepts(secondHoverToken),
+               "leaving the Dock invalidates an in-flight window enumeration token")
+        suite.expect(dockPreviewServiceCode.contains("enumerationQueue.async")
+                && dockPreviewServiceCode.contains("previewableWindows(for: pid, snapshot: snapshot)")
+                && dockPreviewServiceCode.contains("hoverGeneration.accepts(generation)"),
+               "Dock Preview enumerates windows on a background queue and discards stale hover results")
         let corridor = DockPreviewSupport.hoverCorridor(iconFrame: iconBottom,
                                                         panelFrame: bottomFrame,
                                                         orientation: .bottom)

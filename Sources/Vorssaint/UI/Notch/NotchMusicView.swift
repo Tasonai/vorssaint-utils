@@ -467,24 +467,46 @@ private struct NotchMusicSideButton: View {
 /// redraws every second while a song plays. A process number another app
 /// took since is looked up again.
 private enum NotchPlayerApps {
-    private static var known: [Int32: (bundle: String?, name: String?, icon: NSImage?)] = [:]
+    private final class Entry: NSObject {
+        let bundle: String?
+        let name: String?
+        let icon: NSImage?
+        init(bundle: String?, name: String?, icon: NSImage?) {
+            self.bundle = bundle
+            self.name = name
+            self.icon = icon
+        }
+    }
+
+    private static let known: NSCache<NSNumber, Entry> = {
+        let cache = NSCache<NSNumber, Entry>()
+        cache.countLimit = 32
+        cache.totalCostLimit = 4 * 1024 * 1024
+        return cache
+    }()
 
     static func app(pid: Int32, bundle: String?) -> (name: String?, icon: NSImage?) {
-        if let entry = known[pid], bundle == nil || entry.bundle == bundle { return (entry.name, entry.icon) }
+        let key = NSNumber(value: pid)
+        if let entry = known.object(forKey: key), bundle == nil || entry.bundle == bundle {
+            return (entry.name, entry.icon)
+        }
         let running = NSRunningApplication(processIdentifier: pid)
         let resolvedBundle = running?.bundleIdentifier ?? bundle
-        let icon: NSImage?
+        let rawIcon: NSImage?
         if running?.activationPolicy == .regular, running?.bundleURL?.pathExtension == "app" {
-            icon = running?.icon
+            rawIcon = running?.icon
         } else if let resolvedBundle,
                   let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: resolvedBundle),
                   url.pathExtension == "app" {
-            icon = NSWorkspace.shared.icon(forFile: url.path)
+            rawIcon = InstalledApps.cachedFileIcon(atPath: url.path)
         } else {
-            icon = nil
+            rawIcon = nil
         }
-        if known.count >= 16 { known.removeAll() }
-        known[pid] = (resolvedBundle, running?.localizedName, icon)
+        let icon = rawIcon.flatMap { ImageThumbnailer.thumbnail(for: $0, pointSize: 28) ?? $0 }
+        let cost = icon != nil ? ImageThumbnailer.estimatedBitmapCost(pointSize: 28) : 64
+        known.setObject(Entry(bundle: resolvedBundle, name: running?.localizedName, icon: icon),
+                        forKey: key,
+                        cost: cost)
         return (running?.localizedName, icon)
     }
 }

@@ -335,7 +335,11 @@ struct MenuPanelView: View {
                     selectedMetric = .connectedDevices
                 }
             }
-        case .network: if showNetwork { NetworkSection(collapsible: collapsible) }
+        case .network:
+            if showNetwork {
+                NetworkSection(collapsible: collapsible,
+                               panelVisible: notchSize != nil || panelFocus.popoverIsVisible)
+            }
         case .disk: if showDisk { DiskSection(collapsible: collapsible) }
         case .power: if showPower { PowerSection(collapsible: collapsible) }
         case .fanControl:

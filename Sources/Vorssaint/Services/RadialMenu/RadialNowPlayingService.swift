@@ -2,42 +2,88 @@
 // Copyright (C) 2026 Vorssaint
 
 import AppKit
+import Combine
 import Foundation
 import SwiftUI
 
-/// A session-scoped view of macOS Now Playing. The read itself lives in the
-/// bridge below, out of process; a failed run, a timeout and malformed
+/// A session-scoped view of macOS Now Playing. Reuses `NotchMusicService.shared`
+/// whenever it is already watching Now Playing; otherwise falls back to the
+/// out-of-process adapter bridge below. A failed run, a timeout and malformed
 /// metadata all arrive here as an empty playback session.
 /// Nothing here is required for the radial menu itself to work.
 final class RadialNowPlayingService {
     static let shared = RadialNowPlayingService()
 
     private let bridge = MediaRemoteNowPlayingBridge()
-    private var generation = 0
-    private(set) var state = RadialNowPlayingState.nothingPlaying
+    private let coordinator: RadialNowPlayingCoordinator
     private var pendingPresentationAnchor: CGPoint?
     private var panel: NSPanel?
     private var eventMonitors: [Any] = []
     private var activationObserver: NSObjectProtocol?
 
-    private init() {}
+    var state: RadialNowPlayingState { coordinator.state }
+    var cachedArtwork: NSImage? { coordinator.cachedArtwork }
+
+    var sharedNowPlayingProvider: () -> RadialNowPlayingSharedReading {
+        get { coordinator.sharedNowPlayingProvider }
+        set { coordinator.sharedNowPlayingProvider = newValue }
+    }
+
+    var fallbackFetcher: (@escaping (RadialNowPlayingSnapshot?) -> Void) -> Void {
+        get { coordinator.fallbackFetcher }
+        set { coordinator.fallbackFetcher = newValue }
+    }
+
+    init(sharedNowPlayingProvider: (() -> RadialNowPlayingSharedReading)? = nil,
+         fallbackFetcher: ((@escaping (RadialNowPlayingSnapshot?) -> Void) -> Void)? = nil) {
+        let bridge = self.bridge
+        self.coordinator = RadialNowPlayingCoordinator(
+            sharedNowPlayingProvider: sharedNowPlayingProvider ?? {
+                let readOnMain = { () -> RadialNowPlayingSharedReading in
+                    let music = NotchMusicService.shared
+                    return RadialNowPlayingSharedReading(
+                        isTracking: music.isTrackingAutomaticNowPlaying,
+                        isAwaitingInitialReply: music.isAwaitingInitialAutomaticNowPlaying,
+                        playbackIsActive: music.playback?.isPlaying == true,
+                        snapshot: music.playback?.track,
+                        artwork: music.artwork
+                    )
+                }
+                if Thread.isMainThread { return readOnMain() }
+                return DispatchQueue.main.sync(execute: readOnMain)
+            },
+            awaitInitialSharedReply: sharedNowPlayingProvider == nil ? { ready in
+                var cancellable: AnyCancellable?
+                cancellable = NotchMusicService.shared.$awaitingPlayback
+                    .filter { !$0 }
+                    .first()
+                    .receive(on: DispatchQueue.main)
+                    .sink { _ in
+                        _ = cancellable
+                        cancellable = nil
+                        ready()
+                    }
+                return {
+                    cancellable?.cancel()
+                    cancellable = nil
+                }
+            } : nil,
+            fallbackFetcher: fallbackFetcher ?? { completion in
+                bridge.fetch(completion: completion)
+            },
+            backingScaleProvider: {
+                if Thread.isMainThread { return ImageThumbnailer.backingScale }
+                return 2
+            }
+        )
+    }
 
     func refresh(update: @escaping (RadialNowPlayingState) -> Void) {
-        generation += 1
-        let requestedGeneration = generation
-        state = .loading
-        update(.loading)
-        bridge.fetch { [weak self] snapshot in
-            DispatchQueue.main.async {
-                guard let self, self.generation == requestedGeneration else { return }
-                let nextState = snapshot.map(RadialNowPlayingState.playing) ?? .nothingPlaying
-                self.state = nextState
-                update(nextState)
-                guard let anchor = self.pendingPresentationAnchor else { return }
-                self.pendingPresentationAnchor = nil
-                if case let .playing(snapshot) = nextState {
-                    self.showCard(snapshot: snapshot, at: anchor)
-                }
+        coordinator.refresh(update: update) { [weak self] nextState in
+            guard let self, let anchor = self.pendingPresentationAnchor else { return }
+            self.pendingPresentationAnchor = nil
+            if case let .playing(snapshot) = nextState {
+                self.showCard(snapshot: snapshot, at: anchor)
             }
         }
     }
@@ -65,7 +111,12 @@ final class RadialNowPlayingService {
             return
         }
         dismissDetails()
-        let card = RadialNowPlayingCard(snapshot: snapshot) { [weak self] in
+        let artworkImage = cachedArtwork ?? RadialNowPlayingArtworkCache.artwork(
+            for: snapshot,
+            pointSize: RadialNowPlayingArtworkCache.cardPointSize,
+            scale: ImageThumbnailer.backingScale
+        )
+        let card = RadialNowPlayingCard(snapshot: snapshot, artworkImage: artworkImage) { [weak self] in
             self?.dismissDetails()
             RadialNowPlayingApplication.open(snapshot)
         }
@@ -141,6 +192,7 @@ final class RadialNowPlayingService {
 
 private struct RadialNowPlayingCard: View {
     let snapshot: RadialNowPlayingSnapshot
+    let artworkImage: NSImage?
     let openApplication: () -> Void
 
     @ObservedObject private var l10n = L10n.shared
@@ -206,8 +258,8 @@ private struct RadialNowPlayingCard: View {
 
     @ViewBuilder
     private var artwork: some View {
-        if let data = snapshot.artworkData, let image = NSImage(data: data) {
-            Image(nsImage: image)
+        if let artworkImage {
+            Image(nsImage: artworkImage)
                 .resizable()
                 .interpolation(.high)
                 .aspectRatio(contentMode: .fill)
@@ -234,7 +286,12 @@ private struct RadialNowPlayingCard: View {
 }
 
 enum RadialNowPlayingApplication {
-    private static var icons: [String: NSImage] = [:]
+    private static let icons: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 64
+        cache.totalCostLimit = 8 * 1024 * 1024
+        return cache
+    }()
     private static var missingIcons = Set<String>()
 
     static func runningApplication(for snapshot: RadialNowPlayingSnapshot) -> NSRunningApplication? {
@@ -257,23 +314,29 @@ enum RadialNowPlayingApplication {
 
     static func icon(for snapshot: RadialNowPlayingSnapshot) -> NSImage? {
         let key = snapshot.appBundleIdentifier ?? snapshot.appPID.map { "pid:\($0)" } ?? ""
-        if let icon = icons[key] { return icon }
+        guard !key.isEmpty else { return nil }
+        let cacheKey = key as NSString
+        if let icon = icons.object(forKey: cacheKey) { return icon }
         if missingIcons.contains(key) { return nil }
-        let icon: NSImage?
+        let rawIcon: NSImage?
         if let runningIcon = runningApplication(for: snapshot)?.icon {
-            icon = runningIcon
+            rawIcon = runningIcon
         } else if let identifier = snapshot.appBundleIdentifier,
                   let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier) {
-            icon = NSWorkspace.shared.icon(forFile: url.path)
+            rawIcon = NSWorkspace.shared.icon(forFile: url.path)
         } else {
-            icon = nil
+            rawIcon = nil
         }
-        if let icon {
-            icons[key] = icon
+        if let rawIcon {
+            let icon = ImageThumbnailer.thumbnail(for: rawIcon, pointSize: 42) ?? rawIcon
+            let cost = ImageThumbnailer.estimatedBitmapCost(pointSize: 42)
+            icons.setObject(icon, forKey: cacheKey, cost: cost)
+            return icon
         } else {
+            if missingIcons.count >= 128 { missingIcons.removeAll() }
             missingIcons.insert(key)
+            return nil
         }
-        return icon
     }
 
     /// The island and the radial card are non-activating panels, so Vorssaint

@@ -10,7 +10,8 @@ import Foundation
 /// the pipe closes. The kernel closes it on both ordinary exit and SIGKILL.
 enum SuperKeyMappingGuard {
     static let cleanupArgument = "--super-key-mapping-cleanup"
-    private static let commandTimeout: TimeInterval = 5
+    static let commandTimeout: TimeInterval = 5
+    static let maxOutputBytes = 4 * 1024 * 1024
 
     final class Handle {
         let source: SuperKeySource
@@ -66,6 +67,19 @@ enum SuperKeyMappingGuard {
                 _ = finished.wait(timeout: .now() + 0.5)
             }
             return didFinish && process.terminationStatus == EXIT_SUCCESS
+        }
+
+        /// Dismisses the standby shell without spawning a second `hidutil`
+        /// cleanup pass when `SuperKeyService` has already verified the clear.
+        func dismissAfterConfirmedClear() {
+            if process.isRunning {
+                process.terminate()
+            }
+            try? input.close()
+            if finished.wait(timeout: .now() + 0.5) != .success {
+                kill(process.processIdentifier, SIGKILL)
+                _ = finished.wait(timeout: .now() + 0.5)
+            }
         }
     }
 
@@ -131,8 +145,9 @@ enum SuperKeyMappingGuard {
             "/usr/bin/hidutil",
             arguments,
             timeout: commandTimeout,
-            maxOutputBytes: 4 * 1024 * 1024
+            maxOutputBytes: maxOutputBytes
         )
-        return (result.status, String(decoding: result.output, as: UTF8.self))
+        let status: Int32 = result.timedOut ? -1 : result.status
+        return (status, String(decoding: result.output, as: UTF8.self))
     }
 }

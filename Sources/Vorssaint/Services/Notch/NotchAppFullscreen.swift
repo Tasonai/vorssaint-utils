@@ -36,8 +36,15 @@ enum NotchAppFullscreen {
 
     /// Reads the windows on screen only when another app is frontmost.
     static func coveredDisplays() -> Set<CGDirectDisplayID> {
-        let ownPID = ProcessInfo.processInfo.processIdentifier
-        guard let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+        coveredDisplays(
+            frontmostPID: NSWorkspace.shared.frontmostApplication?.processIdentifier,
+            ownPID: ProcessInfo.processInfo.processIdentifier
+        )
+    }
+
+    /// Thread-safe window-server query when `frontmostPID` was already captured on the main thread.
+    static func coveredDisplays(frontmostPID: pid_t?, ownPID: pid_t) -> Set<CGDirectDisplayID> {
+        guard let frontmostPID,
               frontmostPID != ownPID,
               let entries = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
                                                        kCGNullWindowID) as? [[String: Any]]

@@ -459,5 +459,57 @@ enum AgentUsageReadTests {
         empty.start(session: 1, providers: Set(AgentProvider.allCases), cancellation: Cancellation())
         suite.expect(empty.publications.count == 1 && empty.snapshot.loaded && empty.snapshot.seen.isEmpty,
                      "a completed pass with genuinely no history leaves the loading state")
+
+        let interner = AgentStringInterner()
+        let emptyInternID = interner.intern("")
+        let modelInternID1 = interner.intern("claude-opus-4-6-20260501")
+        let modelInternID2 = interner.intern("claude-opus-4-6-20260501")
+        let unicodeInternID = interner.intern("/Users/tasonai/Проекты/vorssaint-mac/сессия-🚀")
+        suite.expect(emptyInternID == AgentStringInterner.emptyID
+                        && interner.resolve(emptyInternID).isEmpty
+                        && modelInternID1 == modelInternID2
+                        && modelInternID1 != emptyInternID
+                        && interner.resolve(modelInternID1) == "claude-opus-4-6-20260501"
+                        && interner.resolve(unicodeInternID) == "/Users/tasonai/Проекты/vorssaint-mac/сессия-🚀"
+                        && interner.count == 3,
+                     "AgentStringInterner deduplicates repeated strings into compact UInt32 IDs with exact round-trip fidelity")
+
+        let recordDate = Date(timeIntervalSince1970: 1_760_000_000)
+        let internedRecordA = AgentUsageRecord(
+            provider: .claude,
+            date: recordDate,
+            model: "claude-sonnet-4-6",
+            project: "/Users/me/vorssaint-mac",
+            session: "session-uuid-1234",
+            requests: 3,
+            tokens: AgentTokens(input: 100, cacheWrite: 20, cacheRead: 500, output: 40, reasoning: 10),
+            cost: 0.042,
+            savings: 0.015,
+            reportedCost: true
+        )
+        let internedRecordB = AgentUsageRecord(
+            provider: .claude,
+            date: recordDate,
+            model: "claude-sonnet-4-6",
+            project: "/Users/me/vorssaint-mac",
+            session: "session-uuid-1234",
+            requests: 3,
+            tokens: AgentTokens(input: 100, cacheWrite: 20, cacheRead: 500, output: 40, reasoning: 10),
+            cost: 0.042,
+            savings: 0.015,
+            reportedCost: true
+        )
+        let idsMatch = internedRecordA == internedRecordB
+            && internedRecordA.modelID == internedRecordB.modelID
+            && internedRecordA.projectID == internedRecordB.projectID
+            && internedRecordA.sessionID == internedRecordB.sessionID
+        let roundTripMatches = internedRecordA.model == "claude-sonnet-4-6"
+            && internedRecordA.project == "/Users/me/vorssaint-mac"
+            && internedRecordA.session == "session-uuid-1234"
+            && internedRecordA.requests == 3
+        let compactStrides = MemoryLayout<AgentUsageRecord>.stride <= 96
+            && MemoryLayout<AgentUsageStore.SourceList>.stride <= 16
+        suite.expect(idsMatch && roundTripMatches && compactStrides,
+                     "AgentUsageRecord and SourceList store UInt32 string IDs within compact inline strides (<=96B and <=16B)")
     }
 }

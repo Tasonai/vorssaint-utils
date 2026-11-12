@@ -28,9 +28,12 @@ enum NotchScreenRefreshContract {
     }
     enum DispatchQueue { static var main = Scheduler() }
     final class Timer {
+        let timeInterval: Double
         var tolerance: Double = 0
         var invalidated = false
-        init(timeInterval: Double, repeats: Bool, block: @escaping (Timer) -> Void) {}
+        init(timeInterval: Double, repeats: Bool, block: @escaping (Timer) -> Void) {
+            self.timeInterval = timeInterval
+        }
         func invalidate() { invalidated = true }
     }
     enum RunLoop {
@@ -280,6 +283,8 @@ enum NotchScreenRefreshContract {
         let fullscreen = Service()
         fullscreen.syncMenuSpaceMonitoring()
         let fullscreenTimer = fullscreen.menuSpaceTimer
+        suite.expect((fullscreenTimer?.timeInterval ?? 0) >= 6.0 && fullscreenTimer?.tolerance == 2.0,
+                     "menu space fallback timer uses a low-frequency >=6s interval with 2.0s coalescing tolerance")
         fullscreen.hiddenInFullscreen = true
         fullscreen.syncMenuSpaceMonitoring()
         suite.expect(fullscreen.menuSpaceTimer == nil && fullscreenTimer?.invalidated == true,

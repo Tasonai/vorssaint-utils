@@ -398,45 +398,68 @@ struct RadialWedgeShape: Shape {
 /// dead network mount would otherwise stall every highlight change).
 /// Configurations are tiny (a wheel holds 12 items), so entries accumulate.
 enum RadialMenuIconStore {
-    private static var icons: [String: NSImage] = [:]
-    private static var names: [String: String] = [:]
-    private static var customIcons: [UUID: NSImage] = [:]
+    private static let iconPointSize: CGFloat = 34
+    private static let icons: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 96
+        cache.totalCostLimit = 8 * 1024 * 1024
+        return cache
+    }()
+    private static let names: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.countLimit = 128
+        return cache
+    }()
+    private static let customIcons: NSCache<NSUUID, NSImage> = {
+        let cache = NSCache<NSUUID, NSImage>()
+        cache.countLimit = 64
+        cache.totalCostLimit = 4 * 1024 * 1024
+        return cache
+    }()
 
     static func fileIcon(for payload: String) -> NSImage {
-        if let cached = icons[payload] { return cached }
-        let path = (payload as NSString).expandingTildeInPath
-        let icon = NSWorkspace.shared.icon(forFile: path)
-        icon.size = NSSize(width: 34, height: 34)
-        icons[payload] = icon
+        let key = payload as NSString
+        if let cached = icons.object(forKey: key) { return cached }
+        let path = key.expandingTildeInPath
+        let rawIcon = NSWorkspace.shared.icon(forFile: path)
+        let icon = ImageThumbnailer.thumbnail(for: rawIcon, pointSize: iconPointSize) ?? rawIcon
+        icon.size = NSSize(width: iconPointSize, height: iconPointSize)
+        icons.setObject(icon, forKey: key, cost: ImageThumbnailer.estimatedBitmapCost(pointSize: iconPointSize))
         return icon
     }
 
     static func customIcon(for item: RadialMenuItem) -> NSImage? {
         guard let data = item.customIconData else { return nil }
-        if let cached = customIcons[item.id] { return cached }
-        guard let image = NSImage(data: data) else { return nil }
-        image.size = NSSize(width: 34, height: 34)
-        customIcons[item.id] = image
+        let key = item.id as NSUUID
+        if let cached = customIcons.object(forKey: key) { return cached }
+        let scale = ImageThumbnailer.backingScale
+        guard let image = ImageThumbnailer.thumbnail(data: data, pointSize: iconPointSize, scale: scale)
+                ?? NSImage(data: data) else { return nil }
+        image.size = NSSize(width: iconPointSize, height: iconPointSize)
+        customIcons.setObject(image, forKey: key, cost: ImageThumbnailer.estimatedBitmapCost(pointSize: iconPointSize))
         return image
     }
 
     static func fileName(for payload: String) -> String {
-        if let cached = names[payload] { return cached }
-        let path = (payload as NSString).expandingTildeInPath
+        let key = payload as NSString
+        if let cached = names.object(forKey: key) { return cached as String }
+        let path = key.expandingTildeInPath
         let name = FileManager.default.displayName(atPath: path)
-        names[payload] = name
+        names.setObject(name as NSString, forKey: key)
         return name
     }
 
     static func invalidate(_ payload: String) {
-        icons.removeValue(forKey: payload)
-        names.removeValue(forKey: payload)
+        let key = payload as NSString
+        icons.removeObject(forKey: key)
+        names.removeObject(forKey: key)
     }
 
     static func invalidate(item: RadialMenuItem) {
-        icons.removeValue(forKey: item.payload)
-        names.removeValue(forKey: item.payload)
-        customIcons.removeValue(forKey: item.id)
+        let key = item.payload as NSString
+        icons.removeObject(forKey: key)
+        names.removeObject(forKey: key)
+        customIcons.removeObject(forKey: item.id as NSUUID)
     }
 }
 

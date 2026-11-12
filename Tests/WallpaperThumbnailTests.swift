@@ -59,5 +59,25 @@ enum WallpaperThumbnailTests {
                              "wallpaper \(index) stays in its grid slot at \(width)")
             }
         }
+
+        suite.expect(WallpaperSupport.maxConcurrentThumbnailDecodes == 3,
+                     "WallpaperThumbnailCache bounds concurrent ImageIO thumbnail decoding to 3 operations")
+        suite.expect(WallpaperSupport.thumbnailCacheCountLimit > 0
+                         && WallpaperSupport.thumbnailCacheTotalCostLimit >= 16 * 1024 * 1024,
+                     "WallpaperThumbnailCache configures both countLimit and totalCostLimit")
+        suite.expect(WallpaperSupport.estimatedByteCost(for: NSImage(size: NSSize(width: 160, height: 90))) == 160 * 90 * 4,
+                     "WallpaperThumbnailCache estimates RGBA byte cost as width * height * 4")
+        let wallpaperServiceSource = (try? String(
+            contentsOfFile: "Sources/Vorssaint/Services/Wallpaper/WallpaperService.swift",
+            encoding: .utf8)) ?? ""
+        let wallpaperSupportSource = (try? String(
+            contentsOfFile: "Sources/Vorssaint/Services/Wallpaper/WallpaperSupport.swift",
+            encoding: .utf8)) ?? ""
+        suite.expect(wallpaperServiceSource.contains("OperationQueue()")
+                         && wallpaperServiceSource.contains("WallpaperSupport.maxConcurrentThumbnailDecodes")
+                         && wallpaperServiceSource.contains("autoreleasepool")
+                         && wallpaperSupportSource.contains("kCGImageSourceShouldCache: false")
+                         && wallpaperSupportSource.contains("kCGImageSourceCreateThumbnailFromImageIfAbsent: true"),
+                     "WallpaperThumbnailCache runs ImageIO decodes on a bounded OperationQueue inside autoreleasepool without caching full-size bitmaps")
     }
 }
