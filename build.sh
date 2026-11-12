@@ -78,23 +78,27 @@ developer_id_identity() {
 }
 
 unlock_signing_keychain() {
-    [[ -f "$SIGNING_KC" ]] || return 0
-    if [[ -f "$SIGNING_SECRET_FILE" ]]; then
-        local secret
-        secret="$(<"$SIGNING_SECRET_FILE")"
-        if [[ -n "$secret" ]] && security unlock-keychain -p "$secret" "$SIGNING_KC" 2>/dev/null; then
-            security set-keychain-settings -lut 300 "$SIGNING_KC" 2>/dev/null || true
-            return 0
-        fi
+    [[ -f "$SIGNING_KC" && -f "$SIGNING_SECRET_FILE" ]] || return 0
+    local secret
+    secret="$(<"$SIGNING_SECRET_FILE")"
+    if [[ -n "$secret" ]] && security unlock-keychain -p "$secret" "$SIGNING_KC" 2>/dev/null; then
+        security set-keychain-settings -lut 300 "$SIGNING_KC" 2>/dev/null || true
     fi
-    security unlock-keychain -p vorssaint-signing "$SIGNING_KC" 2>/dev/null || true
-    security set-keychain-settings -lut 300 "$SIGNING_KC" 2>/dev/null || true
+    return 0
 }
 
 lock_signing_keychain() {
     [[ -f "$SIGNING_KC" ]] && security lock-keychain "$SIGNING_KC" 2>/dev/null || true
     return 0
 }
+
+# Migrate pre-existing vorssaint-signing.keychain-db installations off the
+# legacy hardcoded password into signing-keychain.secret in place, preserving
+# the certificate and all granted macOS TCC permissions.
+if (( ! TEST )) && [[ -z "$(developer_id_identity)" ]] \
+    && [[ -f "$SIGNING_KC" && ! -f "$SIGNING_SECRET_FILE" ]]; then
+    ./Tools/setup-signing.sh >/dev/null 2>&1 || true
+fi
 
 # A find-identity listing also names certificates codesign then rejects (an
 # expired one fails the build with errSecInternalComponent), and -v excludes

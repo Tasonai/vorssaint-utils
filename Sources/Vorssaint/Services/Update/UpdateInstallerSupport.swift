@@ -78,9 +78,14 @@ enum UpdateInstallerSupport {
                 cleanup_script
                 exit 1
             }
+            APP="$REAL_APP_DIR/$(/usr/bin/basename "$APP")"
         fi
         note fail-tempdir
-        WORKDIR="$(/usr/bin/mktemp -d)" && /bin/chmod 0700 "$WORKDIR" || { /bin/rm -f "$DMG"; finalize; relaunch "$APP"; cleanup_script; exit 1; }
+        if running_as_root; then
+            WORKDIR="$(/usr/bin/mktemp -d /var/root/vorssaint-update.XXXXXX)" && /bin/chmod 0700 "$WORKDIR"
+        else
+            WORKDIR="$(/usr/bin/mktemp -d)" && /bin/chmod 0700 "$WORKDIR"
+        fi || { /bin/rm -f "$DMG"; finalize; relaunch "$APP"; cleanup_script; exit 1; }
         STAGED_DMG="$WORKDIR/update.dmg"
         MNT="$WORKDIR/mnt"
         if [ -L "$DMG" ] || [ ! -f "$DMG" ] || ! /bin/cp "$DMG" "$STAGED_DMG" 2>/dev/null || ! /bin/mkdir -m 0700 "$MNT" 2>/dev/null; then

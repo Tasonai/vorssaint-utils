@@ -974,13 +974,16 @@ enum UpdateFeatureTests {
         }
         suite.expect(installerScript.contains("spctl --status"),
                "installer script skips Gatekeeper assessment when the user disabled it")
+        let dmgRootWorkdir = installerScript.range(of: "/usr/bin/mktemp -d /var/root/vorssaint-update.XXXXXX")
         let dmgStageCopy = installerScript.range(of: "/bin/cp \"$DMG\" \"$STAGED_DMG\"")
         let dmgVerification = installerScript.range(of: "DMG_VERIFY_REQ")
         let dmgMount = installerScript.range(of: "/usr/bin/hdiutil attach \"$STAGED_DMG\" -readonly -noautoopen -nobrowse")
-        suite.expect(dmgStageCopy != nil && dmgVerification != nil && dmgMount != nil
+        suite.expect(dmgRootWorkdir != nil && dmgStageCopy != nil && dmgVerification != nil && dmgMount != nil
+               && installerScript.contains("APP=\"$REAL_APP_DIR/$(/usr/bin/basename \"$APP\")\"")
+               && dmgRootWorkdir!.lowerBound < dmgStageCopy!.lowerBound
                && dmgStageCopy!.lowerBound < dmgVerification!.lowerBound
                && dmgVerification!.lowerBound < dmgMount!.lowerBound,
-               "installer stages the DMG into a private 0700 directory before verifying and mounting it read-only")
+               "installer canonicalizes APP and stages the DMG into root-owned /var/root/vorssaint-update.XXXXXX before verifying and mounting it read-only")
         suite.expect(installerScript.contains("BUNDLE_VERSION=")
                && installerScript.contains("\"$BUNDLE_VERSION\" = \"$EXPECTED_VERSION\""),
                "installer requires the signed app to match the offered release version")

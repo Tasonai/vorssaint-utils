@@ -68,6 +68,20 @@ identity_can_sign() {
 }
 
 if identity_can_sign; then
+    if [[ "$KCPASS" == "$FALLBACK_KCPASS" || ! -f "$SECRET_FILE" ]]; then
+        mkdir -p "$SECRET_DIR"
+        chmod 700 "$SECRET_DIR"
+        NEW_KCPASS="$(umask 077 && openssl rand -hex 32)"
+        if security set-keychain-password -o "$KCPASS" -p "$NEW_KCPASS" "$KC" 2>/dev/null; then
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$NEW_KCPASS" "$KC" >/dev/null 2>&1 || true
+            (
+                umask 077
+                printf '%s' "$NEW_KCPASS" > "$SECRET_FILE"
+            )
+            chmod 600 "$SECRET_FILE"
+            KCPASS="$NEW_KCPASS"
+        fi
+    fi
     security set-keychain-settings -lut 300 "$KC" 2>/dev/null || true
     lock_signing_keychain
     echo "✓ Signing identity already installed."

@@ -2176,7 +2176,7 @@ extension RecorderFeatureStrings {
         pointerSmoothingCinematic: "Кінематографічне",
         pointerSizeLabel: "Розмір",
         clickRingToggle: "Позначати, де ви клацаєте",
-        zoomSectionLabel: "Змінити масштаб",
+        zoomSectionLabel: "Масштаб",
         zoomToggle: "Збільшувати при кожному клаці",
         zoomAmountLabel: "Наскільки близько",
         backgroundSectionLabel: "Фон",
