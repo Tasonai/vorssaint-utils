@@ -449,13 +449,13 @@ enum SwitcherModelFeatureTests {
         suite.expect(registeredDefaults[DefaultsKey.switcherMaxColumns] as? Int == 0
                && SettingsBackupSupport.exportKeys().contains(DefaultsKey.switcherMaxColumns),
                "App Switcher columns start on Auto and carry the choice in backups")
-        suite.expect(registeredDefaults[DefaultsKey.switcherInstantSelection] as? Bool == false
+        suite.expect(registeredDefaults[DefaultsKey.switcherInstantSelection] as? Bool == true
                && SettingsBackupSupport.exportKeys().contains(DefaultsKey.switcherInstantSelection),
-               "App Switcher keeps smooth selection by default and carries instant selection in backups")
+               "App Switcher uses instant selection by default and carries the choice in backups")
         let instantSelectionBackup = SettingsBackupSupport.payload(appVersion: "test") { key in
-            key == DefaultsKey.switcherInstantSelection ? true : nil
+            key == DefaultsKey.switcherInstantSelection ? false : nil
         }
-        suite.expect(SettingsBackupSupport.sanitizedSettings(from: instantSelectionBackup)?[DefaultsKey.switcherInstantSelection] as? Bool == true,
+        suite.expect(SettingsBackupSupport.sanitizedSettings(from: instantSelectionBackup)?[DefaultsKey.switcherInstantSelection] as? Bool == false,
                "App Switcher restores the instant selection choice from a settings backup")
         suite.expect(SwitcherSupport.appearanceDelayMillisecondsRange
                .contains(SwitcherSupport.defaultAppearanceDelayMilliseconds),

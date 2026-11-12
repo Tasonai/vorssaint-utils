@@ -53,8 +53,8 @@ struct RadialMenuView: View {
         .scaleEffect(service.visible || !animates ? 1 : 0.9)
         .animation(animates
                    ? (service.visible
-                      ? .spring(response: 0.27, dampingFraction: 0.86)
-                      : .easeIn(duration: 0.13))
+                      ? .spring(duration: 0.24, bounce: 0.08)
+                      : .easeOut(duration: 0.14))
                    : nil,
                    value: service.visible)
         .onChange(of: service.highlightedIndex) { _, _ in syncWedge() }
@@ -312,7 +312,7 @@ private struct RadialChipView: View {
             settled = true
             return
         }
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.75).delay(openDelay)) {
+        withAnimation(.spring(duration: 0.24, bounce: 0.08).delay(openDelay)) {
             settled = true
         }
     }
@@ -324,7 +324,7 @@ private struct RadialChipView: View {
             settled = false
             return
         }
-        withAnimation(.easeIn(duration: 0.1).delay(openDelay * 0.25)) {
+        withAnimation(.easeOut(duration: 0.14).delay(openDelay * 0.25)) {
             settled = false
         }
     }

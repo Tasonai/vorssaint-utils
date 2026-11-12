@@ -130,8 +130,8 @@ struct PanelPortManagerView: View {
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundStyle(.secondary)
             Text(strings.emptyHint)
-                .font(.system(size: 9.5))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 72)
@@ -169,8 +169,8 @@ struct PanelPortManagerView: View {
                     .font(.system(size: 10.5))
                     .lineLimit(1)
                 Text("PID \(String(entry.pid))  •  \(entry.address)")
-                    .font(.system(size: 8.5, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }

@@ -447,6 +447,7 @@ struct AppUpdatesListView: View {
             } label: {
                 Text(String(format: text.updateSelectedFormat, updates.selectedCount))
                     .font(.system(size: compact ? 11 : 12, weight: .semibold))
+                    .monospacedDigit()
                     .frame(maxWidth: compact ? .infinity : nil)
             }
             .buttonStyle(.borderedProminent)

@@ -50,7 +50,7 @@ struct SnippetLibraryView: View {
                 .font(.system(size: 15))
                 .focused($searchFocused)
             if !library.query.isEmpty {
-                ClearIconButton(label: text.librarySearchPlaceholder) {
+                ClearIconButton(label: l10n.s.actionClear) {
                     library.query = ""
                 }
             }

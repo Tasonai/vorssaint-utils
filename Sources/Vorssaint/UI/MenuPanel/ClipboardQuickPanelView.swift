@@ -459,7 +459,9 @@ private struct QuickEntryView: View, Equatable {
             }
             entryContent(entry)
             Spacer(minLength: 8)
-            entryTrailing(entry, isHovered: isHovered)
+            rowTimestampColumn
+                .opacity(isHovered ? 0 : 1)
+                .accessibilityHidden(isHovered)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -476,6 +478,19 @@ private struct QuickEntryView: View, Equatable {
                               : isSelected ? Color.accentColor.opacity(0.24) : Color.clear,
                               lineWidth: 1)
         )
+        .overlay(alignment: .trailing) {
+            if isHovered {
+                hoverActionCluster(entry)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 3)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                    )
+                    .padding(.trailing, 6)
+            }
+        }
     }
 
     private var card: some View {
@@ -681,55 +696,70 @@ private struct QuickEntryView: View, Equatable {
         }
     }
 
-    @ViewBuilder
-    private func entryTrailing(_ entry: ClipboardHistoryEntry, isHovered: Bool) -> some View {
-        if isHovered {
-            HStack(spacing: 4) {
-                if entry.kind == .image, AppFeature.screenshot.isAvailable {
-                    Button { history.editImage(entry) } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .frame(width: 24, height: 24)
-                            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-                    .help(text.edit)
-                    .accessibilityLabel(text.edit)
-                }
-                Button {
-                    history.copyOnlyQuickEntry(entry)
-                } label: {
-                    Image(systemName: "doc.on.doc")
+    private var rowTimestampColumn: some View {
+        VStack(alignment: .trailing, spacing: 3) {
+            Text(entry.copiedAt, style: .time)
+                .font(.system(size: 9.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+            if let shortcutIndex {
+                Text("⌘\(shortcutIndex + 1)")
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func hoverActionCluster(_ entry: ClipboardHistoryEntry) -> some View {
+        HStack(spacing: 4) {
+            if entry.kind == .image, AppFeature.screenshot.isAvailable {
+                Button { history.editImage(entry) } label: {
+                    Image(systemName: "pencil")
                         .font(.system(size: 10.5, weight: .semibold))
                         .frame(width: 24, height: 24)
                         .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(text.copy)
-                Menu {
-                    entryActions(entry)
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(width: 24, height: 24)
-                        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
+                .help(text.edit)
+                .accessibilityLabel(text.edit)
             }
+            Button {
+                history.copyOnlyQuickEntry(entry)
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .frame(width: 24, height: 24)
+                    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(text.copy)
+            .accessibilityLabel(text.copy)
+            Menu {
+                entryActions(entry)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 24, height: 24)
+                    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .accessibilityLabel(FeatureStrings.recorder(l10n.language).moreOptions)
+        }
+    }
+
+    @ViewBuilder
+    private func entryTrailing(_ entry: ClipboardHistoryEntry, isHovered: Bool) -> some View {
+        if isHovered {
+            hoverActionCluster(entry)
         } else if isRow {
             // A card shows these in its footer.
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(entry.copiedAt, style: .time)
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(.tertiary)
-                if let shortcutIndex {
-                    Text("⌘\(shortcutIndex + 1)")
-                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-            }
+            rowTimestampColumn
         } else if entry.isPinned, sourceApp != nil || showsFileIcon {
             // The app's or the file's icon took the pin's place on the left.
             Image(systemName: "pin.fill")

@@ -61,6 +61,106 @@ enum NotchPrivacyTests {
                      "CameraMicrophonePrivacyMonitor pauses reconciliation during display sleep and configures timer tolerance")
 
         NotchPrivacyMuteContract.run(suite)
+        runWave4UXContractChecks(suite, source: source)
+    }
+
+    private static func runWave4UXContractChecks(_ suite: TestSuite, source: (String) -> String) {
+        let privacyViewSource = source("Sources/Vorssaint/UI/Notch/NotchPrivacyView.swift")
+        suite.expect(privacyViewSource.range(of: "\\p{Cyrillic}", options: .regularExpression) == nil
+                         && privacyViewSource.contains("FeatureStrings.notch(l10n.language)"),
+                     "NotchPrivacyView uses localized FeatureStrings.notch tokens with zero hardcoded Cyrillic strings")
+        suite.expect(!privacyViewSource.contains(".transition(.scale.combined")
+                         && privacyViewSource.contains(".scale(scale: 0.95).combined(with: .opacity)")
+                         && privacyViewSource.contains("accessibilityReduceMotion"),
+                     "NotchPrivacyView avoids scale(0) transitions and respects Reduce Motion")
+
+        for language in AppLanguage.allCases {
+            let notch = FeatureStrings.notch(language)
+            suite.expect(!notch.privacyCameraFallback.isEmpty
+                             && !notch.privacyCameraActive.isEmpty
+                             && notch.privacyCameraStatusFormat.contains("%@")
+                             && notch.privacyMicrophoneActionFormat.components(separatedBy: "%@").count == 3
+                             && !notch.privacyMuteMicrophone.isEmpty
+                             && !notch.privacyUnmuteMicrophone.isEmpty,
+                         "NotchStrings privacy catalog is complete for \(language.rawValue)")
+        }
+
+        suite.expect(FeatureStrings.recorder(.ru).zoomSectionLabel == "Масштаб",
+                     "Russian recorder inspector uses concise Масштаб tab label")
+
+        let switcherSource = source("Sources/Vorssaint/UI/Switcher/SwitcherView.swift")
+        let dockPreviewSource = source("Sources/Vorssaint/UI/Switcher/DockPreviewPanelView.swift")
+        let quickToolHUDSource = source("Sources/Vorssaint/Services/QuickTools/QuickToolHUD.swift")
+        suite.expect(!switcherSource.contains("Color.white.opacity(0.06)")
+                         && !switcherSource.contains("Color.white.opacity(0.14)")
+                         && switcherSource.contains("Color.primary.opacity(0.06)")
+                         && switcherSource.contains("Color.accentColor.opacity(0.15)"),
+                     "SwitcherView WindowCard uses adaptive primary/accent tokens for Light and Dark modes")
+        suite.expect(!dockPreviewSource.contains("Color.white.opacity(0.06)")
+                         && !dockPreviewSource.contains("Color.white.opacity(0.14)")
+                         && dockPreviewSource.contains("Color.primary.opacity(0.06)")
+                         && dockPreviewSource.contains("Color.accentColor.opacity(0.15)"),
+                     "DockPreviewPanelView cards and capsules use adaptive primary/accent tokens")
+        suite.expect(!quickToolHUDSource.contains("Color.white.opacity(0.12)")
+                         && quickToolHUDSource.contains("Color.primary.opacity(0.12)"),
+                     "QuickToolHUD countdown ring uses adaptive primary token over HUDBackdrop")
+
+        let shelfTilesSource = source("Sources/Vorssaint/UI/Shelf/ShelfTilesView.swift")
+        suite.expect(!shelfTilesSource.contains("NSColor.white")
+                         && shelfTilesSource.contains("private func updateLayerColors()")
+                         && shelfTilesSource.contains("override func viewDidChangeEffectiveAppearance()")
+                         && shelfTilesSource.contains("effectiveAppearance.performAsCurrentDrawingAppearance"),
+                     "ShelfTilesView resolves dynamic CALayer colors on effective appearance changes")
+
+        let commandBarSource = source("Sources/Vorssaint/UI/CommandBar/CommandBarView.swift")
+        let snippetLibrarySource = source("Sources/Vorssaint/UI/SnippetLibraryView.swift")
+        suite.expect(!commandBarSource.contains("table: \"CommandBar\"")
+                         && !commandBarSource.contains("Color(nsColor: .windowBackgroundColor)")
+                         && commandBarSource.contains("l10n.s.actionClear")
+                         && snippetLibrarySource.contains("ClearIconButton(label: l10n.s.actionClear)"),
+                     "CommandBarView and SnippetLibraryView use localized actionClear and dark-aware status ring")
+
+        for path in [
+            "Sources/Vorssaint/UI/Shelf/ShelfDropZoneView.swift",
+            "Sources/Vorssaint/UI/Screenshot/ScreenshotEditorView.swift",
+            "Sources/Vorssaint/UI/Notch/NotchCapsuleViews.swift",
+        ] {
+            let text = source(path)
+            suite.expect(!text.contains(".scale.combined(with: .opacity)")
+                             && text.contains(".scale(scale: 0.95).combined(with: .opacity)"),
+                         "\(path) replaces scale(0) transition with scale(0.95) + opacity")
+        }
+
+        for path in [
+            "Sources/Vorssaint/UI/RadialMenu/RadialMenuView.swift",
+            "Sources/Vorssaint/UI/Notch/NotchQuickAccessView.swift",
+            "Sources/Vorssaint/UI/MenuPanel/DiskSection.swift",
+        ] {
+            suite.expect(!source(path).contains(".easeIn("),
+                         "\(path) eliminates sluggish .easeIn exit curves")
+        }
+
+        let sharedUISource = source("Sources/Vorssaint/UI/SharedUI.swift")
+        let screenshotEditorSource = source("Sources/Vorssaint/UI/Screenshot/ScreenshotEditorView.swift")
+        let recorderEditorSource = source("Sources/Vorssaint/UI/Recorder/RecorderEditorView.swift")
+        let updateHighlightsSource = source("Sources/Vorssaint/UI/UpdateHighlightsView.swift")
+        suite.expect(sharedUISource.contains(".frame(minWidth: 22, minHeight: 22)")
+                         && sharedUISource.contains(".contentShape(Rectangle())")
+                         && screenshotEditorSource.contains(".accessibilityLabel(l10n.s.menuUndo)")
+                         && screenshotEditorSource.contains(".accessibilityLabel(l10n.s.menuRedo)"),
+                     "Shared icon buttons and ScreenshotEditor Undo/Redo expose >=22pt hit shapes and VoiceOver labels")
+        suite.expect(updateHighlightsSource.contains(".onExitCommand")
+                         && recorderEditorSource.contains(".onExitCommand")
+                         && screenshotEditorSource.contains(".onExitCommand"),
+                     "Modal overlays and shared-link sheets dismiss on Escape")
+
+        let clipboardPanelSource = source("Sources/Vorssaint/UI/MenuPanel/ClipboardQuickPanelView.swift")
+        let scrollingTitleSource = source("Sources/Vorssaint/UI/Switcher/ScrollingTitle.swift")
+        suite.expect(clipboardPanelSource.contains(".overlay(alignment: .trailing)")
+                         && clipboardPanelSource.contains("hoverActionCluster(entry)")
+                         && scrollingTitleSource.contains("weight: .semibold")
+                         && scrollingTitleSource.contains(".hidden()"),
+                     "ClipboardQuickPanelView and ScrollingTitle prevent hover reflow and font-weight width jitter")
     }
 }
 

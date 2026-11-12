@@ -27,7 +27,7 @@ struct SwitcherSettings: View {
     @AppStorage(DefaultsKey.switcherSearchPinEnabled) private var switcherSearchPinEnabled = false
     @AppStorage(DefaultsKey.switcherShowShortcutHints) private var switcherShowShortcutHints = true
     @AppStorage(DefaultsKey.switcherAppearanceDelay) private var switcherAppearanceDelay = SwitcherSupport.defaultAppearanceDelayMilliseconds
-    @AppStorage(DefaultsKey.switcherInstantSelection) private var switcherInstantSelection = false
+    @AppStorage(DefaultsKey.switcherInstantSelection) private var switcherInstantSelection = true
     @AppStorage(DefaultsKey.switcherMaxColumns) private var switcherMaxColumns = 0
     private var pages: SettingsPageStrings { FeatureStrings.settingsPages(l10n.language) }
     private var switcherEngaged: Bool { switcherEnabled && AppFeature.switcher.isAvailable }

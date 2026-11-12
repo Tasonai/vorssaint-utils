@@ -318,6 +318,7 @@ extension View {
 struct ListRemoveButton: View {
     let label: String
     let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     init(label: String, action: @escaping () -> Void) {
@@ -329,8 +330,10 @@ struct ListRemoveButton: View {
         Button(action: action) {
             Image(systemName: "minus.circle.fill")
                 .foregroundStyle(isHovered ? Color.red.opacity(0.85) : Color.secondary)
-                .scaleEffect(isHovered ? 1.10 : 1.0)
-                .animation(.easeOut(duration: 0.12), value: isHovered)
+                .scaleEffect(isHovered && !reduceMotion ? 1.10 : 1.0)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+                .frame(minWidth: 22, minHeight: 22)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
@@ -344,6 +347,7 @@ struct ClearIconButton: View {
     let label: String
     var disabled: Bool = false
     let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     init(label: String, disabled: Bool = false, action: @escaping () -> Void) {
@@ -357,8 +361,10 @@ struct ClearIconButton: View {
             Image(systemName: "xmark.circle.fill")
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(isHovered && !disabled ? Color.primary : Color.secondary)
-                .scaleEffect(isHovered && !disabled ? 1.08 : 1.0)
-                .animation(.easeOut(duration: 0.12), value: isHovered)
+                .scaleEffect(isHovered && !disabled && !reduceMotion ? 1.08 : 1.0)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+                .frame(minWidth: 22, minHeight: 22)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(disabled)

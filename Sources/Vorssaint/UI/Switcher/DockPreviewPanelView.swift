@@ -292,7 +292,7 @@ private struct DockPreviewPanelContent: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Capsule().fill(Color.white.opacity(0.10)))
+                    .background(Capsule().fill(Color.primary.opacity(0.08)))
                 }
                 if isPinned {
                     Text(l10n.s.dockPreviewPinned)
@@ -300,7 +300,7 @@ private struct DockPreviewPanelContent: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.white.opacity(0.10)))
+                        .background(Capsule().fill(Color.primary.opacity(0.08)))
                 }
                 Spacer(minLength: 0)
             }
@@ -338,7 +338,7 @@ private struct DockPreviewPanelContent: View {
             .foregroundStyle(Color.secondary)
             .padding(.horizontal, 3)
             .padding(.vertical, 1)
-            .background(Capsule().fill(Color.white.opacity(0.10)))
+            .background(Capsule().fill(Color.primary.opacity(0.08)))
         }
     }
 
@@ -389,6 +389,7 @@ private struct DockPreviewCard: View {
     let onToggleMinimized: () -> Void
 
     @ObservedObject private var l10n = L10n.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(DefaultsKey.minimalWindowPreviews) private var minimalPreviews = false
     @State private var isHovering = false
     @State private var isCloseHovering = false
@@ -411,7 +412,7 @@ private struct DockPreviewCard: View {
         VStack(spacing: DockPreviewSupport.cardTitleSpacing) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(minimalPreviews ? Color.clear : Color.white.opacity(0.06))
+                    .fill(minimalPreviews ? Color.clear : Color.primary.opacity(0.06))
 
                 if let preview {
                     Image(decorative: preview, scale: 2)
@@ -477,13 +478,13 @@ private struct DockPreviewCard: View {
         // card re-composited the shadowed app badge and it blinked once.
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? Color.white.opacity(0.14) : Color.clear)
-                .animation(.spring(response: 0.2, dampingFraction: 0.82), value: isSelected)
+                .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+                .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.08), value: isSelected)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
-                .animation(.spring(response: 0.2, dampingFraction: 0.82), value: isSelected)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.55) : Color.clear, lineWidth: 2)
+                .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.08), value: isSelected)
         )
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {

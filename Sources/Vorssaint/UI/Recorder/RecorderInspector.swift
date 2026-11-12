@@ -388,22 +388,29 @@ struct RecorderInspector: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Color(white: 0.72))
                 HStack(spacing: 6) {
-                    ForEach(RecorderTextOverlay.Palette.allCases, id: \.rawValue) { palette in
+                    ForEach(Array(RecorderTextOverlay.Palette.allCases.enumerated()), id: \.element.rawValue) { index, palette in
                         let parts = palette.components
-                        Circle()
-                            .fill(Color(.sRGB, red: parts.red, green: parts.green,
-                                        blue: parts.blue, opacity: 1))
-                            .frame(width: 20, height: 20)
-                            .overlay {
-                                Circle().strokeBorder(
-                                    overlay.palette == palette
-                                        ? Color.accentColor : Color.white.opacity(0.18),
-                                    lineWidth: overlay.palette == palette ? 2.5 : 1)
-                            }
-                            .onTapGesture {
-                                model.updateSelectedText { $0.palette = palette }
-                                model.commitZoomEdit()
-                            }
+                        let isSelected = overlay.palette == palette
+                        Button {
+                            model.updateSelectedText { $0.palette = palette }
+                            model.commitZoomEdit()
+                        } label: {
+                            Circle()
+                                .fill(Color(.sRGB, red: parts.red, green: parts.green,
+                                            blue: parts.blue, opacity: 1))
+                                .frame(width: 20, height: 20)
+                                .overlay {
+                                    Circle().strokeBorder(
+                                        isSelected
+                                            ? Color.accentColor : Color.white.opacity(0.18),
+                                        lineWidth: isSelected ? 2.5 : 1)
+                                }
+                                .frame(minWidth: 22, minHeight: 22)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(strings.textColorLabel) \(index + 1)")
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
                 }
             }
@@ -543,6 +550,21 @@ struct RecorderInspector: View {
         }
     }
 
+    private func anchorLabel(_ anchor: RecorderTextOverlay.Anchor) -> String {
+        let layout = FeatureStrings.windowLayout(l10n.language)
+        switch anchor {
+        case .topLeading: return layout.topLeft
+        case .top: return layout.topHalf
+        case .topTrailing: return layout.topRight
+        case .leading: return layout.leftHalf
+        case .center: return layout.center
+        case .trailing: return layout.rightHalf
+        case .bottomLeading: return layout.bottomLeft
+        case .bottom: return layout.bottomHalf
+        case .bottomTrailing: return layout.bottomRight
+        }
+    }
+
     /// Nine places instead of a drag: it reads at a glance, needs no gesture
     /// on the picture, and covers what people actually do with a caption or a
     /// mark of their own.
@@ -558,15 +580,21 @@ struct RecorderInspector: View {
             ForEach(rows.indices, id: \.self) { row in
                 HStack(spacing: 4) {
                     ForEach(rows[row], id: \.rawValue) { anchor in
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(selected == anchor
-                                  ? Color.accentColor.opacity(0.85)
-                                  : Color.white.opacity(0.08))
-                            .frame(height: 20)
-                            .onTapGesture {
-                                onSelect(anchor)
-                                model.commitZoomEdit()
-                            }
+                        let isSelected = selected == anchor
+                        Button {
+                            onSelect(anchor)
+                            model.commitZoomEdit()
+                        } label: {
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(isSelected
+                                      ? Color.accentColor.opacity(0.85)
+                                      : Color.white.opacity(0.08))
+                                .frame(minWidth: 22, minHeight: 22)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(anchorLabel(anchor))
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
                 }
             }

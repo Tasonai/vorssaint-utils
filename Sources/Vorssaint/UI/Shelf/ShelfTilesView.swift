@@ -333,6 +333,9 @@ final class ShelfTileView: NSView, NSDraggingSource {
     private var closeButton: NSButton!
     private var pinBadge: NSImageView?
     private var expandButton: NSButton?
+    private var iconWell: NSView?
+    private var stackBackplates: [NSView] = []
+    private var batchBadge: NSTextField?
     private let sharePresenter = ShelfSharePresenter()
 
     init(item: ShelfService.Item, isSelected: Bool, isExpanded: Bool, isPinned: Bool) {
@@ -352,16 +355,24 @@ final class ShelfTileView: NSView, NSDraggingSource {
 
     override var isFlipped: Bool { true }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        syncChrome()
+        updateLayerColors()
+    }
+
     private func syncChrome() {
-        layer?.backgroundColor = isSelected
-            ? NSColor.controlAccentColor.withAlphaComponent(0.16).cgColor
-            : nil
-        if isSelected || isDropTargeted {
-            layer?.borderWidth = 2
-            layer?.borderColor = NSColor.controlAccentColor.cgColor
-        } else {
-            layer?.borderWidth = 0
-            layer?.borderColor = nil
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = isSelected
+                ? NSColor.controlAccentColor.withAlphaComponent(0.16).cgColor
+                : nil
+            if isSelected || isDropTargeted {
+                layer?.borderWidth = 2
+                layer?.borderColor = NSColor.controlAccentColor.cgColor
+            } else {
+                layer?.borderWidth = 0
+                layer?.borderColor = nil
+            }
         }
     }
 
@@ -374,22 +385,22 @@ final class ShelfTileView: NSView, NSDraggingSource {
     private func buildSubviews() {
         if item.isBatch { addStackBackplates() }
 
-        let iconWell = NSView(frame: NSRect(x: 7, y: 6, width: 64, height: 50))
-        iconWell.wantsLayer = true
-        iconWell.layer?.cornerRadius = 8
-        iconWell.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.06).cgColor
-        addSubview(iconWell)
+        let well = NSView(frame: NSRect(x: 7, y: 6, width: 64, height: 50))
+        well.wantsLayer = true
+        well.layer?.cornerRadius = 8
+        iconWell = well
+        addSubview(well)
 
         // Not `isImage`: an image whose thumbnail has not been decoded yet
         // (or could not be) is still wearing the generic fallback icon, and
         // that wants the generic inset until the real frame arrives.
         let hasThumbnail = item.hasContentThumbnail
-        let imageView = NSImageView(frame: iconWell.bounds.insetBy(dx: hasThumbnail ? 4 : 13,
-                                                                   dy: hasThumbnail ? 4 : 8))
+        let imageView = NSImageView(frame: well.bounds.insetBy(dx: hasThumbnail ? 4 : 13,
+                                                               dy: hasThumbnail ? 4 : 8))
         imageView.image = item.icon
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.autoresizingMask = [.width, .height]
-        iconWell.addSubview(imageView)
+        well.addSubview(imageView)
 
         if item.isBatch {
             let badge = NSTextField(labelWithString: "\(item.leafCount)")
@@ -399,7 +410,7 @@ final class ShelfTileView: NSView, NSDraggingSource {
             badge.textColor = .white
             badge.wantsLayer = true
             badge.layer?.cornerRadius = 7.5
-            badge.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+            batchBadge = badge
             addSubview(badge)
 
             let expand = NSButton(frame: NSRect(x: 4, y: 4, width: 17, height: 17))
@@ -454,6 +465,8 @@ final class ShelfTileView: NSView, NSDraggingSource {
         closeButton.action = #selector(removeSelf)
         closeButton.isHidden = true
         addSubview(closeButton)
+
+        updateLayerColors()
     }
 
     private static func tooltipText(for item: ShelfService.Item) -> String {
@@ -496,17 +509,30 @@ final class ShelfTileView: NSView, NSDraggingSource {
     }
 
     private func addStackBackplates() {
-        for (index, offset) in [2, 1].enumerated() {
+        stackBackplates.removeAll()
+        for offset in [2, 1] {
             let view = NSView(frame: NSRect(x: 7 + CGFloat(offset) * 3,
                                            y: 6 + CGFloat(offset) * 3,
                                            width: 64,
                                            height: 50))
             view.wantsLayer = true
             view.layer?.cornerRadius = 8
-            view.layer?.backgroundColor = NSColor.white.withAlphaComponent(index == 0 ? 0.035 : 0.055).cgColor
             view.layer?.borderWidth = 1
-            view.layer?.borderColor = NSColor.white.withAlphaComponent(0.05).cgColor
+            stackBackplates.append(view)
             addSubview(view)
+        }
+    }
+
+    private func updateLayerColors() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            iconWell?.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.06).cgColor
+            batchBadge?.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+            for (index, view) in stackBackplates.enumerated() {
+                view.layer?.backgroundColor = NSColor.labelColor
+                    .withAlphaComponent(index == 0 ? 0.035 : 0.055)
+                    .cgColor
+                view.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.08).cgColor
+            }
         }
     }
 

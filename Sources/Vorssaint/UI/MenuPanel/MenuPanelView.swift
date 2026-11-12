@@ -3026,6 +3026,7 @@ struct KeepAwakeCard: View {
             }
         }
         .font(.system(size: 11))
+        .monospacedDigit()
         .foregroundStyle(.secondary)
     }
 

@@ -322,7 +322,7 @@ struct CleanerView: View {
         }
         .padding(11)
         .frame(maxWidth: 380)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
     }
 
     // MARK: WhatsApp downloads (panel surface)
@@ -342,7 +342,7 @@ struct CleanerView: View {
         }
         .padding(11)
         .frame(maxWidth: 380, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
     }
 
     /// Collapsed summary: Off until the automation is armed, then the next
@@ -382,6 +382,7 @@ struct CleanerView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Color.primary.opacity(whatsAppHovered ? 0.05 : 0))
+                        .padding(2)
                 )
                 .contentShape(Rectangle())
             }
@@ -424,7 +425,7 @@ struct CleanerView: View {
             }
         }
         .frame(maxWidth: 380)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
     }
 
     // MARK: Automatic cleanup
@@ -536,6 +537,7 @@ struct CleanerView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(Color.primary.opacity(scheduleHovered ? 0.05 : 0))
+                            .padding(2)
                     )
                     .contentShape(Rectangle())
                 }
@@ -557,7 +559,7 @@ struct CleanerView: View {
                 }
             }
             .frame(maxWidth: 380)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.05)))
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
             .modifier(ScheduleChangeSync(notify: $scheduleNotify,
                                          frequency: $scheduleFrequencyRaw,
                                          hour: $scheduleHour,
@@ -586,7 +588,7 @@ struct CleanerView: View {
         }
         .padding(11)
         .frame(maxWidth: 380)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
         .modifier(ScheduleChangeSync(notify: $scheduleNotify,
                                      frequency: $scheduleFrequencyRaw,
                                      hour: $scheduleHour,
@@ -817,7 +819,7 @@ struct CleanerView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(l10n.s.cleanerName).font(.system(size: 15, weight: .semibold))
                 Text("\(Self.byteString(cleaner.totalSize)) \(l10n.s.uninstallerFoundTitle)")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
             Spacer()
             PanelCloseButton(label: l10n.s.uninstallerCancel) { cleaner.reset() }
@@ -909,6 +911,7 @@ struct CleanerView: View {
             Text(String(format: l10n.s.uninstallerSelectedFormat,
                         cleaner.selectedCount, cleaner.items.count))
                 .font(.system(size: 12))
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
             Spacer()
             Button(l10n.s.uninstallerCancel) { cleaner.reset() }
@@ -916,6 +919,7 @@ struct CleanerView: View {
                           Self.byteString(cleaner.selectedSize))) {
                 cleaner.cleanSelected(escalate: true)
             }
+            .monospacedDigit()
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(cleaner.selectedCount == 0)
@@ -933,7 +937,7 @@ struct CleanerView: View {
                 .foregroundStyle(.green)
             Text(l10n.s.uninstallerDoneTitle).font(.system(size: compact ? 17 : 20, weight: .bold))
             Text(String(format: l10n.s.uninstallerFreedFormat, Self.byteString(freed)))
-                .font(.system(size: 13)).foregroundStyle(.secondary)
+                .font(.system(size: 13)).monospacedDigit().foregroundStyle(.secondary)
             Text(l10n.s.cleanerDoneNote)
                 .font(.caption).foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

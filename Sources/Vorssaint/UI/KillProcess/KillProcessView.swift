@@ -80,9 +80,12 @@ struct KillProcessView: View {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .frame(minWidth: 22, minHeight: 22)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help(strings.refreshTooltip)
+                .accessibilityLabel(strings.refreshTooltip)
             }
 
             HStack(spacing: 18) {
@@ -322,7 +325,9 @@ private struct KillProcessRowView: View {
             Button(strings.killButton) {
                 onPendingAction(.kill(entry, force: false))
             }
-            .frame(minWidth: 44)
+            .frame(minWidth: 44, minHeight: 22)
+            .contentShape(Rectangle())
+            .accessibilityLabel(strings.killButton)
             .disabled(entry.isProtected)
             .opacity(isHovered ? 1 : 0)
             .allowsHitTesting(isHovered)
@@ -330,10 +335,14 @@ private struct KillProcessRowView: View {
                 rowActions
             } label: {
                 Image(systemName: "ellipsis")
+                    .frame(minWidth: 22, minHeight: 22)
+                    .contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .frame(minWidth: 44)
+            .frame(minWidth: 44, minHeight: 22)
+            .contentShape(Rectangle())
+            .accessibilityLabel(FeatureStrings.recorder(L10n.shared.language).moreOptions)
             .opacity(isHovered ? 1 : 0)
             .allowsHitTesting(isHovered)
         }

@@ -10,6 +10,7 @@ struct ScreenshotEditorView: View {
     @ObservedObject var model: ScreenshotEditorModel
     let controller: ScreenshotEditorController
     @ObservedObject private var l10n = L10n.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var keyboard = ScreenshotShortcutContext()
 
     @State private var editingText = ""
@@ -871,23 +872,29 @@ struct ScreenshotEditorView: View {
             } label: {
                 Image(systemName: "arrow.uturn.backward")
                     .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .disabled(!model.canUndo)
+            .screenshotSafeHelp(l10n.s.menuUndo + "  (⌘Z)")
+            .accessibilityLabel(l10n.s.menuUndo)
             Button {
                 commitEditingTextIfNeeded()
                 model.redo()
             } label: {
                 Image(systemName: "arrow.uturn.forward")
                     .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .disabled(!model.canRedo)
+            .screenshotSafeHelp(l10n.s.menuRedo + "  (⇧⌘Z)")
+            .accessibilityLabel(l10n.s.menuRedo)
 
             if model.qrReading != nil {
                 Divider().frame(height: 16).padding(.horizontal, 3)
                 qrControl
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.95).combined(with: .opacity))
             }
 
             Divider().frame(height: 16).padding(.horizontal, 3)
@@ -1819,6 +1826,7 @@ private struct ScreenshotEditorSharedLinkView: View {
         }
         .padding(20)
         .frame(width: 480)
+        .onExitCommand(perform: close)
         .alert(strings.deleteFailedHUD, isPresented: $showingDeleteError) {
             Button(strings.done, role: .cancel) {}
         }

@@ -389,8 +389,9 @@ struct RecorderEditorView: View {
             Text(title)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .frame(width: 64, alignment: .trailing)
+                .frame(width: 80, alignment: .trailing)
                 .lineLimit(1)
+                .minimumScaleFactor(0.88)
             content()
         }
     }
@@ -650,6 +651,7 @@ private struct RecorderSharedLinkView: View {
         }
         .padding(20)
         .frame(width: 480)
+        .onExitCommand(perform: close)
         .alert(strings.deleteFailedHUD, isPresented: $showingDeleteError) {
             Button(strings.done, role: .cancel) {}
         }

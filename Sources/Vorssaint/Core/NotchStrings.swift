@@ -96,6 +96,15 @@ struct NotchStrings {
     let translucentBackground: String
     let translucentBackgroundHint: String
     let translucentBackgroundGlassHint: String
+    let privacyCameraFallback: String
+    let privacyCameraActive: String
+    let privacyCameraStatusFormat: String
+    let privacyMicrophoneFallback: String
+    let privacyMicrophoneMutedFormat: String
+    let privacyMicrophoneActiveFormat: String
+    let privacyMicrophoneActionFormat: String
+    let privacyMuteMicrophone: String
+    let privacyUnmuteMicrophone: String
 }
 
 extension FeatureStrings {
@@ -213,7 +222,16 @@ extension NotchStrings {
         quickAccessRight: "Right",
         translucentBackground: "Translucent background",
         translucentBackgroundHint: "When open, Dynamic Island blurs what is behind it with the system’s own material.",
-        translucentBackgroundGlassHint: "Liquid Glass is on, so Dynamic Island uses it instead."
+        translucentBackgroundGlassHint: "Liquid Glass is on, so Dynamic Island uses it instead.",
+        privacyCameraFallback: "Camera",
+        privacyCameraActive: "Active",
+        privacyCameraStatusFormat: "Camera: %@",
+        privacyMicrophoneFallback: "Microphone",
+        privacyMicrophoneMutedFormat: "Microphone: %@ (muted, click to unmute)",
+        privacyMicrophoneActiveFormat: "Microphone: %@ (active, click to mute)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Mute microphone",
+        privacyUnmuteMicrophone: "Unmute microphone"
     )
 
     static let ptBR = NotchStrings(
@@ -308,7 +326,16 @@ extension NotchStrings {
         quickAccessRight: "Direito",
         translucentBackground: "Fundo translúcido",
         translucentBackgroundHint: "Quando aberta, a Dynamic Island desfoca o que está atrás dela com o material do próprio sistema.",
-        translucentBackgroundGlassHint: "O Liquid Glass está ativado, então a Dynamic Island o usa no lugar."
+        translucentBackgroundGlassHint: "O Liquid Glass está ativado, então a Dynamic Island o usa no lugar.",
+        privacyCameraFallback: "Câmera",
+        privacyCameraActive: "Ativa",
+        privacyCameraStatusFormat: "Câmera: %@",
+        privacyMicrophoneFallback: "Microfone",
+        privacyMicrophoneMutedFormat: "Microfone: %@ (silenciado, clique para ativar)",
+        privacyMicrophoneActiveFormat: "Microfone: %@ (ativo, clique para silenciar)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Silenciar microfone",
+        privacyUnmuteMicrophone: "Ativar microfone"
     )
 
     static let es = NotchStrings(
@@ -403,7 +430,16 @@ extension NotchStrings {
         quickAccessRight: "Derecho",
         translucentBackground: "Fondo translúcido",
         translucentBackgroundHint: "Al abrirse, Dynamic Island desenfoca lo que hay detrás con el material del propio sistema.",
-        translucentBackgroundGlassHint: "Liquid Glass está activado, así que Dynamic Island lo usa en su lugar."
+        translucentBackgroundGlassHint: "Liquid Glass está activado, así que Dynamic Island lo usa en su lugar.",
+        privacyCameraFallback: "Cámara",
+        privacyCameraActive: "Activa",
+        privacyCameraStatusFormat: "Cámara: %@",
+        privacyMicrophoneFallback: "Micrófono",
+        privacyMicrophoneMutedFormat: "Micrófono: %@ (silenciado, haz clic para activar)",
+        privacyMicrophoneActiveFormat: "Micrófono: %@ (activo, haz clic para silenciar)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Silenciar micrófono",
+        privacyUnmuteMicrophone: "Activar micrófono"
     )
 
     static let sk = NotchStrings(
@@ -498,7 +534,16 @@ extension NotchStrings {
         quickAccessRight: "Vpravo",
         translucentBackground: "Priesvitné pozadie",
         translucentBackgroundHint: "Otvorený Dynamic Island rozmazáva obsah za sebou pomocou systémového materiálu.",
-        translucentBackgroundGlassHint: "Liquid Glass je zapnuté, preto ho Dynamic Island používa namiesto systémového materiálu."
+        translucentBackgroundGlassHint: "Liquid Glass je zapnuté, preto ho Dynamic Island používa namiesto systémového materiálu.",
+        privacyCameraFallback: "Kamera",
+        privacyCameraActive: "Aktívna",
+        privacyCameraStatusFormat: "Kamera: %@",
+        privacyMicrophoneFallback: "Mikrofón",
+        privacyMicrophoneMutedFormat: "Mikrofón: %@ (stlmený, kliknutím zapnete)",
+        privacyMicrophoneActiveFormat: "Mikrofón: %@ (aktívny, kliknutím stlmíte)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Stlmiť mikrofón",
+        privacyUnmuteMicrophone: "Zapnúť mikrofón"
     )
 
     static let de = NotchStrings(
@@ -593,7 +638,16 @@ extension NotchStrings {
         quickAccessRight: "Rechts",
         translucentBackground: "Durchscheinender Hintergrund",
         translucentBackgroundHint: "Geöffnet zeichnet Dynamic Island den Hintergrund mit dem Material des Systems unscharf.",
-        translucentBackgroundGlassHint: "Liquid Glass ist aktiv, daher verwendet Dynamic Island stattdessen Liquid Glass."
+        translucentBackgroundGlassHint: "Liquid Glass ist aktiv, daher verwendet Dynamic Island stattdessen Liquid Glass.",
+        privacyCameraFallback: "Kamera",
+        privacyCameraActive: "Aktiv",
+        privacyCameraStatusFormat: "Kamera: %@",
+        privacyMicrophoneFallback: "Mikrofon",
+        privacyMicrophoneMutedFormat: "Mikrofon: %@ (stumm, zum Aktivieren klicken)",
+        privacyMicrophoneActiveFormat: "Mikrofon: %@ (aktiv, zum Stummschalten klicken)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Mikrofon stummschalten",
+        privacyUnmuteMicrophone: "Mikrofon aktivieren"
     )
 
     static let fr = NotchStrings(
@@ -688,7 +742,16 @@ extension NotchStrings {
         quickAccessRight: "Droite",
         translucentBackground: "Fond translucide",
         translucentBackgroundHint: "Ouverte, Dynamic Island floute ce qui se trouve derrière avec le matériau du système.",
-        translucentBackgroundGlassHint: "Liquid Glass est activé, Dynamic Island l’utilise donc à la place."
+        translucentBackgroundGlassHint: "Liquid Glass est activé, Dynamic Island l’utilise donc à la place.",
+        privacyCameraFallback: "Caméra",
+        privacyCameraActive: "Active",
+        privacyCameraStatusFormat: "Caméra\u{00A0}: %@",
+        privacyMicrophoneFallback: "Microphone",
+        privacyMicrophoneMutedFormat: "Microphone\u{00A0}: %@ (coupé, cliquer pour réactiver)",
+        privacyMicrophoneActiveFormat: "Microphone\u{00A0}: %@ (actif, cliquer pour couper)",
+        privacyMicrophoneActionFormat: "%@\u{00A0}: %@",
+        privacyMuteMicrophone: "Couper le microphone",
+        privacyUnmuteMicrophone: "Réactiver le microphone"
     )
 
     static let it = NotchStrings(
@@ -783,7 +846,16 @@ extension NotchStrings {
         quickAccessRight: "Destra",
         translucentBackground: "Sfondo traslucido",
         translucentBackgroundHint: "Quando è aperta, Dynamic Island sfoca ciò che si trova dietro con il materiale del sistema.",
-        translucentBackgroundGlassHint: "Liquid Glass è attivo, quindi Dynamic Island usa quello."
+        translucentBackgroundGlassHint: "Liquid Glass è attivo, quindi Dynamic Island usa quello.",
+        privacyCameraFallback: "Fotocamera",
+        privacyCameraActive: "Attiva",
+        privacyCameraStatusFormat: "Fotocamera: %@",
+        privacyMicrophoneFallback: "Microfono",
+        privacyMicrophoneMutedFormat: "Microfono: %@ (disattivato, fai clic per riattivare)",
+        privacyMicrophoneActiveFormat: "Microfono: %@ (attivo, fai clic per disattivare)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Disattiva microfono",
+        privacyUnmuteMicrophone: "Riattiva microfono"
     )
 
     static let ru = NotchStrings(
@@ -878,7 +950,16 @@ extension NotchStrings {
         quickAccessRight: "Справа",
         translucentBackground: "Полупрозрачный фон",
         translucentBackgroundHint: "Открытый Dynamic Island размывает то, что под ним, системным материалом.",
-        translucentBackgroundGlassHint: "Включено Liquid Glass, поэтому Dynamic Island использует его."
+        translucentBackgroundGlassHint: "Включено Liquid Glass, поэтому Dynamic Island использует его.",
+        privacyCameraFallback: "Камера",
+        privacyCameraActive: "Активна",
+        privacyCameraStatusFormat: "Камера: %@",
+        privacyMicrophoneFallback: "Микрофон",
+        privacyMicrophoneMutedFormat: "Микрофон: %@ (заглушен, нажмите для включения)",
+        privacyMicrophoneActiveFormat: "Микрофон: %@ (активен, нажмите для отключения)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Заглушить микрофон",
+        privacyUnmuteMicrophone: "Включить микрофон"
     )
 
     static let tr = NotchStrings(
@@ -973,7 +1054,16 @@ extension NotchStrings {
         quickAccessRight: "Sağ",
         translucentBackground: "Yarı saydam arka plan",
         translucentBackgroundHint: "Dynamic Island açıkken arkasındakini sistemin kendi malzemesiyle bulanıklaştırır.",
-        translucentBackgroundGlassHint: "Liquid Glass açık olduğundan Dynamic Island onu kullanır."
+        translucentBackgroundGlassHint: "Liquid Glass açık olduğundan Dynamic Island onu kullanır.",
+        privacyCameraFallback: "Kamera",
+        privacyCameraActive: "Etkin",
+        privacyCameraStatusFormat: "Kamera: %@",
+        privacyMicrophoneFallback: "Mikrofon",
+        privacyMicrophoneMutedFormat: "Mikrofon: %@ (sessiz, sesi açmak için tıklayın)",
+        privacyMicrophoneActiveFormat: "Mikrofon: %@ (etkin, sessize almak için tıklayın)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Mikrofonu sessize al",
+        privacyUnmuteMicrophone: "Mikrofonun sesini aç"
     )
 
     static let ja = NotchStrings(
@@ -1068,7 +1158,16 @@ extension NotchStrings {
         quickAccessRight: "右",
         translucentBackground: "半透明の背景",
         translucentBackgroundHint: "開いた Dynamic Island の背後をシステムの素材でぼかします。",
-        translucentBackgroundGlassHint: "Liquid Glass がオンのため、Dynamic Island はそちらを使います。"
+        translucentBackgroundGlassHint: "Liquid Glass がオンのため、Dynamic Island はそちらを使います。",
+        privacyCameraFallback: "カメラ",
+        privacyCameraActive: "使用中",
+        privacyCameraStatusFormat: "カメラ: %@",
+        privacyMicrophoneFallback: "マイク",
+        privacyMicrophoneMutedFormat: "マイク: %@（消音中、クリックして解除）",
+        privacyMicrophoneActiveFormat: "マイク: %@（使用中、クリックして消音）",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "マイクを消音",
+        privacyUnmuteMicrophone: "マイクの消音を解除"
     )
 
     static let ko = NotchStrings(
@@ -1163,7 +1262,16 @@ extension NotchStrings {
         quickAccessRight: "오른쪽",
         translucentBackground: "반투명 배경",
         translucentBackgroundHint: "열린 Dynamic Island가 시스템 재질로 뒤쪽을 흐리게 표시합니다.",
-        translucentBackgroundGlassHint: "Liquid Glass가 켜져 있어 Dynamic Island가 대신 사용합니다."
+        translucentBackgroundGlassHint: "Liquid Glass가 켜져 있어 Dynamic Island가 대신 사용합니다.",
+        privacyCameraFallback: "카메라",
+        privacyCameraActive: "사용 중",
+        privacyCameraStatusFormat: "카메라: %@",
+        privacyMicrophoneFallback: "마이크",
+        privacyMicrophoneMutedFormat: "마이크: %@(음소거됨, 클릭하여 켜기)",
+        privacyMicrophoneActiveFormat: "마이크: %@(사용 중, 클릭하여 음소거)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "마이크 음소거",
+        privacyUnmuteMicrophone: "마이크 음소거 해제"
     )
 
     static let zhHans = NotchStrings(
@@ -1258,7 +1366,16 @@ extension NotchStrings {
         quickAccessRight: "右侧",
         translucentBackground: "半透明背景",
         translucentBackgroundHint: "展开的 Dynamic Island 会用系统材质模糊其背后的内容。",
-        translucentBackgroundGlassHint: "Liquid Glass 已开启，Dynamic Island 将改用 Liquid Glass。"
+        translucentBackgroundGlassHint: "Liquid Glass 已开启，Dynamic Island 将改用 Liquid Glass。",
+        privacyCameraFallback: "相机",
+        privacyCameraActive: "使用中",
+        privacyCameraStatusFormat: "相机：%@",
+        privacyMicrophoneFallback: "麦克风",
+        privacyMicrophoneMutedFormat: "麦克风：%@（已静音，点击以取消静音）",
+        privacyMicrophoneActiveFormat: "麦克风：%@（使用中，点击以静音）",
+        privacyMicrophoneActionFormat: "%@：%@",
+        privacyMuteMicrophone: "将麦克风静音",
+        privacyUnmuteMicrophone: "取消麦克风静音"
     )
 
     static let zhTW = NotchStrings(
@@ -1353,7 +1470,16 @@ extension NotchStrings {
         quickAccessRight: "右側",
         translucentBackground: "半透明背景",
         translucentBackgroundHint: "展開的 Dynamic Island 會以系統材質模糊背後的內容。",
-        translucentBackgroundGlassHint: "Liquid Glass 已開啟，Dynamic Island 會改用 Liquid Glass。"
+        translucentBackgroundGlassHint: "Liquid Glass 已開啟，Dynamic Island 會改用 Liquid Glass。",
+        privacyCameraFallback: "相機",
+        privacyCameraActive: "使用中",
+        privacyCameraStatusFormat: "相機：%@",
+        privacyMicrophoneFallback: "麥克風",
+        privacyMicrophoneMutedFormat: "麥克風：%@（已靜音，點一下以取消靜音）",
+        privacyMicrophoneActiveFormat: "麥克風：%@（使用中，點一下以靜音）",
+        privacyMicrophoneActionFormat: "%@：%@",
+        privacyMuteMicrophone: "將麥克風靜音",
+        privacyUnmuteMicrophone: "取消麥克風靜音"
     )
 
     static let zhHK = NotchStrings(
@@ -1448,7 +1574,16 @@ extension NotchStrings {
         quickAccessRight: "右側",
         translucentBackground: "半透明背景",
         translucentBackgroundHint: "展開的 Dynamic Island 會以系統材質模糊背後的內容。",
-        translucentBackgroundGlassHint: "Liquid Glass 已開啟，Dynamic Island 會改用 Liquid Glass。"
+        translucentBackgroundGlassHint: "Liquid Glass 已開啟，Dynamic Island 會改用 Liquid Glass。",
+        privacyCameraFallback: "鏡頭",
+        privacyCameraActive: "使用中",
+        privacyCameraStatusFormat: "鏡頭：%@",
+        privacyMicrophoneFallback: "咪高風",
+        privacyMicrophoneMutedFormat: "咪高風：%@（已靜音，撳一下以取消靜音）",
+        privacyMicrophoneActiveFormat: "咪高風：%@（使用中，撳一下以靜音）",
+        privacyMicrophoneActionFormat: "%@：%@",
+        privacyMuteMicrophone: "將咪高風靜音",
+        privacyUnmuteMicrophone: "取消咪高風靜音"
     )
 
     static let uk = NotchStrings(
@@ -1543,7 +1678,16 @@ extension NotchStrings {
         quickAccessRight: "Праворуч",
         translucentBackground: "Напівпрозоре тло",
         translucentBackgroundHint: "Відкритий Dynamic Island розмиває вміст позаду за допомогою системного матеріалу.",
-        translucentBackgroundGlassHint: "Liquid Glass увімкнено, тому Dynamic Island використовує його."
+        translucentBackgroundGlassHint: "Liquid Glass увімкнено, тому Dynamic Island використовує його.",
+        privacyCameraFallback: "Камера",
+        privacyCameraActive: "Активна",
+        privacyCameraStatusFormat: "Камера: %@",
+        privacyMicrophoneFallback: "Мікрофон",
+        privacyMicrophoneMutedFormat: "Мікрофон: %@ (вимкнено звук, натисніть, щоб увімкнути)",
+        privacyMicrophoneActiveFormat: "Мікрофон: %@ (активний, натисніть, щоб вимкнути звук)",
+        privacyMicrophoneActionFormat: "%@: %@",
+        privacyMuteMicrophone: "Вимкнути звук мікрофона",
+        privacyUnmuteMicrophone: "Увімкнути звук мікрофона"
     )
 
 }

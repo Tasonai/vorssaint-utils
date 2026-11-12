@@ -648,7 +648,7 @@ extension RecorderFeatureStrings {
         pointerSmoothingCinematic: "Как в кино",
         pointerSizeLabel: "Размер",
         clickRingToggle: "Отмечать нажатия",
-        zoomSectionLabel: "Увеличение",
+        zoomSectionLabel: "Масштаб",
         zoomToggle: "Приближать при каждом нажатии",
         zoomAmountLabel: "Насколько близко",
         backgroundSectionLabel: "Фон",

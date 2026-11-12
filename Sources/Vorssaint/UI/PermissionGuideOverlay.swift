@@ -160,10 +160,13 @@ private struct PermissionGuideCard: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 14))
                         .foregroundStyle(isCloseHovered ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                        .frame(minWidth: 22, minHeight: 22)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .onHover { isCloseHovered = $0 }
                 .help(guide.closeHelp)
+                .accessibilityLabel(guide.closeHelp)
             }
 
             VStack(alignment: .leading, spacing: 6) {

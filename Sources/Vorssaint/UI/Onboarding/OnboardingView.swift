@@ -241,6 +241,7 @@ private struct PurposeStep: View {
                 Text(String(format: hub.activeCountFormat,
                             selectedFeatures.count, FeatureRuntime.shared.installableCount))
                     .font(.caption)
+                    .monospacedDigit()
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 28)

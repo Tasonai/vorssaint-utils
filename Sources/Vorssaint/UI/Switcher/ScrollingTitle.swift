@@ -47,8 +47,16 @@ struct ScrollingTitle: View {
                 scrollingLine
             } else {
                 Text(text)
+                    .font(.system(size: Self.size, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .hidden()
+                    .overlay(alignment: alignment) {
+                        Text(text)
+                            .font(.system(size: Self.size, weight: weight))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
             }
         }
         .font(.system(size: Self.size, weight: weight))

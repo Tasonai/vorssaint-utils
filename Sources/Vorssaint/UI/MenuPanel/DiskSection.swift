@@ -577,6 +577,7 @@ private struct DiskSelectorEjectButton: View {
 
 private struct DiskUsageBar: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let fraction: Double
 
     var body: some View {
@@ -586,7 +587,7 @@ private struct DiskUsageBar: View {
                 Capsule()
                     .fill(color)
                     .frame(width: max(3, proxy.size.width * min(1, max(0, fraction))))
-                    .animation(.easeOut(duration: 0.4), value: fraction)
+                    .animation(reduceMotion ? nil : .spring(duration: 0.24, bounce: 0.08), value: fraction)
             }
         }
         .frame(height: 6)

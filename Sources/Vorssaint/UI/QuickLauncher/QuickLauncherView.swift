@@ -266,11 +266,11 @@ struct QuickLauncherView: View {
         } label: {
             VStack(spacing: notchSize == nil ? 7 : 6) {
                 ZStack(alignment: .topTrailing) {
-                    RoundedRectangle(cornerRadius: notchSize == nil ? 12 : 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: notchSize == nil ? 11 : 9, style: .continuous)
                         .fill(iconBackground(item, isSelected: isSelected, isHovered: isHovered))
                         .frame(width: notchSize == nil ? 46 : 32, height: notchSize == nil ? 46 : 32)
                         .overlay {
-                            RoundedRectangle(cornerRadius: notchSize == nil ? 12 : 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: notchSize == nil ? 11 : 9, style: .continuous)
                                 .strokeBorder(
                                     LinearGradient(
                                         colors: [.white.opacity(0.16), .white.opacity(0.04)],
@@ -341,18 +341,18 @@ struct QuickLauncherView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, notchSize == nil ? 9 : 4)
             .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                RoundedRectangle(cornerRadius: notchSize == nil ? 16 : 13, style: .continuous)
                     .fill(notchSize != nil ? .clear : isSelected ? Color.accentColor.opacity(0.14)
                           : isHovered ? Color.primary.opacity(0.07)
                           : Color.primary.opacity(0.035))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                RoundedRectangle(cornerRadius: notchSize == nil ? 16 : 13, style: .continuous)
                     .strokeBorder(notchSize != nil ? .clear
                                   : isSelected ? Color.accentColor.opacity(0.55) : Color.clear,
                                   lineWidth: 1.2)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: notchSize == nil ? 16 : 13, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title(for: item))
@@ -410,15 +410,15 @@ struct QuickLauncherView: View {
     private var footer: some View {
         HStack(spacing: 5) {
             Image(systemName: "keyboard")
-                .font(.system(size: 8.5))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
             Text(GlobalShortcutRole.quickLauncher.savedShortcut.displayString)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
             Spacer()
             Text("Esc")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
         }
     }
 

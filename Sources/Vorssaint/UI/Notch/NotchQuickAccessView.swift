@@ -41,8 +41,9 @@ final class NotchQuickAccessMotion: ObservableObject {
         generation += 1
         let token = generation
         interactive = false
-        let animation: Animation? = animated
-            ? (visible ? .spring(duration: 0.38, bounce: 0.12).delay(delay) : .easeIn(duration: NotchQuickAccessLayout.withdrawalDuration))
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let animation: Animation? = animated && !reduceMotion
+            ? (visible ? .spring(duration: 0.24, bounce: 0.08).delay(delay) : .easeOut(duration: 0.14))
             : nil
         withAnimation(animation, completionCriteria: .logicallyComplete) {
             progress = visible ? 1 : 0

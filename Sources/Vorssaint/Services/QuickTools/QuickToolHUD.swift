@@ -253,7 +253,7 @@ private struct QuickToolCountdownView: View {
     var body: some View {
         ZStack {
             Circle()
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
             Circle()
                 .trim(from: 0.04, to: 0.04 + progress * 0.92)
                 .stroke(Color.accentColor,

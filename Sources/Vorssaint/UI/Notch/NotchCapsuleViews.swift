@@ -341,7 +341,7 @@ struct NotchCapsuleMusicStrip: View {
                         }
                         .buttonStyle(.plain)
                         .padding(.leading, 3)
-                        .transition(reduceMotion ? .identity : .scale.combined(with: .opacity))
+                        .transition(reduceMotion ? .opacity : .scale(scale: 0.95).combined(with: .opacity))
                     }
                 }
                 .padding(.trailing, CapsuleLayout.endPadding)
@@ -399,7 +399,7 @@ struct NotchCapsuleTimerStrip: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.leading, 3)
-                    .transition(reduceMotion ? .identity : .scale.combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.95).combined(with: .opacity))
                 }
             }
         }

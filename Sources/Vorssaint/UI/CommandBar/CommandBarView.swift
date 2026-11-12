@@ -287,14 +287,14 @@ struct CommandBarView: View {
     private var compactHints: some View {
         HStack(spacing: 4) {
             Text("↓")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
             Text(text.suggestionsLabel)
-                .font(.system(size: 9))
+                .font(.system(size: 10))
             Text("Esc")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .padding(.leading, 4)
         }
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(.secondary)
         .lineLimit(1)
         .fixedSize()
     }
@@ -304,9 +304,9 @@ struct CommandBarView: View {
     private var actionsList: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(text.actionsTitle.uppercased())
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .tracking(0.5)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
                 .padding(.bottom, 2)
@@ -708,7 +708,14 @@ struct CommandBarView: View {
                     .fill(.green)
                     .frame(width: 7, height: 7)
                     // A ring keeps the dot legible on top of a colorful icon.
-                    .overlay(Circle().strokeBorder(Color(nsColor: .windowBackgroundColor), lineWidth: 1.2))
+                    .overlay(
+                        Circle().strokeBorder(
+                            (shownAs != .window || colorScheme == .dark)
+                                ? Color.black.opacity(0.88)
+                                : Color.white.opacity(0.92),
+                            lineWidth: 1.2
+                        )
+                    )
                     .offset(x: 2.5, y: -2.5)
             }
         }
@@ -1038,8 +1045,10 @@ struct CommandBarView: View {
                 Text(String(format: l10n.s.uninstallerSelectedFormat,
                             uninstaller.items.filter(\.include).count, uninstaller.items.count))
                     .font(.system(size: 11, weight: .medium))
+                    .monospacedDigit()
                 Text(Self.uninstallByteString(uninstaller.selectedSize))
                     .font(.system(size: 9.5))
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -1152,39 +1161,39 @@ struct CommandBarView: View {
     private var footer: some View {
         HStack(spacing: 5) {
             Image(systemName: "keyboard")
-                .font(.system(size: 8.5))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
             Text(GlobalShortcut.saved(for: DefaultsKey.commandBarShortcut,
                                       fallback: .commandBarDefault).displayString)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
             Spacer()
             if service.canOpenActions {
                 Text("⌘K")
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
                 Text(text.actionsHint)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
                     .padding(.trailing, 4)
             }
             Text(service.isShowingSuggestions && !service.categoryChips.isEmpty ? "⌃P ⌃N ↑↓ ←→" : "⌃P ⌃N ↑↓")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
             if service.selectedEntry?.id == "math.result" {
                 Text("⇥")
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
                 Text(text.reuseHint)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
             Image(systemName: "return")
-                .font(.system(size: 8))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 9.5))
+                .foregroundStyle(.secondary)
             Text("Esc")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -1279,10 +1288,11 @@ private struct CommandBarMascot: View {
 }
 
 private struct CommandBarClearButton: View {
+    @ObservedObject private var l10n = L10n.shared
     let action: () -> Void
 
     var body: some View {
-        ClearIconButton(label: String(localized: "Clear search", table: "CommandBar"), action: action)
+        ClearIconButton(label: l10n.s.actionClear, action: action)
     }
 }
 
@@ -1301,7 +1311,12 @@ private struct CommandBarCategoryChip: View {
                         .font(.system(size: 8.5, weight: .semibold))
                 }
                 Text(label)
-                    .font(.system(size: 10, weight: isActive ? .semibold : .regular))
+                    .font(.system(size: 10, weight: .semibold))
+                    .hidden()
+                    .overlay {
+                        Text(label)
+                            .font(.system(size: 10, weight: isActive ? .semibold : .regular))
+                    }
             }
             .foregroundStyle(isActive ? Color.accentColor : (isHovered ? Color.primary : Color.secondary))
             .padding(.horizontal, 7)

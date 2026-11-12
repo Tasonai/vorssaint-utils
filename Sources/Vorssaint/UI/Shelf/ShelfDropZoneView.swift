@@ -37,42 +37,48 @@ private struct ShelfPill: View {
     @EnvironmentObject private var shelf: ShelfService
     @ObservedObject private var l10n = L10n.shared
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var targeted: Bool { shelf.dropTargeted }
     @State private var hovered = false
 
 
     var body: some View {
-        HStack(spacing: 7) {
-            leadingGlyph
-            if shelf.itemCount > 0 {
-                Text("\(shelf.itemCount)")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.primary)
+        Button {
+            shelf.expandDocked()
+        } label: {
+            HStack(spacing: 7) {
+                leadingGlyph
+                if shelf.itemCount > 0 {
+                    Text("\(shelf.itemCount)")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .opacity(hovered || targeted ? 1 : 0.55)
             }
-            Image(systemName: "chevron.down")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.secondary)
-                .opacity(hovered || targeted ? 1 : 0.55)
+            .padding(.horizontal, shelf.itemCount > 0 ? 12 : 11)
+            .padding(.vertical, 8)
+            .background(HUDBackdrop(cornerRadius: 13))
+            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(targeted ? Color.accentColor : Color.primary.opacity(hovered ? 0.22 : 0.12),
+                                  lineWidth: targeted ? 2 : 1)
+            )
+            .scaleEffect(targeted && !reduceMotion ? 1.06 : 1)
+            .shadow(color: targeted ? Color.accentColor.opacity(0.32) : Color.black.opacity(0.16),
+                    radius: targeted ? 12 : 7, x: 0, y: 3)
+            .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
-        .padding(.horizontal, shelf.itemCount > 0 ? 12 : 11)
-        .padding(.vertical, 8)
-        .background(HUDBackdrop(cornerRadius: 13))
-        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(targeted ? Color.accentColor : Color.primary.opacity(hovered ? 0.22 : 0.12),
-                              lineWidth: targeted ? 2 : 1)
-        )
-        .scaleEffect(targeted ? 1.06 : 1)
-        .shadow(color: targeted ? Color.accentColor.opacity(0.32) : Color.black.opacity(0.16),
-                radius: targeted ? 12 : 7, x: 0, y: 3)
-        .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .buttonStyle(.plain)
         .onHover { hovered = $0 }
-        .onTapGesture { shelf.expandDocked() }
         .help(l10n.s.shelfOpenNow)
-        .animation(.easeOut(duration: 0.13), value: targeted)
-        .animation(.easeOut(duration: 0.15), value: shelf.dockedJustCaught)
+        .accessibilityLabel(l10n.s.shelfOpenNow)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.13), value: targeted)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: shelf.dockedJustCaught)
         .padding(8)
 
     }
@@ -85,7 +91,7 @@ private struct ShelfPill: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.green)
-                .transition(.scale.combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .scale(scale: 0.95).combined(with: .opacity))
         } else {
             BrandMark(width: 15, tint: colorScheme == .light ? Color(white: 0.16) : .white)
                 .opacity(0.85)

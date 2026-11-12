@@ -8,57 +8,81 @@ import SwiftUI
 /// camera or microphone are in active use by any application.
 struct NotchPrivacyDots: View {
     @ObservedObject private var monitor = CameraMicrophonePrivacyMonitor.shared
+    @ObservedObject private var l10n = L10n.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var text: NotchStrings { FeatureStrings.notch(l10n.language) }
+
+    private var itemTransition: AnyTransition {
+        reduceMotion ? .opacity : .scale(scale: 0.95).combined(with: .opacity)
+    }
 
     var body: some View {
         if monitor.isAnyActive {
-            HStack(spacing: 3) {
-                if monitor.isCameraActive {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6.5, height: 6.5)
-                        .shadow(color: Color.green.opacity(0.8), radius: 2.5)
-                        .transition(.scale.combined(with: .opacity))
-                }
+            Group {
                 if monitor.isMicrophoneActive {
-                    ZStack {
-                        Circle()
-                            .fill(monitor.isMicrophoneMuted ? Color.orange.opacity(0.4) : Color.orange)
-                            .frame(width: 6.5, height: 6.5)
-                            .shadow(color: monitor.isMicrophoneMuted ? Color.clear : Color.orange.opacity(0.8), radius: 2.5)
-                        if monitor.isMicrophoneMuted {
-                            Image(systemName: "line.diagonal")
-                                .font(.system(size: 7, weight: .bold))
-                                .foregroundStyle(.white)
-                        }
+                    Button {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+                        monitor.toggleMicrophoneMute()
+                    } label: {
+                        dotsRow
+                            .frame(minWidth: 22, minHeight: 22)
+                            .contentShape(Rectangle())
                     }
-                    .transition(.scale.combined(with: .opacity))
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if monitor.isMicrophoneActive {
-                    NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
-                    monitor.toggleMicrophoneMute()
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tooltipText)
+                    .accessibilityAddTraits(monitor.isMicrophoneMuted ? .isSelected : [])
+                } else {
+                    dotsRow
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(tooltipText)
                 }
             }
             .help(tooltipText)
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: monitor.isCameraActive)
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: monitor.isMicrophoneActive)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: monitor.isMicrophoneMuted)
+            .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.08), value: monitor.isCameraActive)
+            .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.08), value: monitor.isMicrophoneActive)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: monitor.isMicrophoneMuted)
+        }
+    }
+
+    private var dotsRow: some View {
+        HStack(spacing: 3) {
+            if monitor.isCameraActive {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 6.5, height: 6.5)
+                    .shadow(color: Color.green.opacity(0.8), radius: 2.5)
+                    .transition(itemTransition)
+            }
+            if monitor.isMicrophoneActive {
+                ZStack {
+                    Circle()
+                        .fill(monitor.isMicrophoneMuted ? Color.orange.opacity(0.4) : Color.orange)
+                        .frame(width: 6.5, height: 6.5)
+                        .shadow(color: monitor.isMicrophoneMuted ? Color.clear : Color.orange.opacity(0.8), radius: 2.5)
+                    if monitor.isMicrophoneMuted {
+                        Image(systemName: "line.diagonal")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .transition(itemTransition)
+            }
         }
     }
 
     private var tooltipText: String {
         var items: [String] = []
         if monitor.isCameraActive {
-            let camName = monitor.activeCameraName ?? "Камера"
-            items.append("Камера: \(camName)")
+            let camName = monitor.activeCameraName ?? text.privacyCameraFallback
+            items.append(String(format: text.privacyCameraStatusFormat, camName))
         }
         if monitor.isMicrophoneActive {
-            let micName = monitor.activeMicrophoneName ?? "Микрофон"
-            let state = monitor.isMicrophoneMuted ? " (заглушен, нажмите для включения)" : " (активен, нажмите для отключения)"
-            items.append("Микрофон: \(micName)\(state)")
+            let micName = monitor.activeMicrophoneName ?? text.privacyMicrophoneFallback
+            let format = monitor.isMicrophoneMuted
+                ? text.privacyMicrophoneMutedFormat
+                : text.privacyMicrophoneActiveFormat
+            items.append(String(format: format, micName))
         }
         return items.joined(separator: "\n")
     }
@@ -68,7 +92,10 @@ struct NotchPrivacyDots: View {
 /// Displays camera/microphone indicators with 1-click microphone mute and full device names in tooltip.
 struct NotchPrivacyHeaderBadge: View {
     @ObservedObject private var monitor = CameraMicrophonePrivacyMonitor.shared
+    @ObservedObject private var l10n = L10n.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var text: NotchStrings { FeatureStrings.notch(l10n.language) }
 
     var body: some View {
         if monitor.isAnyActive {
@@ -79,6 +106,10 @@ struct NotchPrivacyHeaderBadge: View {
                         .foregroundStyle(.green)
                         .frame(width: 18, height: 18)
                         .background(Color.green.opacity(0.14), in: Circle())
+                        .accessibilityLabel(
+                            String(format: text.privacyCameraStatusFormat,
+                                   monitor.activeCameraName ?? text.privacyCameraActive)
+                        )
                 }
 
                 if monitor.isMicrophoneActive {
@@ -94,27 +125,32 @@ struct NotchPrivacyHeaderBadge: View {
                                 (monitor.isMicrophoneMuted ? Color.red.opacity(0.16) : Color.orange.opacity(0.14)),
                                 in: Circle()
                             )
+                            .frame(minWidth: 22, minHeight: 22)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(monitor.isMicrophoneMuted ? text.privacyUnmuteMicrophone : text.privacyMuteMicrophone)
+                    .accessibilityAddTraits(monitor.isMicrophoneMuted ? .isSelected : [])
                 }
             }
             .help(tooltipText)
-            .transition(.opacity.combined(with: .scale))
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: monitor.isCameraActive)
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: monitor.isMicrophoneActive)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: monitor.isMicrophoneMuted)
+            .transition(reduceMotion ? .opacity : .scale(scale: 0.95).combined(with: .opacity))
+            .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.08), value: monitor.isCameraActive)
+            .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.08), value: monitor.isMicrophoneActive)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: monitor.isMicrophoneMuted)
         }
     }
 
     private var tooltipText: String {
         var items: [String] = []
         if monitor.isCameraActive {
-            items.append("Камера: \(monitor.activeCameraName ?? "Активна")")
+            items.append(String(format: text.privacyCameraStatusFormat,
+                                monitor.activeCameraName ?? text.privacyCameraActive))
         }
         if monitor.isMicrophoneActive {
-            let micName = monitor.activeMicrophoneName ?? "Микрофон"
-            let action = monitor.isMicrophoneMuted ? "Включить микрофон" : "Заглушить микрофон"
-            items.append("\(micName) — \(action)")
+            let micName = monitor.activeMicrophoneName ?? text.privacyMicrophoneFallback
+            let action = monitor.isMicrophoneMuted ? text.privacyUnmuteMicrophone : text.privacyMuteMicrophone
+            items.append(String(format: text.privacyMicrophoneActionFormat, micName, action))
         }
         return items.joined(separator: "\n")
     }

@@ -66,6 +66,7 @@ struct UpdateHighlightsView: View {
         .frame(maxWidth: 500)
         .padding(24)
         .frame(width: size.width, height: size.height)
+        .onExitCommand(perform: onFinish)
     }
 }
 
